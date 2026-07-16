@@ -12,7 +12,8 @@ describe('prepareVisionCompatibleMessages', () => {
         comboId: 'combo/agent',
         enabled: true,
         toolMode: 'off',
-        visionMode: 'proxy'
+        visionMode: 'proxy',
+        thinkingMode: 'off'
       },
       messages: [{ role: 1, content: [{ mimeType: 'image/png' }] }],
       summarizeImageInputs
@@ -33,7 +34,8 @@ describe('prepareVisionCompatibleMessages', () => {
         comboId: 'combo/agent-vision',
         enabled: true,
         toolMode: 'off',
-        visionMode: 'native'
+        visionMode: 'native',
+        thinkingMode: 'off'
       },
       messages: [{ role: 1, content: ['Inspect this image', imagePart] }],
       summarizeImageInputs
@@ -52,7 +54,8 @@ describe('prepareVisionCompatibleMessages', () => {
         comboId: 'combo/daily',
         enabled: true,
         toolMode: 'off',
-        visionMode: 'off'
+        visionMode: 'off',
+        thinkingMode: 'off'
       },
       messages: [{ role: 1, content: [{ mimeType: 'image/png' }] }]
     });

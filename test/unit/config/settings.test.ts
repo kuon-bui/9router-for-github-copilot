@@ -49,6 +49,40 @@ describe('loadDisplayModelSettings', () => {
     ]);
   });
 
+  it('loads a thinking mode for each curated display model', () => {
+    const configuration = {
+      get: (key: string) => {
+        if (key === 'displayModels') {
+          return ['daily', 'agent'];
+        }
+
+        if (key === 'modelMappings.daily') {
+          return 'combo/daily';
+        }
+
+        if (key === 'modelMappings.agent') {
+          return 'combo/agent';
+        }
+
+        if (key === 'thinkingMode.agent') {
+          return 'high';
+        }
+
+        return undefined;
+      }
+    };
+
+    expect(
+      loadDisplayModelSettings(configuration as never).map(({ key, thinkingMode }) => ({
+        key,
+        thinkingMode
+      }))
+    ).toEqual([
+      { key: 'daily', thinkingMode: 'off' },
+      { key: 'agent', thinkingMode: 'high' }
+    ]);
+  });
+
   it('normalizes the router base url to /v1', () => {
     const configuration = {
       get: (key: string) => (key === 'baseUrl' ? 'https://router.example.com' : undefined)
@@ -111,6 +145,72 @@ describe('buildSettingsSnapshot', () => {
     expect(snapshot.publishedModels.map((model) => model.id)).toEqual(['daily']);
     expect(snapshot.rejectedModels).toEqual([
       expect.objectContaining({ key: 'agent', code: 'INVALID_COMBO_MAPPING' })
+    ]);
+  });
+
+  it('degrades only the model with an unsupported thinking mode', () => {
+    const configuration = {
+      get: (key: string) => {
+        if (key === 'displayModels') {
+          return ['daily', 'agent'];
+        }
+
+        if (key === 'modelMappings.daily') {
+          return 'combo/daily';
+        }
+
+        if (key === 'modelMappings.agent') {
+          return 'combo/agent';
+        }
+
+        if (key === 'thinkingMode.agent') {
+          return 'turbo';
+        }
+
+        return undefined;
+      }
+    };
+
+    const snapshot = buildSettingsSnapshot(configuration as never);
+
+    expect(snapshot.state).toBe('degraded');
+    expect(snapshot.publishedModels.map((model) => model.id)).toEqual(['daily']);
+    expect(snapshot.rejectedModels).toEqual([
+      expect.objectContaining({ key: 'agent', code: 'INVALID_THINKING_MODE' })
+    ]);
+    expect(snapshot.issues).toEqual([
+      expect.objectContaining({
+        modelKey: 'agent',
+        code: 'INVALID_THINKING_MODE',
+        message: expect.stringContaining('9router-copilot.thinkingMode.agent')
+      })
+    ]);
+  });
+
+  it('rejects a combo mapping that already contains a thinking suffix', () => {
+    const configuration = {
+      get: (key: string) => {
+        if (key === 'displayModels') {
+          return ['daily'];
+        }
+
+        if (key === 'modelMappings.daily') {
+          return 'combo/daily(high)';
+        }
+
+        return undefined;
+      }
+    };
+
+    const snapshot = buildSettingsSnapshot(configuration as never);
+
+    expect(snapshot.state).toBe('empty');
+    expect(snapshot.rejectedModels).toEqual([
+      expect.objectContaining({
+        key: 'daily',
+        code: 'INVALID_COMBO_MAPPING',
+        message: expect.stringContaining('9router-copilot.thinkingMode.daily')
+      })
     ]);
   });
 

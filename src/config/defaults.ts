@@ -1,4 +1,4 @@
-import type { ProductModelKey } from '../types/product-model';
+import type { ProductModelKey, ThinkingMode } from '../types/product-model';
 
 export const DEFAULT_BASE_URL = 'http://127.0.0.1:3456/v1';
 export const DEFAULT_REQUEST_TIMEOUT_MS = 60_000;
@@ -28,5 +28,11 @@ export const DEFAULT_TOOL_MODES: Record<ProductModelKey, 'auto' | 'off'> = {
 export const DEFAULT_VISION_MODES: Record<ProductModelKey, 'native' | 'proxy' | 'off'> = {
   daily: 'off',
   agent: 'proxy',
+  fallback: 'off'
+};
+
+export const DEFAULT_THINKING_MODES: Record<ProductModelKey, ThinkingMode> = {
+  daily: 'off',
+  agent: 'off',
   fallback: 'off'
 };

@@ -11,7 +11,8 @@ describe('adaptMessagesToRouterRequest', () => {
         comboId: 'combo/daily',
         enabled: true,
         toolMode: 'off',
-        visionMode: 'off'
+        visionMode: 'off',
+        thinkingMode: 'off'
       },
       messages: [{ role: 1, content: 'Say hello' }],
       maxTokens: 256
@@ -33,7 +34,8 @@ describe('adaptMessagesToRouterRequest', () => {
         comboId: '123',
         enabled: true,
         toolMode: 'auto',
-        visionMode: 'off'
+        visionMode: 'off',
+        thinkingMode: 'off'
       },
       messages: [
         {
@@ -86,7 +88,8 @@ describe('adaptMessagesToRouterRequest', () => {
         comboId: '123',
         enabled: true,
         toolMode: 'auto',
-        visionMode: 'off'
+        visionMode: 'off',
+        thinkingMode: 'off'
       },
       messages: [
         {
@@ -158,7 +161,8 @@ describe('adaptMessagesToRouterRequest', () => {
         comboId: '123',
         enabled: true,
         toolMode: 'auto',
-        visionMode: 'off'
+        visionMode: 'off',
+        thinkingMode: 'off'
       },
       messages: [
         {
@@ -184,7 +188,8 @@ describe('adaptMessagesToRouterRequest', () => {
         comboId: '123',
         enabled: true,
         toolMode: 'auto',
-        visionMode: 'off'
+        visionMode: 'off',
+        thinkingMode: 'off'
       },
       messages: [
         {
@@ -210,7 +215,8 @@ describe('adaptMessagesToRouterRequest', () => {
         comboId: '123',
         enabled: true,
         toolMode: 'auto',
-        visionMode: 'off'
+        visionMode: 'off',
+        thinkingMode: 'off'
       },
       messages: [
         {
@@ -238,7 +244,8 @@ describe('adaptMessagesToRouterRequest', () => {
         comboId: '123',
         enabled: true,
         toolMode: 'auto',
-        visionMode: 'off'
+        visionMode: 'off',
+        thinkingMode: 'off'
       },
       messages: [
         {
@@ -268,7 +275,8 @@ describe('adaptMessagesToRouterRequest', () => {
         comboId: '123',
         enabled: true,
         toolMode: 'auto',
-        visionMode: 'off'
+        visionMode: 'off',
+        thinkingMode: 'off'
       },
       messages: [
         {
@@ -308,7 +316,8 @@ describe('adaptMessagesToRouterRequest', () => {
         comboId: '123',
         enabled: true,
         toolMode: 'auto',
-        visionMode: 'off'
+        visionMode: 'off',
+        thinkingMode: 'off'
       },
       messages: [
         {
@@ -352,7 +361,8 @@ describe('adaptMessagesToRouterRequest', () => {
         comboId: 'combo/agent',
         enabled: true,
         toolMode: 'auto',
-        visionMode: 'off'
+        visionMode: 'off',
+        thinkingMode: 'off'
       },
       messages: [{ role: 1, content: 'Use a tool' }],
       tools: [
@@ -388,7 +398,8 @@ describe('adaptMessagesToRouterRequest', () => {
         comboId: 'combo/agent-vision',
         enabled: true,
         toolMode: 'off',
-        visionMode: 'native'
+        visionMode: 'native',
+        thinkingMode: 'off'
       },
       messages: [{ role: 1, content: ['What is in this image?', imagePart] }]
     });

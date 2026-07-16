@@ -14,7 +14,8 @@ describe('shouldExposeTools', () => {
         comboId: 'combo/agent',
         enabled: true,
         toolMode: 'auto',
-        visionMode: 'off'
+        visionMode: 'off',
+        thinkingMode: 'off'
       })
     ).toBe(true);
   });
@@ -85,7 +86,8 @@ describe('adaptToolOptionsForRouter', () => {
         comboId: 'combo/agent',
         enabled: true,
         toolMode: 'auto',
-        visionMode: 'off'
+        visionMode: 'off',
+        thinkingMode: 'off'
       },
       tools: [
         {
@@ -117,7 +119,8 @@ describe('adaptToolOptionsForRouter', () => {
         comboId: 'combo/daily',
         enabled: true,
         toolMode: 'off',
-        visionMode: 'off'
+        visionMode: 'off',
+        thinkingMode: 'off'
       },
       tools: [
         {

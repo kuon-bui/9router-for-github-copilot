@@ -7,14 +7,22 @@ import {
   DEFAULT_MODEL_LABELS,
   DEFAULT_MODEL_MAPPINGS,
   DEFAULT_REQUEST_TIMEOUT_MS,
+  DEFAULT_THINKING_MODES,
   DEFAULT_TOOL_MODES,
   DEFAULT_VISION_MODES
 } from './defaults';
-import { PRODUCT_MODEL_KEYS } from '../types/product-model';
-import type { DisplayModelSetting, ProductModelKey, PublishedModel } from '../types/product-model';
+import { PRODUCT_MODEL_KEYS, THINKING_MODES } from '../types/product-model';
+import type {
+  DisplayModelSetting,
+  ProductModelKey,
+  PublishedModel,
+  ThinkingMode
+} from '../types/product-model';
 
 const SECTION = '9router-copilot';
 const PRODUCT_MODEL_KEY_SET = new Set<ProductModelKey>(PRODUCT_MODEL_KEYS);
+const THINKING_MODE_SET = new Set<string>(THINKING_MODES);
+const THINKING_SUFFIX_PATTERN = new RegExp(`\\((?:${THINKING_MODES.join('|')})\\)$`, 'i');
 
 export interface RuntimeSettings {
   baseUrl: string;
@@ -30,14 +38,15 @@ export interface SettingsIssue {
     | 'INVALID_REQUEST_TIMEOUT'
     | 'INVALID_MAX_TOKENS'
     | 'INVALID_DISPLAY_MODEL_KEY'
-    | 'INVALID_COMBO_MAPPING';
+    | 'INVALID_COMBO_MAPPING'
+    | 'INVALID_THINKING_MODE';
   message: string;
   modelKey?: string;
 }
 
 export interface RejectedModelSetting {
   key: string;
-  code: 'INVALID_COMBO_MAPPING';
+  code: 'INVALID_COMBO_MAPPING' | 'INVALID_THINKING_MODE';
   message: string;
 }
 
@@ -93,19 +102,45 @@ function collectConfiguredDisplayModelKeys(input: unknown): { validKeys: Product
   };
 }
 
+function getConfiguredThinkingMode(
+  configuration: Pick<vscode.WorkspaceConfiguration, 'get'>,
+  key: ProductModelKey
+): unknown {
+  const configured = configuration.get<unknown>(`thinkingMode.${key}`);
+  return configured === undefined ? DEFAULT_THINKING_MODES[key] : configured;
+}
+
+function isThinkingMode(value: unknown): value is ThinkingMode {
+  return typeof value === 'string' && THINKING_MODE_SET.has(value);
+}
+
+function hasThinkingSuffix(comboId: string): boolean {
+  return THINKING_SUFFIX_PATTERN.test(comboId);
+}
+
 export function loadDisplayModelSettings(
   configuration: Pick<vscode.WorkspaceConfiguration, 'get'>
 ): DisplayModelSetting[] {
   const configuredKeys = normalizeDisplayModelKeys(configuration.get<unknown>('displayModels'));
 
-  return configuredKeys.map((key) => ({
-    key,
-    label: configuration.get<string>(`labels.${key}`)?.trim() || DEFAULT_MODEL_LABELS[key],
-    comboId: configuration.get<string>(`modelMappings.${key}`)?.trim() || DEFAULT_MODEL_MAPPINGS[key],
-    enabled: true,
-    toolMode: configuration.get<'auto' | 'off'>(`toolMode.${key}`) ?? DEFAULT_TOOL_MODES[key],
-    visionMode: configuration.get<'native' | 'proxy' | 'off'>(`visionMode.${key}`) ?? DEFAULT_VISION_MODES[key]
-  }));
+  return configuredKeys.map((key) => {
+    const configuredThinkingMode = getConfiguredThinkingMode(configuration, key);
+
+    return {
+      key,
+      label: configuration.get<string>(`labels.${key}`)?.trim() || DEFAULT_MODEL_LABELS[key],
+      comboId:
+        configuration.get<string>(`modelMappings.${key}`)?.trim() || DEFAULT_MODEL_MAPPINGS[key],
+      enabled: true,
+      toolMode: configuration.get<'auto' | 'off'>(`toolMode.${key}`) ?? DEFAULT_TOOL_MODES[key],
+      visionMode:
+        configuration.get<'native' | 'proxy' | 'off'>(`visionMode.${key}`) ??
+        DEFAULT_VISION_MODES[key],
+      thinkingMode: isThinkingMode(configuredThinkingMode)
+        ? configuredThinkingMode
+        : DEFAULT_THINKING_MODES[key]
+    };
+  });
 }
 
 export function loadRuntimeSettings(
@@ -150,16 +185,9 @@ export function buildSettingsSnapshot(
   const publishedModels: PublishedModel[] = [];
 
   for (const key of validKeys) {
-    const setting: DisplayModelSetting = {
-      key,
-      label: configuration.get<string>(`labels.${key}`)?.trim() || DEFAULT_MODEL_LABELS[key],
-      comboId: configuration.get<string>(`modelMappings.${key}`)?.trim() || '',
-      enabled: true,
-      toolMode: configuration.get<'auto' | 'off'>(`toolMode.${key}`) ?? DEFAULT_TOOL_MODES[key],
-      visionMode: configuration.get<'native' | 'proxy' | 'off'>(`visionMode.${key}`) ?? DEFAULT_VISION_MODES[key]
-    };
+    const comboId = configuration.get<string>(`modelMappings.${key}`)?.trim() || '';
 
-    if (setting.comboId.length === 0) {
+    if (comboId.length === 0) {
       const message = `Display model "${key}" is missing a valid 9router combo mapping.`;
       issues.push({
         scope: 'model',
@@ -174,6 +202,51 @@ export function buildSettingsSnapshot(
       });
       continue;
     }
+
+    if (hasThinkingSuffix(comboId)) {
+      const message = `Display model "${key}" must use a base combo id without a thinking suffix. Remove the suffix from 9router-copilot.modelMappings.${key} and configure 9router-copilot.thinkingMode.${key}.`;
+      issues.push({
+        scope: 'model',
+        code: 'INVALID_COMBO_MAPPING',
+        message,
+        modelKey: key
+      });
+      rejectedModels.push({
+        key,
+        code: 'INVALID_COMBO_MAPPING',
+        message
+      });
+      continue;
+    }
+
+    const configuredThinkingMode = getConfiguredThinkingMode(configuration, key);
+    if (!isThinkingMode(configuredThinkingMode)) {
+      const message = `Display model "${key}" has an unsupported thinking mode. Update 9router-copilot.thinkingMode.${key} to off, minimal, low, medium, high, xhigh, or max.`;
+      issues.push({
+        scope: 'model',
+        code: 'INVALID_THINKING_MODE',
+        message,
+        modelKey: key
+      });
+      rejectedModels.push({
+        key,
+        code: 'INVALID_THINKING_MODE',
+        message
+      });
+      continue;
+    }
+
+    const setting: DisplayModelSetting = {
+      key,
+      label: configuration.get<string>(`labels.${key}`)?.trim() || DEFAULT_MODEL_LABELS[key],
+      comboId,
+      enabled: true,
+      toolMode: configuration.get<'auto' | 'off'>(`toolMode.${key}`) ?? DEFAULT_TOOL_MODES[key],
+      visionMode:
+        configuration.get<'native' | 'proxy' | 'off'>(`visionMode.${key}`) ??
+        DEFAULT_VISION_MODES[key],
+      thinkingMode: configuredThinkingMode
+    };
 
     displayModels.push(setting);
     publishedModels.push(createPublishedModel(setting));
