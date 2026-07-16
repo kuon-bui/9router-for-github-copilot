@@ -29,4 +29,20 @@ describe('parseSseChunk', () => {
       }
     ]);
   });
+
+  it('does not expose reasoning-only deltas as response events', () => {
+    const events = parseSseChunk(
+      'data: {"choices":[{"delta":{"reasoning_content":"private reasoning"}}]}\n\n'
+    );
+
+    expect(events).toEqual([]);
+  });
+
+  it('emits visible content without exposing a sibling reasoning delta', () => {
+    const events = parseSseChunk(
+      'data: {"choices":[{"delta":{"content":"Visible","reasoning_content":"private reasoning"}}]}\n\n'
+    );
+
+    expect(events).toEqual([{ type: 'text-delta', text: 'Visible' }]);
+  });
 });

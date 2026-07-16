@@ -7,10 +7,12 @@ import { adaptToolOptionsForRouter } from './tool-adapter';
 import { adaptMessagesToRouterRequest } from './request-adapter';
 import { createRouterEventEmitter } from './stream-adapter';
 import { createAbortSignalFromToken } from './cancellation';
+import { resolveEffectiveThinkingMode } from './thinking-effort';
 import { prepareVisionCompatibleMessages } from './vision-proxy';
 import type { RouterClient } from '../router/client';
 import type { SettingsSnapshot } from '../config/settings';
 import type { DisplayModelSetting, PublishedModel } from '../types/product-model';
+import type { ModelConfigurationResponseOptions } from '../types/vscode-chat-compat';
 import type { HostToolDefinition } from './tool-adapter';
 import type { HostChatRequestMessage } from './vision-proxy';
 
@@ -80,7 +82,7 @@ export class NineRouterChatProvider
   public async provideLanguageModelChatResponse(
     model: PublishedModel,
     messages: readonly vscode.LanguageModelChatRequestMessage[],
-    options: vscode.ProvideLanguageModelChatResponseOptions,
+    options: ModelConfigurationResponseOptions,
     progress: vscode.Progress<vscode.LanguageModelResponsePart>,
     token: vscode.CancellationToken
   ): Promise<void> {
@@ -104,8 +106,14 @@ export class NineRouterChatProvider
       );
     }
 
+    const effectiveThinking = resolveEffectiveThinkingMode(options, selectedModel.thinkingMode);
+    const requestSelectedModel: DisplayModelSetting = {
+      ...selectedModel,
+      thinkingMode: effectiveThinking.thinkingMode
+    };
+
     const visionResult = await prepareVisionCompatibleMessages({
-      selectedModel,
+      selectedModel: requestSelectedModel,
       messages: messages as readonly HostChatRequestMessage[]
     });
 
@@ -133,7 +141,7 @@ export class NineRouterChatProvider
     }
 
     const requestInput: Parameters<typeof adaptMessagesToRouterRequest>[0] = {
-      selectedModel,
+      selectedModel: requestSelectedModel,
       messages: visionResult.messages
     };
 
@@ -143,7 +151,7 @@ export class NineRouterChatProvider
       requestInput.hostToolMode = getRequestToolMode(options);
 
       const toolOptions = adaptToolOptionsForRouter({
-        selectedModel,
+        selectedModel: requestSelectedModel,
         tools: requestTools,
         hostToolMode: getRequestToolMode(options)
       });
@@ -164,7 +172,9 @@ export class NineRouterChatProvider
     logDebugEvent(this.snapshot.runtime.debugMode, 'Submitting request to 9router', {
       displayModel: selectedModel.key,
       comboId: selectedModel.comboId,
-      thinkingMode: selectedModel.thinkingMode,
+      configuredThinkingMode: selectedModel.thinkingMode,
+      effectiveThinkingMode: effectiveThinking.thinkingMode,
+      thinkingModeSource: effectiveThinking.source,
       baseUrl: this.snapshot.runtime.baseUrl,
       snapshotState: this.snapshot.state,
       issueCount: this.snapshot.issues.length
