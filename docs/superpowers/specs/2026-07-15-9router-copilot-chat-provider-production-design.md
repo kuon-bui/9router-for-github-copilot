@@ -204,6 +204,14 @@ Recommended configuration keys:
 - `9router-copilot.requestTimeoutMs`
 - `9router-copilot.debugMode`
 
+### Native thinking effort picker
+
+Every valid published model exposes a `configurationSchema` navigation property named `reasoningEffort`. Copilot Chat renders the property as an independent per-model **Thinking Effort** submenu with `None`, `Minimal`, `Low`, `Medium`, `High`, `XHigh`, and `Max`.
+
+The validated `9router-copilot.thinkingMode.<model>` value supplies that model's schema default and request fallback. A valid `modelConfiguration.reasoningEffort` value overrides the local default for the current request; `none` maps to internal `off`, while the remaining values map directly.
+
+The extension continues to express the effective level only through the `9router` model suffix. `9router` owns provider-specific reasoning translation and compatibility policy. Reasoning deltas remain hidden.
+
 ### Recommended behavior
 
 - Ship default display model labels, but keep combo mapping defaults empty.

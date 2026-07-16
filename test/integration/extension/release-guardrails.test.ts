@@ -29,7 +29,7 @@ describe('release guardrails', () => {
     }
   });
 
-  it('documents thinking configuration without moving reasoning policy into the extension', async () => {
+  it('documents the native picker without moving reasoning policy into the extension', async () => {
     const readme = await readFile(resolve(process.cwd(), 'README.md'), 'utf8');
     const productionDesign = await readFile(
       resolve(
@@ -39,11 +39,16 @@ describe('release guardrails', () => {
       'utf8'
     );
 
-    expect(readme).toContain('### Thinking Mode');
+    expect(readme).toContain('Thinking Effort');
+    expect(readme).toContain('None');
+    expect(readme).toContain('XHigh');
     expect(readme).toContain('9router-copilot.thinkingMode.agent');
+    expect(readme).toContain('default and fallback');
     expect(readme).toContain('base combo id');
-    expect(productionDesign).toContain('9router-copilot.thinkingMode.daily');
+    expect(productionDesign).toContain('configurationSchema');
+    expect(productionDesign).toContain('modelConfiguration.reasoningEffort');
     expect(productionDesign).toContain('provider-specific reasoning translation');
+    expect(productionDesign).toContain('Reasoning deltas remain hidden');
   });
 
   it('keeps the VSIX package command explicit about local repository metadata', () => {

@@ -111,14 +111,20 @@ Use `auto` only for combos that are expected to support tool calling through `9r
 
 Proxy mode is intended for text-only combos. Native vision should be configured only for combos that can handle image inputs directly.
 
-### Thinking Mode
+### Thinking Effort
 
-`thinkingMode` controls the reasoning effort requested for each display model.
+Each published `Daily`, `Agent`, and `Fallback` model has its own **Thinking Effort** submenu in the Copilot Chat model picker:
 
-- `off`: Send the base combo id unchanged.
-- `minimal`, `low`, `medium`, `high`, `xhigh`, `max`: Send the level through the `9router` model suffix contract.
+- `None`: Send the base combo id unchanged.
+- `Minimal`, `Low`, `Medium`, `High`, `XHigh`, `Max`: Send the selected level through the `9router` model suffix contract.
+
+The choice is stored independently for each model. For example, `Daily` can use `None` while `Agent` uses `Max`.
+
+The `9router-copilot.thinkingMode.<model>` setting remains the per-model default and fallback when Copilot Chat does not provide a valid picker value. A picker selection overrides that default for the request.
 
 Configure `modelMappings.<model>` with a base combo id such as `combo/agent`, not a suffixed value such as `combo/agent(high)`. The extension selects the requested level, while `9router` remains responsible for provider-specific reasoning translation and provider limits.
+
+Reasoning deltas remain hidden; only normal response text and supported tool calls are displayed.
 
 ### Debug Mode
 
