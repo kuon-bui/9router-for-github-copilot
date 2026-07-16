@@ -151,6 +151,48 @@
           "default": "off",
           "description": "Vision mode for Fallback. Use native when the mapped 9router combo can accept image inputs directly, proxy for text-only combos, and off to block image inputs."
         },
+        "9router-copilot.thinkingMode.daily": {
+          "type": "string",
+          "enum": [
+            "off",
+            "minimal",
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ],
+          "default": "off",
+          "description": "Thinking level for Daily. Non-off values are forwarded through the 9router model suffix contract."
+        },
+        "9router-copilot.thinkingMode.agent": {
+          "type": "string",
+          "enum": [
+            "off",
+            "minimal",
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ],
+          "default": "off",
+          "description": "Thinking level for Agent. Non-off values are forwarded through the 9router model suffix contract."
+        },
+        "9router-copilot.thinkingMode.fallback": {
+          "type": "string",
+          "enum": [
+            "off",
+            "minimal",
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ],
+          "default": "off",
+          "description": "Thinking level for Fallback. Non-off values are forwarded through the 9router model suffix contract."
+        },
         "9router-copilot.maxTokens": {
           "type": "number",
           "minimum": 1,

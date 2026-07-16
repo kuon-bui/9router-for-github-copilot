@@ -75,6 +75,9 @@ Example `settings.json`:
   "9router-copilot.visionMode.daily": "off",
   "9router-copilot.visionMode.agent": "proxy",
   "9router-copilot.visionMode.fallback": "off",
+  "9router-copilot.thinkingMode.daily": "off",
+  "9router-copilot.thinkingMode.agent": "high",
+  "9router-copilot.thinkingMode.fallback": "off",
   "9router-copilot.maxTokens": 4096,
   "9router-copilot.requestTimeoutMs": 60000,
   "9router-copilot.debugMode": "minimal"
@@ -108,6 +111,15 @@ Use `auto` only for combos that are expected to support tool calling through `9r
 
 Proxy mode is intended for text-only combos. Native vision should be configured only for combos that can handle image inputs directly.
 
+### Thinking Mode
+
+`thinkingMode` controls the reasoning effort requested for each display model.
+
+- `off`: Send the base combo id unchanged.
+- `minimal`, `low`, `medium`, `high`, `xhigh`, `max`: Send the level through the `9router` model suffix contract.
+
+Configure `modelMappings.<model>` with a base combo id such as `combo/agent`, not a suffixed value such as `combo/agent(high)`. The extension selects the requested level, while `9router` remains responsible for provider-specific reasoning translation and provider limits.
+
 ### Debug Mode
 
 `debugMode` controls extension diagnostics:
@@ -133,6 +145,8 @@ Common issues:
 - Empty combo mapping: configure the relevant `9router-copilot.modelMappings.<model>` setting with an existing combo id.
 - Combo not found: the configured id no longer exists in `9router`; recreate the backend combo or update the setting.
 - Image input blocked: set the selected model's `visionMode` to `native` or `proxy` when appropriate.
+- Invalid thinking mode: select `off`, `minimal`, `low`, `medium`, `high`, `xhigh`, or `max`.
+- Suffixed combo mapping: remove the `(level)` suffix from `modelMappings.<model>` and set `thinkingMode.<model>` instead.
 
 ## Debug in VS Code
 

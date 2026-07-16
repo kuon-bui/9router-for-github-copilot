@@ -197,6 +197,9 @@ Recommended configuration keys:
 - `9router-copilot.modelMappings.daily`
 - `9router-copilot.modelMappings.agent`
 - `9router-copilot.modelMappings.fallback`
+- `9router-copilot.thinkingMode.daily`
+- `9router-copilot.thinkingMode.agent`
+- `9router-copilot.thinkingMode.fallback`
 - `9router-copilot.maxTokens`
 - `9router-copilot.requestTimeoutMs`
 - `9router-copilot.debugMode`
@@ -237,6 +240,8 @@ Recommended request shape:
 - `tools` when supported
 - `max_tokens`
 - optional generation parameters that `9router` documents as compatible
+
+Thinking preferences are configured per curated display model. The extension appends a validated non-`off` level to the resolved combo id using the `model(level)` contract. `9router` owns provider-specific reasoning translation, normalization, limits, and upstream compatibility.
 
 ### Compatibility note
 
