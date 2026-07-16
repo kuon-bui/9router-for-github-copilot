@@ -3,11 +3,21 @@ export type RouterRole = 'system' | 'user' | 'assistant' | 'tool';
 export type RouterContentPart = string | Record<string, unknown>;
 export type RouterMessageContent = string | RouterContentPart[];
 
+export interface RouterToolCall {
+  id: string;
+  type: 'function';
+  function: {
+    name: string;
+    arguments: string;
+  };
+}
+
 export interface RouterMessage {
   role: RouterRole;
-  content: RouterMessageContent;
+  content: RouterMessageContent | null;
   name?: string;
   tool_call_id?: string;
+  tool_calls?: RouterToolCall[];
 }
 
 export interface RouterToolDefinition {

@@ -25,17 +25,25 @@ describe('adaptMessagesToRouterRequest', () => {
     });
   });
 
-  it('converts VS Code tool result parts into OpenAI-compatible tool messages', () => {
+  it('preserves matching assistant tool calls and tool results', () => {
     const request = adaptMessagesToRouterRequest({
       selectedModel: {
         key: 'agent',
         label: 'Agent',
-        comboId: 'combo/agent',
+        comboId: '123',
         enabled: true,
         toolMode: 'auto',
         visionMode: 'off'
       },
       messages: [
+        {
+          role: 2,
+          content: [
+            new vscode.LanguageModelToolCallPart('call-1', 'lookupUser', {
+              id: '42'
+            })
+          ]
+        },
         {
           role: 1,
           content: [
@@ -49,9 +57,289 @@ describe('adaptMessagesToRouterRequest', () => {
 
     expect(request.messages).toEqual([
       {
+        role: 'assistant',
+        content: null,
+        tool_calls: [
+          {
+            id: 'call-1',
+            type: 'function',
+            function: {
+              name: 'lookupUser',
+              arguments: '{"id":"42"}'
+            }
+          }
+        ]
+      },
+      {
         role: 'tool',
         content: 'result text',
         tool_call_id: 'call-1'
+      }
+    ]);
+  });
+
+  it('preserves multiple tool calls and results in order', () => {
+    const request = adaptMessagesToRouterRequest({
+      selectedModel: {
+        key: 'agent',
+        label: 'Agent',
+        comboId: '123',
+        enabled: true,
+        toolMode: 'auto',
+        visionMode: 'off'
+      },
+      messages: [
+        {
+          role: 2,
+          content: [
+            new vscode.LanguageModelToolCallPart('call-1', 'lookupUser', {
+              id: '42'
+            }),
+            new vscode.LanguageModelToolCallPart('call-2', 'lookupTeam', {
+              slug: 'core'
+            })
+          ]
+        },
+        {
+          role: 1,
+          content: [
+            new vscode.LanguageModelToolResultPart('call-1', [
+              new vscode.LanguageModelTextPart('user result')
+            ]),
+            new vscode.LanguageModelToolResultPart('call-2', [
+              new vscode.LanguageModelTextPart('team result')
+            ])
+          ]
+        }
+      ]
+    });
+
+    expect(request.messages).toEqual([
+      {
+        role: 'assistant',
+        content: null,
+        tool_calls: [
+          {
+            id: 'call-1',
+            type: 'function',
+            function: {
+              name: 'lookupUser',
+              arguments: '{"id":"42"}'
+            }
+          },
+          {
+            id: 'call-2',
+            type: 'function',
+            function: {
+              name: 'lookupTeam',
+              arguments: '{"slug":"core"}'
+            }
+          }
+        ]
+      },
+      {
+        role: 'tool',
+        content: 'user result',
+        tool_call_id: 'call-1'
+      },
+      {
+        role: 'tool',
+        content: 'team result',
+        tool_call_id: 'call-2'
+      }
+    ]);
+  });
+
+  it('degrades undocumented numeric roles without tool results to user messages', () => {
+    const request = adaptMessagesToRouterRequest({
+      selectedModel: {
+        key: 'agent',
+        label: 'Agent',
+        comboId: '123',
+        enabled: true,
+        toolMode: 'auto',
+        visionMode: 'off'
+      },
+      messages: [
+        {
+          role: 3,
+          content: 'Internal progress-message instructions'
+        }
+      ]
+    });
+
+    expect(request.messages).toEqual([
+      {
+        role: 'user',
+        content: 'Internal progress-message instructions'
+      }
+    ]);
+  });
+
+  it('degrades string tool roles without tool results to user messages', () => {
+    const request = adaptMessagesToRouterRequest({
+      selectedModel: {
+        key: 'agent',
+        label: 'Agent',
+        comboId: '123',
+        enabled: true,
+        toolMode: 'auto',
+        visionMode: 'off'
+      },
+      messages: [
+        {
+          role: 'tool',
+          content: 'Internal tool-like instructions'
+        }
+      ]
+    });
+
+    expect(request.messages).toEqual([
+      {
+        role: 'user',
+        content: 'Internal tool-like instructions'
+      }
+    ]);
+  });
+
+  it('does not promote tool result parts with empty call ids', () => {
+    const request = adaptMessagesToRouterRequest({
+      selectedModel: {
+        key: 'agent',
+        label: 'Agent',
+        comboId: '123',
+        enabled: true,
+        toolMode: 'auto',
+        visionMode: 'off'
+      },
+      messages: [
+        {
+          role: 1,
+          content: [
+            new vscode.LanguageModelToolResultPart('', [
+              new vscode.LanguageModelTextPart('orphaned result')
+            ])
+          ]
+        }
+      ]
+    });
+
+    expect(request.messages[0]).toMatchObject({
+      role: 'user'
+    });
+    expect(request.messages[0]).not.toHaveProperty('tool_call_id');
+  });
+
+  it('degrades orphaned tool results to user content', () => {
+    const request = adaptMessagesToRouterRequest({
+      selectedModel: {
+        key: 'agent',
+        label: 'Agent',
+        comboId: '123',
+        enabled: true,
+        toolMode: 'auto',
+        visionMode: 'off'
+      },
+      messages: [
+        {
+          role: 1,
+          content: [
+            new vscode.LanguageModelToolResultPart('missing-call', [
+              new vscode.LanguageModelTextPart('orphaned result')
+            ])
+          ]
+        }
+      ]
+    });
+
+    expect(request.messages).toEqual([
+      {
+        role: 'user',
+        content: 'orphaned result'
+      }
+    ]);
+  });
+
+  it('does not match tool results across an intervening ordinary message', () => {
+    const request = adaptMessagesToRouterRequest({
+      selectedModel: {
+        key: 'agent',
+        label: 'Agent',
+        comboId: '123',
+        enabled: true,
+        toolMode: 'auto',
+        visionMode: 'off'
+      },
+      messages: [
+        {
+          role: 2,
+          content: [
+            new vscode.LanguageModelToolCallPart('call-1', 'lookupUser', {
+              id: '42'
+            })
+          ]
+        },
+        {
+          role: 1,
+          content: 'Intervening user message'
+        },
+        {
+          role: 1,
+          content: [
+            new vscode.LanguageModelToolResultPart('call-1', [
+              new vscode.LanguageModelTextPart('late result')
+            ])
+          ]
+        }
+      ]
+    });
+
+    expect(request.messages[2]).toEqual({
+      role: 'user',
+      content: 'late result'
+    });
+  });
+
+  it('places ordinary result-message text after matching tool responses', () => {
+    const request = adaptMessagesToRouterRequest({
+      selectedModel: {
+        key: 'agent',
+        label: 'Agent',
+        comboId: '123',
+        enabled: true,
+        toolMode: 'auto',
+        visionMode: 'off'
+      },
+      messages: [
+        {
+          role: 2,
+          content: [
+            new vscode.LanguageModelToolCallPart('call-1', 'lookupUser', {
+              id: '42'
+            })
+          ]
+        },
+        {
+          role: 1,
+          content: [
+            new vscode.LanguageModelTextPart('Continue after tool result'),
+            new vscode.LanguageModelToolResultPart('call-1', [
+              new vscode.LanguageModelTextPart('result text')
+            ])
+          ]
+        }
+      ]
+    });
+
+    expect(request.messages.slice(1)).toEqual([
+      {
+        role: 'tool',
+        content: 'result text',
+        tool_call_id: 'call-1'
+      },
+      {
+        role: 'user',
+        content: 'Continue after tool result'
       }
     ]);
   });

@@ -6,6 +6,7 @@ import { NineRouterError } from '../router/errors';
 import { adaptToolOptionsForRouter } from './tool-adapter';
 import { adaptMessagesToRouterRequest } from './request-adapter';
 import { createRouterEventEmitter } from './stream-adapter';
+import { createAbortSignalFromToken } from './cancellation';
 import { prepareVisionCompatibleMessages } from './vision-proxy';
 import type { RouterClient } from '../router/client';
 import type { SettingsSnapshot } from '../config/settings';
@@ -169,14 +170,24 @@ export class NineRouterChatProvider
     });
 
     const emitter = createRouterEventEmitter(progress);
-    for await (const event of this.routerClient.streamChatCompletion({
-      baseUrl: this.snapshot.runtime.baseUrl,
-      apiKey,
-      request,
-      timeoutMs: this.snapshot.runtime.requestTimeoutMs,
-      signal: token as unknown as AbortSignal
-    })) {
-      emitter.emit(event);
+    const requestCancellation = createAbortSignalFromToken(token);
+
+    try {
+      const stream = this.routerClient.streamChatCompletion({
+        baseUrl: this.snapshot.runtime.baseUrl,
+        apiKey,
+        request,
+        timeoutMs: this.snapshot.runtime.requestTimeoutMs,
+        signal: requestCancellation.signal
+      });
+
+      for await (const event of stream) {
+        emitter.emit(event);
+      }
+    } catch (error) {
+      throw mapProviderError(error, selectedModel);
+    } finally {
+      requestCancellation.cleanup();
     }
   }
 
@@ -199,6 +210,42 @@ export function findSelectedModelSetting(
   model: PublishedModel
 ): DisplayModelSetting | undefined {
   return settings.find((setting) => setting.key === model.id);
+}
+
+function mapProviderError(error: unknown, selectedModel: DisplayModelSetting): NineRouterError {
+  if (!(error instanceof NineRouterError) || error.code !== 'COMBO_MAPPING_ERROR') {
+    if (error instanceof NineRouterError) {
+      return error;
+    }
+
+    throw error;
+  }
+
+  return new NineRouterError(
+    'CONFIGURATION_ERROR',
+    `9router combo mapping for display model "${selectedModel.key}" was not found. Update 9router-copilot.modelMappings.${selectedModel.key} to a valid combo id.`,
+    buildMissingComboMappingOptions(error, selectedModel)
+  );
+}
+
+function buildMissingComboMappingOptions(
+  error: NineRouterError,
+  selectedModel: DisplayModelSetting
+): { requestId?: string; details: Record<string, unknown> } {
+  const options: { requestId?: string; details: Record<string, unknown> } = {
+    details: {
+      ...error.details,
+      displayModel: selectedModel.key,
+      comboId: selectedModel.comboId,
+      settingsKey: `9router-copilot.modelMappings.${selectedModel.key}`
+    }
+  };
+
+  if (error.requestId) {
+    options.requestId = error.requestId;
+  }
+
+  return options;
 }
 
 function flattenRequestContent(content: string | readonly unknown[]): string {

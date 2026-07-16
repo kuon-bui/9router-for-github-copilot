@@ -1,7 +1,12 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import * as vscode from 'vscode';
 import { NineRouterChatProvider } from '../../../src/provider/provider';
-import { __resetVscodeState, __setConfigurationValues } from '../../support/vscode';
+import { NineRouterError } from '../../../src/router/errors';
+import {
+  __createCancellationToken,
+  __resetVscodeState,
+  __setConfigurationValues
+} from '../../support/vscode';
 
 describe('NineRouterChatProvider', () => {
   beforeEach(() => {
@@ -53,7 +58,7 @@ describe('NineRouterChatProvider', () => {
           }
         }
       } as vscode.Progress<vscode.LanguageModelResponsePart>,
-      new AbortController().signal as never
+      __createCancellationToken().value as never
     );
 
     expect(progressCalls.join('')).toBe('Hello world');
@@ -90,7 +95,7 @@ describe('NineRouterChatProvider', () => {
         [{ role: 1, content: [{ mimeType: 'image/png' }] }] as never,
         {} as never,
         { report: () => undefined } as never,
-        new AbortController().signal as never
+        __createCancellationToken().value as never
       )
     ).rejects.toMatchObject({
       code: 'CONFIGURATION_ERROR',
@@ -100,5 +105,56 @@ describe('NineRouterChatProvider', () => {
     });
 
     expect(streamCalled).toBe(false);
+  });
+
+  it('reclassifies missing combo mappings as actionable configuration errors', async () => {
+    const provider = new NineRouterChatProvider(
+      {
+        secrets: {
+          get: async () => 'token'
+        }
+      } as never,
+      {
+        async *streamChatCompletion() {
+          throw new NineRouterError('COMBO_MAPPING_ERROR', '9router combo mapping was not found', {
+            requestId: 'req-404',
+            details: {
+              status: 404,
+              responseText: '{"error":"missing combo"}'
+            }
+          });
+        }
+      } as never
+    );
+
+    await expect(
+      provider.provideLanguageModelChatResponse(
+        {
+          id: 'daily',
+          name: 'Daily',
+          vendor: '9router',
+          family: 'daily',
+          version: '1',
+          maxInputTokens: 128000,
+          maxOutputTokens: 8192,
+          capabilities: {}
+        },
+        [{ role: 1, content: 'Say hello' }] as never,
+        {} as never,
+        { report: () => undefined } as never,
+        __createCancellationToken().value as never
+      )
+    ).rejects.toMatchObject({
+      code: 'CONFIGURATION_ERROR',
+      requestId: 'req-404',
+      message:
+        '9router combo mapping for display model "daily" was not found. Update 9router-copilot.modelMappings.daily to a valid combo id.',
+      details: expect.objectContaining({
+        displayModel: 'daily',
+        comboId: 'combo/daily',
+        settingsKey: '9router-copilot.modelMappings.daily',
+        status: 404
+      })
+    });
   });
 });

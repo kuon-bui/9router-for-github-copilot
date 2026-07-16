@@ -1,7 +1,11 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { NineRouterError } from '../../../src/router/errors';
 import { NineRouterChatProvider } from '../../../src/provider/provider';
-import { __resetVscodeState, __setConfigurationValues } from '../../support/vscode';
+import {
+  __createCancellationToken,
+  __resetVscodeState,
+  __setConfigurationValues
+} from '../../support/vscode';
 
 describe('NineRouterChatProvider cancellation flow', () => {
   beforeEach(() => {
@@ -17,6 +21,7 @@ describe('NineRouterChatProvider cancellation flow', () => {
   });
 
   it('surfaces cancellation-safe failures from the router client', async () => {
+    let cancelRequest: (() => void) | undefined;
     const provider = new NineRouterChatProvider(
       {
         secrets: {
@@ -24,11 +29,24 @@ describe('NineRouterChatProvider cancellation flow', () => {
         }
       } as never,
       {
-        async *streamChatCompletion() {
+        async *streamChatCompletion({ signal }) {
+          const abortPromise = new Promise<void>((resolve) => {
+            signal.addEventListener('abort', () => {
+              resolve();
+            }, { once: true });
+          });
+
+          cancelRequest?.();
+          await abortPromise;
+
+          expect(signal.aborted).toBe(true);
           throw new NineRouterError('CANCELLATION_ERROR', '9router request was cancelled');
         }
       } as never
     );
+
+    const token = __createCancellationToken();
+    cancelRequest = token.cancel;
 
     await expect(
       provider.provideLanguageModelChatResponse(
@@ -45,7 +63,7 @@ describe('NineRouterChatProvider cancellation flow', () => {
         [{ role: 1, content: 'Say hello' }] as never,
         {} as never,
         { report: () => undefined } as never,
-        new AbortController().signal as never
+        token.value
       )
     ).rejects.toMatchObject({
       code: 'CANCELLATION_ERROR'

@@ -203,7 +203,8 @@ Recommended configuration keys:
 
 ### Recommended behavior
 
-- Ship the extension with default display model labels and default combo mappings.
+- Ship default display model labels, but keep combo mapping defaults empty.
+- Require each published display model to reference an existing user-configured `9router` combo id.
 - Let the user override which models are shown and what combo ids they resolve to.
 - Refresh the picker when settings change, without requiring reload where possible.
 - If a mapping is invalid, degrade that single model entry rather than disabling the whole provider.

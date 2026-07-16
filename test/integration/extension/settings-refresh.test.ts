@@ -3,6 +3,7 @@ import { buildSettingsSnapshot } from '../../../src/config/settings';
 import { NineRouterChatProvider } from '../../../src/provider/provider';
 import { handleConfigurationChange } from '../../../src/runtime/activate';
 import type { PublishedModel } from '../../../src/types/product-model';
+import { __createCancellationToken } from '../../support/vscode';
 
 describe('handleConfigurationChange', () => {
   beforeEach(() => {
@@ -126,7 +127,7 @@ describe('NineRouterChatProvider snapshot refresh', () => {
         [{ role: 1, content: 'hello' }] as never,
         {} as never,
         { report: () => undefined } as never,
-        new AbortController().signal as never
+        __createCancellationToken().value as never
       )
     ).rejects.toMatchObject({
       code: 'CONFIGURATION_ERROR'

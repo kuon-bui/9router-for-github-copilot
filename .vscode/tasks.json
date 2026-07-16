@@ -1,0 +1,46 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "build",
+      "type": "shell",
+      "command": "pnpm run build",
+      "problemMatcher": ["$tsc"]
+    },
+    {
+      "label": "watch",
+      "type": "shell",
+      "command": "pnpm exec tsc -p tsconfig.json --watch",
+      "isBackground": true,
+      "problemMatcher": {
+        "owner": "typescript",
+        "fileLocation": "relative",
+        "pattern": "$tsc",
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": "Starting compilation in watch mode",
+          "endsPattern": "Watching for file changes\\."
+        }
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      }
+    },
+    {
+      "label": "test:unit",
+      "type": "shell",
+      "command": "pnpm run test:unit"
+    },
+    {
+      "label": "test:integration",
+      "type": "shell",
+      "command": "pnpm run test:integration"
+    },
+    {
+      "label": "package",
+      "type": "shell",
+      "command": "pnpm run package"
+    }
+  ]
+}

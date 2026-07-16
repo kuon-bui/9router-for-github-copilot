@@ -149,6 +149,27 @@ export function __getCommandHandler(command: string): ((...args: unknown[]) => u
   return commandHandlers.get(command);
 }
 
+export function __createCancellationToken(): {
+  value: { isCancellationRequested: boolean; onCancellationRequested: (listener: () => void) => Disposable };
+  cancel: () => void;
+} {
+  let isCancellationRequested = false;
+  const emitter = new EventEmitter<void>();
+
+  return {
+    value: {
+      get isCancellationRequested() {
+        return isCancellationRequested;
+      },
+      onCancellationRequested: emitter.event
+    },
+    cancel: () => {
+      isCancellationRequested = true;
+      emitter.fire();
+    }
+  };
+}
+
 export function __resetVscodeState(): void {
   configurationValues.clear();
   commandHandlers.clear();

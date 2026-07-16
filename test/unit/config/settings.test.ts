@@ -4,6 +4,7 @@ import {
   loadDisplayModelSettings,
   loadRuntimeSettings
 } from '../../../src/config/settings';
+import { DEFAULT_MODEL_MAPPINGS } from '../../../src/config/defaults';
 
 describe('loadDisplayModelSettings', () => {
   it('returns only enabled curated models with stable keys', () => {
@@ -28,6 +29,23 @@ describe('loadDisplayModelSettings', () => {
     expect(loadDisplayModelSettings(configuration as never)).toEqual([
       expect.objectContaining({ key: 'daily', comboId: 'combo/daily-default', enabled: true }),
       expect.objectContaining({ key: 'fallback', comboId: 'combo/fallback-default', enabled: true })
+    ]);
+  });
+
+  it('does not invent backend combo ids for unconfigured display models', () => {
+    const configuration = {
+      get: () => undefined
+    };
+
+    expect(DEFAULT_MODEL_MAPPINGS).toEqual({
+      daily: '',
+      agent: '',
+      fallback: ''
+    });
+    expect(loadDisplayModelSettings(configuration as never).map((model) => model.comboId)).toEqual([
+      '',
+      '',
+      ''
     ]);
   });
 

@@ -81,18 +81,18 @@
         },
         "9router-copilot.modelMappings.daily": {
           "type": "string",
-          "default": "combo/daily",
-          "description": "9router combo id used by the Daily display model."
+          "default": "",
+          "description": "Existing 9router combo id used by the Daily display model. The model stays hidden until configured."
         },
         "9router-copilot.modelMappings.agent": {
           "type": "string",
-          "default": "combo/agent",
-          "description": "9router combo id used by the Agent display model."
+          "default": "",
+          "description": "Existing 9router combo id used by the Agent display model. The model stays hidden until configured."
         },
         "9router-copilot.modelMappings.fallback": {
           "type": "string",
-          "default": "combo/fallback",
-          "description": "9router combo id used by the Fallback display model."
+          "default": "",
+          "description": "Existing 9router combo id used by the Fallback display model. The model stays hidden until configured."
         },
         "9router-copilot.toolMode.daily": {
           "type": "string",

@@ -1,5 +1,7 @@
+.vscode/**
 .github/**
 .git/**
+.gitignore
 .worktrees/**
 docs/**
 test/**

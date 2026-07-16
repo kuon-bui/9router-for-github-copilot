@@ -14,9 +14,9 @@ export const DEFAULT_MODEL_LABELS: Record<ProductModelKey, string> = {
 };
 
 export const DEFAULT_MODEL_MAPPINGS: Record<ProductModelKey, string> = {
-  daily: 'combo/daily',
-  agent: 'combo/agent',
-  fallback: 'combo/fallback'
+  daily: '',
+  agent: '',
+  fallback: ''
 };
 
 export const DEFAULT_TOOL_MODES: Record<ProductModelKey, 'auto' | 'off'> = {
