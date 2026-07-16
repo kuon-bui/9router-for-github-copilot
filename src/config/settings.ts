@@ -11,6 +11,7 @@ import {
   DEFAULT_TOOL_MODES,
   DEFAULT_VISION_MODES
 } from './defaults';
+import { createPublishedModel } from '../provider/model-catalog';
 import { PRODUCT_MODEL_KEYS, THINKING_MODES } from '../types/product-model';
 import type {
   DisplayModelSetting,
@@ -338,22 +339,4 @@ function isValidBaseUrl(input: string): boolean {
   } catch {
     return false;
   }
-}
-
-function createPublishedModel(setting: DisplayModelSetting): PublishedModel {
-  const capabilities: PublishedModel['capabilities'] = {
-    ...(setting.toolMode === 'auto' ? { toolCalling: 32 } : {}),
-    ...(setting.visionMode === 'native' ? { imageInput: true } : {})
-  };
-
-  return {
-    id: setting.key,
-    name: setting.label,
-    vendor: '9router',
-    family: setting.key,
-    version: '1',
-    maxInputTokens: 128_000,
-    maxOutputTokens: 8_192,
-    capabilities
-  };
 }

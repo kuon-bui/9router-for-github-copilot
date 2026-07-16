@@ -1,4 +1,5 @@
 import type * as vscode from 'vscode';
+import type { LanguageModelConfigurationSchema } from './vscode-chat-compat';
 
 export const PRODUCT_MODEL_KEYS = ['daily', 'agent', 'fallback'] as const;
 export const THINKING_MODES = [
@@ -27,4 +28,5 @@ export interface DisplayModelSetting {
 export interface PublishedModel extends vscode.LanguageModelChatInformation {
   vendor: '9router';
   family: 'daily' | 'agent' | 'fallback';
+  configurationSchema?: LanguageModelConfigurationSchema;
 }

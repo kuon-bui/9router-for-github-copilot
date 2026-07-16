@@ -93,6 +93,34 @@ describe('loadDisplayModelSettings', () => {
 });
 
 describe('buildSettingsSnapshot', () => {
+  it('derives each published picker default from that model thinking setting', () => {
+    const snapshot = buildSettingsSnapshot(
+      {
+        get: (key: string) => {
+          const values: Record<string, unknown> = {
+            displayModels: ['daily', 'agent'],
+            'modelMappings.daily': 'combo/daily',
+            'modelMappings.agent': 'combo/agent',
+            'thinkingMode.daily': 'low',
+            'thinkingMode.agent': 'xhigh'
+          };
+
+          return values[key];
+        }
+      } as never
+    );
+
+    expect(
+      snapshot.publishedModels.map((model) => ({
+        id: model.id,
+        defaultEffort: model.configurationSchema?.properties.reasoningEffort.default
+      }))
+    ).toEqual([
+      { id: 'daily', defaultEffort: 'low' },
+      { id: 'agent', defaultEffort: 'xhigh' }
+    ]);
+  });
+
   it('marks the snapshot invalid when runtime settings are malformed', () => {
     const configuration = {
       get: (key: string) => {

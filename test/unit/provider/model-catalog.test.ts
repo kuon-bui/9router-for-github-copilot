@@ -28,4 +28,31 @@ describe('resolvePublishedModels', () => {
       expect.objectContaining({ id: 'daily', name: 'Daily', vendor: '9router' })
     ]);
   });
+
+  it('publishes an independent thinking effort schema for each model', () => {
+    const models = resolvePublishedModels([
+      {
+        key: 'daily',
+        label: 'Daily',
+        comboId: 'combo/daily',
+        enabled: true,
+        toolMode: 'off',
+        visionMode: 'off',
+        thinkingMode: 'off'
+      },
+      {
+        key: 'agent',
+        label: 'Agent',
+        comboId: 'combo/agent',
+        enabled: true,
+        toolMode: 'auto',
+        visionMode: 'proxy',
+        thinkingMode: 'max'
+      }
+    ]);
+
+    expect(models[0]?.configurationSchema?.properties.reasoningEffort.default).toBe('none');
+    expect(models[1]?.configurationSchema?.properties.reasoningEffort.default).toBe('max');
+    expect(models[0]?.configurationSchema).not.toBe(models[1]?.configurationSchema);
+  });
 });
