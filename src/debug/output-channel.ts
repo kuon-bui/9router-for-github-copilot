@@ -43,6 +43,8 @@ export function formatSettingsSnapshotDiagnostics(snapshot: SettingsSnapshot): s
     snapshot.issues
       .map((issue) => `${issue.code}${issue.modelKey ? `:${issue.modelKey}` : ''}`)
       .join(', ') || 'none';
+  const thinkingModes =
+    snapshot.displayModels.map((model) => `${model.key}=${model.thinkingMode}`).join(', ') || 'none';
   const runtimeLine = snapshot.runtime
     ? `Runtime: ${JSON.stringify(
         redactObject({
@@ -58,6 +60,7 @@ export function formatSettingsSnapshotDiagnostics(snapshot: SettingsSnapshot): s
     `Snapshot state: ${snapshot.state}`,
     runtimeLine,
     `Published models: ${publishedModels}`,
+    `Thinking modes: ${thinkingModes}`,
     `Rejected models: ${rejectedModels}`,
     `Issues: ${issues}`
   ];

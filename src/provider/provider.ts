@@ -164,6 +164,7 @@ export class NineRouterChatProvider
     logDebugEvent(this.snapshot.runtime.debugMode, 'Submitting request to 9router', {
       displayModel: selectedModel.key,
       comboId: selectedModel.comboId,
+      thinkingMode: selectedModel.thinkingMode,
       baseUrl: this.snapshot.runtime.baseUrl,
       snapshotState: this.snapshot.state,
       issueCount: this.snapshot.issues.length

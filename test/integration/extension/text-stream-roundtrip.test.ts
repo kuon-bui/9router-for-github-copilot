@@ -64,6 +64,52 @@ describe('NineRouterChatProvider', () => {
     expect(progressCalls.join('')).toBe('Hello world');
   });
 
+  it('sends the selected display model thinking mode to 9router', async () => {
+    __setConfigurationValues({
+      displayModels: ['daily'],
+      'modelMappings.daily': 'combo/daily',
+      'thinkingMode.daily': 'xhigh',
+      baseUrl: 'https://router.example.com/v1',
+      maxTokens: 128,
+      requestTimeoutMs: 5000,
+      debugMode: 'minimal'
+    });
+
+    let submittedModel: string | undefined;
+    const provider = new NineRouterChatProvider(
+      {
+        secrets: {
+          get: async () => 'token'
+        }
+      } as never,
+      {
+        async *streamChatCompletion(input: { request: { model: string } }) {
+          submittedModel = input.request.model;
+          yield { type: 'response-complete' };
+        }
+      } as never
+    );
+
+    await provider.provideLanguageModelChatResponse(
+      {
+        id: 'daily',
+        name: 'Daily',
+        vendor: '9router',
+        family: 'daily',
+        version: '1',
+        maxInputTokens: 128000,
+        maxOutputTokens: 8192,
+        capabilities: {}
+      },
+      [{ role: 1, content: 'Think deeply' }] as never,
+      {} as never,
+      { report: () => undefined } as never,
+      __createCancellationToken().value as never
+    );
+
+    expect(submittedModel).toBe('combo/daily(xhigh)');
+  });
+
   it('blocks image inputs when the selected model is configured as vision off', async () => {
     let streamCalled = false;
     const provider = new NineRouterChatProvider(

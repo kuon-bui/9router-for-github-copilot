@@ -26,6 +26,23 @@ describe('adaptMessagesToRouterRequest', () => {
     });
   });
 
+  it('appends the configured thinking mode to the router model name', () => {
+    const request = adaptMessagesToRouterRequest({
+      selectedModel: {
+        key: 'agent',
+        label: 'Agent',
+        comboId: 'combo/agent',
+        enabled: true,
+        toolMode: 'auto',
+        visionMode: 'off',
+        thinkingMode: 'high'
+      },
+      messages: [{ role: 1, content: 'Solve this carefully' }]
+    });
+
+    expect(request.model).toBe('combo/agent(high)');
+  });
+
   it('preserves matching assistant tool calls and tool results', () => {
     const request = adaptMessagesToRouterRequest({
       selectedModel: {

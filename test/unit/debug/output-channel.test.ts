@@ -19,6 +19,10 @@ describe('formatSettingsSnapshotDiagnostics', () => {
             return ' ';
           }
 
+          if (key === 'thinkingMode.daily') {
+            return 'high';
+          }
+
           return undefined;
         }
       } as never
@@ -30,6 +34,7 @@ describe('formatSettingsSnapshotDiagnostics', () => {
       expect.arrayContaining([
         'Snapshot state: degraded',
         'Published models: daily',
+        'Thinking modes: daily=high',
         'Rejected models: agent (INVALID_COMBO_MAPPING)',
         expect.stringContaining('Issues: INVALID_COMBO_MAPPING')
       ])

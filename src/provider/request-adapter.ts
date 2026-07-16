@@ -207,6 +207,14 @@ function extractToolResultText(toolResult: ToolResultLike): string {
     .join('\n');
 }
 
+function resolveRouterModelName(selectedModel: DisplayModelSetting): string {
+  if (selectedModel.thinkingMode === 'off') {
+    return selectedModel.comboId;
+  }
+
+  return `${selectedModel.comboId}(${selectedModel.thinkingMode})`;
+}
+
 export function adaptMessagesToRouterRequest(input: {
   selectedModel: DisplayModelSetting;
   messages: readonly HostChatRequestMessage[];
@@ -285,7 +293,7 @@ export function adaptMessagesToRouterRequest(input: {
   }
 
   const request: RouterChatCompletionRequest = {
-    model: input.selectedModel.comboId,
+    model: resolveRouterModelName(input.selectedModel),
     stream: true,
     messages
   };
