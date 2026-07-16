@@ -1,0 +1,122 @@
+import { describe, expect, it } from 'vitest';
+import {
+  buildSettingsSnapshot,
+  loadDisplayModelSettings,
+  loadRuntimeSettings
+} from '../../../src/config/settings';
+
+describe('loadDisplayModelSettings', () => {
+  it('returns only enabled curated models with stable keys', () => {
+    const configuration = {
+      get: (key: string) => {
+        if (key === 'displayModels') {
+          return ['daily', 'fallback'];
+        }
+
+        if (key === 'modelMappings.daily') {
+          return 'combo/daily-default';
+        }
+
+        if (key === 'modelMappings.fallback') {
+          return 'combo/fallback-default';
+        }
+
+        return undefined;
+      }
+    };
+
+    expect(loadDisplayModelSettings(configuration as never)).toEqual([
+      expect.objectContaining({ key: 'daily', comboId: 'combo/daily-default', enabled: true }),
+      expect.objectContaining({ key: 'fallback', comboId: 'combo/fallback-default', enabled: true })
+    ]);
+  });
+
+  it('normalizes the router base url to /v1', () => {
+    const configuration = {
+      get: (key: string) => (key === 'baseUrl' ? 'https://router.example.com' : undefined)
+    };
+
+    expect(loadRuntimeSettings(configuration as never).baseUrl).toBe('https://router.example.com/v1');
+  });
+});
+
+describe('buildSettingsSnapshot', () => {
+  it('marks the snapshot invalid when runtime settings are malformed', () => {
+    const configuration = {
+      get: (key: string) => {
+        if (key === 'baseUrl') {
+          return 'not-a-url';
+        }
+
+        if (key === 'requestTimeoutMs') {
+          return 0;
+        }
+
+        return undefined;
+      }
+    };
+
+    const snapshot = buildSettingsSnapshot(configuration as never);
+
+    expect(snapshot.state).toBe('invalid-runtime');
+    expect(snapshot.publishedModels).toEqual([]);
+    expect(snapshot.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: 'INVALID_BASE_URL', scope: 'runtime' }),
+        expect.objectContaining({ code: 'INVALID_REQUEST_TIMEOUT', scope: 'runtime' })
+      ])
+    );
+  });
+
+  it('degrades one broken model mapping without removing valid models from publication', () => {
+    const configuration = {
+      get: (key: string) => {
+        if (key === 'displayModels') {
+          return ['daily', 'agent'];
+        }
+
+        if (key === 'modelMappings.daily') {
+          return 'combo/daily';
+        }
+
+        if (key === 'modelMappings.agent') {
+          return '   ';
+        }
+
+        return undefined;
+      }
+    };
+
+    const snapshot = buildSettingsSnapshot(configuration as never);
+
+    expect(snapshot.state).toBe('degraded');
+    expect(snapshot.publishedModels.map((model) => model.id)).toEqual(['daily']);
+    expect(snapshot.rejectedModels).toEqual([
+      expect.objectContaining({ key: 'agent', code: 'INVALID_COMBO_MAPPING' })
+    ]);
+  });
+
+  it('returns an empty publication state when no display models are valid', () => {
+    const configuration = {
+      get: (key: string) => {
+        if (key === 'displayModels') {
+          return ['daily'];
+        }
+
+        if (key === 'modelMappings.daily') {
+          return '';
+        }
+
+        return undefined;
+      }
+    };
+
+    const snapshot = buildSettingsSnapshot(configuration as never);
+
+    expect(snapshot.state).toBe('empty');
+    expect(snapshot.publishedModels).toEqual([]);
+    expect(snapshot.rejectedModels).toEqual([
+      expect.objectContaining({ key: 'daily', code: 'INVALID_COMBO_MAPPING' })
+    ]);
+  });
+});

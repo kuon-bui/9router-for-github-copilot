@@ -1,0 +1,15 @@
+.github/**
+.git/**
+.worktrees/**
+docs/**
+test/**
+node_modules/**
+*.log
+AGENTS.md
+CODE_CONVENTION.md
+src/**
+dist/package.json
+dist/test/**
+dist/vitest.config.js
+vitest.config.ts
+eslint.config.js

@@ -1,0 +1,167 @@
+import { NineRouterError } from './errors';
+import { parseRouterEventStream } from './sse-parser';
+import { buildChatCompletionsUrl } from './url';
+import type { RouterChatCompletionRequest, RouterStreamEvent } from '../types/router-contract';
+
+export interface RouterClient {
+  streamChatCompletion(input: {
+    baseUrl: string;
+    apiKey: string;
+    request: RouterChatCompletionRequest;
+    timeoutMs: number;
+    signal: AbortSignal;
+  }): AsyncIterable<RouterStreamEvent>;
+}
+
+function createCompositeAbortSignal(signal: AbortSignal, timeoutMs: number): {
+  signal: AbortSignal;
+  cleanup: () => void;
+  didTimeout: () => boolean;
+} {
+  const controller = new AbortController();
+  let timedOut = false;
+
+  const forwardAbort = (): void => {
+    controller.abort(signal.reason);
+  };
+
+  if (signal.aborted) {
+    controller.abort(signal.reason);
+  } else {
+    signal.addEventListener('abort', forwardAbort, { once: true });
+  }
+
+  const timeoutHandle = setTimeout(() => {
+    timedOut = true;
+    controller.abort(new Error('Timed out'));
+  }, timeoutMs);
+
+  return {
+    signal: controller.signal,
+    cleanup: () => {
+      clearTimeout(timeoutHandle);
+      signal.removeEventListener('abort', forwardAbort);
+    },
+    didTimeout: () => timedOut
+  };
+}
+
+export function createRouterClient(deps: { fetch: typeof globalThis.fetch }): RouterClient {
+  return {
+    async *streamChatCompletion(input) {
+      const composite = createCompositeAbortSignal(input.signal, input.timeoutMs);
+
+      try {
+        const response = await deps.fetch(buildChatCompletionsUrl(input.baseUrl), {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            authorization: `Bearer ${input.apiKey}`
+          },
+          body: JSON.stringify(input.request),
+          signal: composite.signal
+        });
+
+        const requestId = response.headers.get('x-request-id') ?? undefined;
+        if (!response.ok) {
+          const errorBody = await response.text().catch(() => '');
+          throw classifyStatusError(response.status, requestId, errorBody);
+        }
+
+        if (!response.body) {
+          const options = requestId ? { requestId } : undefined;
+          throw new NineRouterError(
+            'MALFORMED_STREAM_ERROR',
+            '9router response stream body is empty',
+            options
+          );
+        }
+
+        for await (const event of parseRouterEventStream(response.body)) {
+          if (event.type === 'response-complete' && !event.requestId && requestId) {
+            yield {
+              ...event,
+              requestId
+            };
+            continue;
+          }
+
+          yield event;
+        }
+      } catch (error) {
+        if (composite.didTimeout()) {
+          throw new NineRouterError('TIMEOUT_ERROR', '9router request timed out');
+        }
+
+        if (input.signal.aborted) {
+          throw new NineRouterError('CANCELLATION_ERROR', '9router request was cancelled');
+        }
+
+        if (error instanceof NineRouterError) {
+          throw error;
+        }
+
+        if (error instanceof Error) {
+          throw new NineRouterError('TRANSPORT_ERROR', error.message);
+        }
+
+        throw new NineRouterError('TRANSPORT_ERROR', 'Unknown transport error');
+      } finally {
+        composite.cleanup();
+      }
+    }
+  };
+}
+
+function classifyStatusError(status: number, requestId: string | undefined, responseText: string): NineRouterError {
+  const details = {
+    status,
+    responseText
+  };
+
+  if (status === 401 || status === 403) {
+    return new NineRouterError(
+      'AUTHENTICATION_ERROR',
+      '9router authentication failed',
+      buildErrorOptions(requestId, details)
+    );
+  }
+
+  if (status === 404) {
+    return new NineRouterError(
+      'COMBO_MAPPING_ERROR',
+      '9router combo mapping was not found',
+      buildErrorOptions(requestId, details)
+    );
+  }
+
+  if (status >= 500) {
+    return new NineRouterError(
+      'UPSTREAM_UNAVAILABLE',
+      '9router upstream execution is unavailable',
+      buildErrorOptions(requestId, details)
+    );
+  }
+
+  return new NineRouterError(
+    'TRANSPORT_ERROR',
+    `9router request failed with status ${status}`,
+    buildErrorOptions(requestId, details)
+  );
+}
+
+function buildErrorOptions(
+  requestId: string | undefined,
+  details: Record<string, unknown>
+): { requestId?: string; details: Record<string, unknown> } {
+  if (requestId) {
+    return {
+      requestId,
+      details
+    };
+  }
+
+  return {
+    details
+  };
+}

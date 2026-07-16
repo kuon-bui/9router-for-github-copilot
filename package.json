@@ -1,0 +1,198 @@
+{
+  "name": "9router-copilot-chat-provider",
+  "displayName": "9router Copilot Chat Provider",
+  "description": "Expose 9router as a custom provider inside GitHub Copilot Chat.",
+  "publisher": "local",
+  "version": "0.1.0",
+  "license": "UNLICENSED",
+  "engines": {
+    "vscode": "^1.125.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "main": "./dist/src/extension.js",
+  "activationEvents": [
+    "onStartupFinished",
+    "onCommand:9routerCopilot.setApiKey",
+    "onCommand:9routerCopilot.clearApiKey",
+    "onCommand:9routerCopilot.showDiagnostics"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "9routerCopilot.setApiKey",
+        "title": "9router: Set API Key"
+      },
+      {
+        "command": "9routerCopilot.clearApiKey",
+        "title": "9router: Clear API Key"
+      },
+      {
+        "command": "9routerCopilot.showDiagnostics",
+        "title": "9router: Show Diagnostics"
+      }
+    ],
+    "languageModelChatProviders": [
+      {
+        "vendor": "9router",
+        "displayName": "9router"
+      }
+    ],
+    "configuration": {
+      "title": "9router Copilot",
+      "properties": {
+        "9router-copilot.baseUrl": {
+          "type": "string",
+          "default": "http://127.0.0.1:3456/v1",
+          "description": "Base URL for the 9router OpenAI-compatible API."
+        },
+        "9router-copilot.displayModels": {
+          "type": "array",
+          "default": [
+            "daily",
+            "agent",
+            "fallback"
+          ],
+          "items": {
+            "type": "string",
+            "enum": [
+              "daily",
+              "agent",
+              "fallback"
+            ]
+          },
+          "description": "Curated product models shown in the Copilot Chat model picker."
+        },
+        "9router-copilot.labels.daily": {
+          "type": "string",
+          "default": "Daily",
+          "description": "Display label for the Daily model."
+        },
+        "9router-copilot.labels.agent": {
+          "type": "string",
+          "default": "Agent",
+          "description": "Display label for the Agent model."
+        },
+        "9router-copilot.labels.fallback": {
+          "type": "string",
+          "default": "Fallback",
+          "description": "Display label for the Fallback model."
+        },
+        "9router-copilot.modelMappings.daily": {
+          "type": "string",
+          "default": "combo/daily",
+          "description": "9router combo id used by the Daily display model."
+        },
+        "9router-copilot.modelMappings.agent": {
+          "type": "string",
+          "default": "combo/agent",
+          "description": "9router combo id used by the Agent display model."
+        },
+        "9router-copilot.modelMappings.fallback": {
+          "type": "string",
+          "default": "combo/fallback",
+          "description": "9router combo id used by the Fallback display model."
+        },
+        "9router-copilot.toolMode.daily": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "off"
+          ],
+          "default": "off",
+          "description": "Tool exposure mode for the Daily display model."
+        },
+        "9router-copilot.toolMode.agent": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "off"
+          ],
+          "default": "auto",
+          "description": "Tool exposure mode for the Agent display model."
+        },
+        "9router-copilot.toolMode.fallback": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "off"
+          ],
+          "default": "off",
+          "description": "Tool exposure mode for the Fallback display model."
+        },
+        "9router-copilot.visionMode.daily": {
+          "type": "string",
+          "enum": [
+            "native",
+            "proxy",
+            "off"
+          ],
+          "default": "off",
+          "description": "Vision mode for Daily. Use native when the mapped 9router combo can accept image inputs directly, proxy for text-only combos, and off to block image inputs."
+        },
+        "9router-copilot.visionMode.agent": {
+          "type": "string",
+          "enum": [
+            "native",
+            "proxy",
+            "off"
+          ],
+          "default": "proxy",
+          "description": "Vision mode for Agent. Use native when the mapped 9router combo can accept image inputs directly, proxy for text-only combos, and off to block image inputs."
+        },
+        "9router-copilot.visionMode.fallback": {
+          "type": "string",
+          "enum": [
+            "native",
+            "proxy",
+            "off"
+          ],
+          "default": "off",
+          "description": "Vision mode for Fallback. Use native when the mapped 9router combo can accept image inputs directly, proxy for text-only combos, and off to block image inputs."
+        },
+        "9router-copilot.maxTokens": {
+          "type": "number",
+          "minimum": 1,
+          "default": 4096,
+          "description": "Requested max_tokens value sent to 9router."
+        },
+        "9router-copilot.requestTimeoutMs": {
+          "type": "number",
+          "minimum": 1000,
+          "default": 60000,
+          "description": "Timeout for requests sent to 9router."
+        },
+        "9router-copilot.debugMode": {
+          "type": "string",
+          "enum": [
+            "minimal",
+            "metadata",
+            "verbose"
+          ],
+          "default": "minimal",
+          "description": "Diagnostics verbosity for the extension."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "lint": "eslint .",
+    "test:unit": "vitest run test/unit",
+    "test:integration": "vitest run test/integration",
+    "test": "pnpm run test:unit && pnpm run test:integration",
+    "package": "vsce package --no-dependencies --allow-missing-repository"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^26.1.1",
+    "@types/vscode": "^1.125.0",
+    "@typescript-eslint/eslint-plugin": "^8.64.0",
+    "@typescript-eslint/parser": "^8.64.0",
+    "@vscode/vsce": "^3.9.2",
+    "eslint": "^10.7.0",
+    "typescript": "^5.6.3",
+    "vitest": "^4.1.10"
+  }
+}
