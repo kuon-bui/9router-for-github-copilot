@@ -257,7 +257,7 @@ Recommended request shape:
 - `messages`
 - `stream`
 - `tools` when supported
-- `max_tokens`
+- `max_tokens` when a positive safe integer is configured
 - optional generation parameters that `9router` documents as compatible
 
 Thinking preferences are configured per curated display model. The extension keeps `modelId` unchanged and sends a validated non-`off` level through `reasoning_effort`. `9router` owns provider-specific reasoning translation, normalization, limits, and upstream compatibility.

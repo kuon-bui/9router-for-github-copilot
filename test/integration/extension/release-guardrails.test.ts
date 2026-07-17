@@ -111,6 +111,7 @@ describe('release guardrails', () => {
 
     for (const document of [readme, productionDesign]) {
       expect(document).toContain('default is `0`');
+      expect(document).toContain('positive safe integer');
       expect(document).toContain('omits `max_tokens`');
       expect(document).toContain('upstream');
     }

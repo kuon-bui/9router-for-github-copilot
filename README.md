@@ -70,7 +70,7 @@ This release replaces the old fixed-model settings. They are not read or migrate
 
 Unknown fields, duplicate ids, invalid values, and empty mappings are rejected per model. One broken entry does not hide unrelated valid entries. The default configuration contains one unpublished `agent` entry until its `modelId` is set.
 
-`9router-copilot.maxTokens` is independent of per-model Context Window metadata. Its default is `0`. A positive integer is sent as `max_tokens`; `0` or a malformed value omits `max_tokens`, applying no extension-level response limit. `9router` or an upstream provider may still enforce its own limit. Streaming requests continue to set `stream_options.include_usage`.
+`9router-copilot.maxTokens` is independent of per-model Context Window metadata. Its default is `0`. A positive safe integer is sent as `max_tokens`; `0` or a malformed value omits `max_tokens`, applying no extension-level response limit. `9router` or an upstream provider may still enforce its own limit. Streaming requests continue to set `stream_options.include_usage`.
 
 ### Tools
 
