@@ -76,7 +76,9 @@ describe('NineRouterChatProvider', () => {
       debugMode: 'minimal'
     });
 
-    let submittedModel: string | undefined;
+    let submittedRequest:
+      | { model: string; reasoning_effort?: string }
+      | undefined;
     const provider = new NineRouterChatProvider(
       {
         secrets: {
@@ -84,8 +86,10 @@ describe('NineRouterChatProvider', () => {
         }
       } as never,
       {
-        async *streamChatCompletion(input: { request: { model: string } }) {
-          submittedModel = input.request.model;
+        async *streamChatCompletion(input: {
+          request: { model: string; reasoning_effort?: string };
+        }) {
+          submittedRequest = input.request;
           yield { type: 'response-complete' };
         }
       } as never
@@ -112,7 +116,10 @@ describe('NineRouterChatProvider', () => {
       __createCancellationToken().value as never
     );
 
-    expect(submittedModel).toBe('combo/daily(max)');
+    expect(submittedRequest).toMatchObject({
+      model: 'combo/daily',
+      reasoning_effort: 'max'
+    });
   });
 
   it('sends the base combo id when the Copilot picker selects None', async () => {

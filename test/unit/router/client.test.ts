@@ -38,4 +38,60 @@ describe('createRouterClient', () => {
     );
     expect(events).toEqual([{ type: 'response-complete' }]);
   });
+
+  it('classifies an explicit missing combo 404 as a combo mapping error', async () => {
+    const client = createRouterClient({
+      fetch: vi.fn().mockResolvedValue({
+        ok: false,
+        status: 404,
+        headers: new Headers({ 'x-request-id': 'req-missing-combo' }),
+        text: async () => '{"error":{"message":"Combo not found"}}'
+      }) as never
+    });
+
+    const consume = async (): Promise<void> => {
+      for await (const _event of client.streamChatCompletion({
+        baseUrl: 'https://router.example.com/v1',
+        apiKey: 'secret-token',
+        request: { model: 'missing-combo', messages: [], stream: true },
+        timeoutMs: 1000,
+        signal: new AbortController().signal
+      })) {
+        // The error occurs before any event is emitted.
+      }
+    };
+
+    await expect(consume()).rejects.toMatchObject({
+      code: 'COMBO_MAPPING_ERROR',
+      requestId: 'req-missing-combo'
+    });
+  });
+
+  it('preserves an unrelated 404 as a transport error', async () => {
+    const client = createRouterClient({
+      fetch: vi.fn().mockResolvedValue({
+        ok: false,
+        status: 404,
+        headers: new Headers(),
+        text: async () => '{"error":{"message":"No active credentials for provider: openai"}}'
+      }) as never
+    });
+
+    const consume = async (): Promise<void> => {
+      for await (const _event of client.streamChatCompletion({
+        baseUrl: 'https://router.example.com/v1',
+        apiKey: 'secret-token',
+        request: { model: '123', messages: [], stream: true },
+        timeoutMs: 1000,
+        signal: new AbortController().signal
+      })) {
+        // The error occurs before any event is emitted.
+      }
+    };
+
+    await expect(consume()).rejects.toMatchObject({
+      code: 'TRANSPORT_ERROR',
+      message: '9router request failed with status 404'
+    });
+  });
 });

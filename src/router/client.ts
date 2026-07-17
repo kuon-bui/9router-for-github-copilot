@@ -113,6 +113,15 @@ export function createRouterClient(deps: { fetch: typeof globalThis.fetch }): Ro
   };
 }
 
+function isExplicitMissingModelError(responseText: string): boolean {
+  const normalized = responseText.toLowerCase();
+  return (
+    /(?:model|combo)\s+(?:was\s+)?not\s+found/.test(normalized) ||
+    /unknown\s+(?:model|combo)/.test(normalized) ||
+    /invalid\s+(?:model|combo)/.test(normalized)
+  );
+}
+
 function classifyStatusError(status: number, requestId: string | undefined, responseText: string): NineRouterError {
   const details = {
     status,
@@ -127,7 +136,7 @@ function classifyStatusError(status: number, requestId: string | undefined, resp
     );
   }
 
-  if (status === 404) {
+  if (status === 404 && isExplicitMissingModelError(responseText)) {
     return new NineRouterError(
       'COMBO_MAPPING_ERROR',
       '9router combo mapping was not found',
