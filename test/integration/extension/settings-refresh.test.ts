@@ -133,4 +133,43 @@ describe('NineRouterChatProvider snapshot refresh', () => {
       code: 'CONFIGURATION_ERROR'
     });
   });
+
+  it('refreshes proxy image capability when the shared Vision combo is configured', async () => {
+    const createSnapshot = (visionProxyComboId?: string) =>
+      buildSettingsSnapshot(
+        {
+          get: (key: string) => {
+            if (key === 'displayModels') return ['agent'];
+            if (key === 'modelMappings.agent') return 'combo/agent';
+            if (key === 'visionMode.agent') return 'proxy';
+            if (key === 'visionProxyComboId') return visionProxyComboId;
+            return undefined;
+          }
+        } as never
+      );
+    const provider = new NineRouterChatProvider(
+      {
+        secrets: {
+          get: async () => 'token'
+        }
+      } as never,
+      {
+        async *streamChatCompletion() {
+          yield { type: 'response-complete' };
+        }
+      } as never,
+      createSnapshot()
+    );
+
+    const initialModels = await provider.provideLanguageModelChatInformation({} as never, {} as never);
+    expect(initialModels[0]?.capabilities.imageInput).toBeUndefined();
+
+    provider.refreshFromSnapshot(createSnapshot('combo/vision'));
+
+    const refreshedModels = await provider.provideLanguageModelChatInformation(
+      {} as never,
+      {} as never
+    );
+    expect(refreshedModels[0]?.capabilities.imageInput).toBe(true);
+  });
 });

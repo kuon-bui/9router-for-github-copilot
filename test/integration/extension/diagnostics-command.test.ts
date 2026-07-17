@@ -41,6 +41,10 @@ describe('9routerCopilot.showDiagnostics', () => {
                   return '';
                 }
 
+                if (key === 'visionProxyComboId') {
+                  return 'combo/vision-private';
+                }
+
                 return undefined;
               }
             } as never
@@ -53,5 +57,7 @@ describe('9routerCopilot.showDiagnostics', () => {
 
     expect(__getOutputLines().join('\n')).toContain('Snapshot state: degraded');
     expect(__getOutputLines().join('\n')).toContain('Rejected models: agent (INVALID_COMBO_MAPPING)');
+    expect(__getOutputLines().join('\n')).toContain('"visionProxyConfigured":true');
+    expect(__getOutputLines().join('\n')).not.toContain('combo/vision-private');
   });
 });

@@ -151,6 +151,11 @@
           "default": "off",
           "description": "Vision mode for Fallback. Use native when the mapped 9router combo can accept image inputs directly, proxy for text-only combos, and off to block image inputs."
         },
+        "9router-copilot.visionProxyComboId": {
+          "type": "string",
+          "default": "",
+          "description": "Existing 9router combo id used to describe image attachments for every display model configured with visionMode proxy."
+        },
         "9router-copilot.thinkingMode.daily": {
           "type": "string",
           "enum": [

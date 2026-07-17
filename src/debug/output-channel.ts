@@ -51,7 +51,8 @@ export function formatSettingsSnapshotDiagnostics(snapshot: SettingsSnapshot): s
           baseUrl: snapshot.runtime.baseUrl,
           requestTimeoutMs: snapshot.runtime.requestTimeoutMs,
           maxTokens: snapshot.runtime.maxTokens,
-          debugMode: snapshot.runtime.debugMode
+          debugMode: snapshot.runtime.debugMode,
+          visionProxyConfigured: snapshot.runtime.visionProxyComboId.length > 0
         })
       )}`
     : 'Runtime: invalid';

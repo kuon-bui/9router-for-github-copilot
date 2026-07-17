@@ -1,10 +1,20 @@
 import { createThinkingEffortConfigurationSchema } from './thinking-effort';
 import type { DisplayModelSetting, PublishedModel } from '../types/product-model';
 
-export function createPublishedModel(setting: DisplayModelSetting): PublishedModel {
+export interface PublishedModelOptions {
+  visionProxyConfigured?: boolean;
+}
+
+export function createPublishedModel(
+  setting: DisplayModelSetting,
+  options: PublishedModelOptions = {}
+): PublishedModel {
+  const exposesImageInput =
+    setting.visionMode === 'native' ||
+    (setting.visionMode === 'proxy' && options.visionProxyConfigured === true);
   const capabilities: PublishedModel['capabilities'] = {
     ...(setting.toolMode === 'auto' ? { toolCalling: 32 } : {}),
-    ...(setting.visionMode === 'native' ? { imageInput: true } : {})
+    ...(exposesImageInput ? { imageInput: true } : {})
   };
 
   return {
@@ -20,8 +30,11 @@ export function createPublishedModel(setting: DisplayModelSetting): PublishedMod
   };
 }
 
-export function resolvePublishedModels(settings: DisplayModelSetting[]): PublishedModel[] {
+export function resolvePublishedModels(
+  settings: DisplayModelSetting[],
+  options: PublishedModelOptions = {}
+): PublishedModel[] {
   return settings
     .filter((setting) => setting.enabled && setting.comboId.trim().length > 0)
-    .map(createPublishedModel);
+    .map((setting) => createPublishedModel(setting, options));
 }

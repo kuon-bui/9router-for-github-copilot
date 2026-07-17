@@ -9,7 +9,8 @@ import {
   DEFAULT_REQUEST_TIMEOUT_MS,
   DEFAULT_THINKING_MODES,
   DEFAULT_TOOL_MODES,
-  DEFAULT_VISION_MODES
+  DEFAULT_VISION_MODES,
+  DEFAULT_VISION_PROXY_COMBO_ID
 } from './defaults';
 import { createPublishedModel } from '../provider/model-catalog';
 import { PRODUCT_MODEL_KEYS, THINKING_MODES } from '../types/product-model';
@@ -30,17 +31,19 @@ export interface RuntimeSettings {
   maxTokens?: number;
   requestTimeoutMs: number;
   debugMode: 'minimal' | 'metadata' | 'verbose';
+  visionProxyComboId: string;
 }
 
 export interface SettingsIssue {
-  scope: 'runtime' | 'model';
+  scope: 'runtime' | 'model' | 'capability';
   code:
     | 'INVALID_BASE_URL'
     | 'INVALID_REQUEST_TIMEOUT'
     | 'INVALID_MAX_TOKENS'
     | 'INVALID_DISPLAY_MODEL_KEY'
     | 'INVALID_COMBO_MAPPING'
-    | 'INVALID_THINKING_MODE';
+    | 'INVALID_THINKING_MODE'
+    | 'MISSING_VISION_PROXY_COMBO';
   message: string;
   modelKey?: string;
 }
@@ -147,6 +150,8 @@ export function loadDisplayModelSettings(
 export function loadRuntimeSettings(
   configuration: Pick<vscode.WorkspaceConfiguration, 'get'>
 ): RuntimeSettings {
+  const visionProxyComboId =
+    configuration.get<string>('visionProxyComboId')?.trim() ?? DEFAULT_VISION_PROXY_COMBO_ID;
   const baseUrl = normalizeBaseUrl(configuration.get<string>('baseUrl') ?? DEFAULT_BASE_URL);
   const maxTokens = configuration.get<number>('maxTokens') ?? DEFAULT_MAX_TOKENS;
   const requestTimeoutMs = configuration.get<number>('requestTimeoutMs') ?? DEFAULT_REQUEST_TIMEOUT_MS;
@@ -156,7 +161,8 @@ export function loadRuntimeSettings(
     baseUrl,
     maxTokens,
     requestTimeoutMs,
-    debugMode
+    debugMode,
+    visionProxyComboId
   };
 }
 
@@ -167,6 +173,8 @@ export function getExtensionConfiguration(): vscode.WorkspaceConfiguration {
 export function buildSettingsSnapshot(
   configuration: Pick<vscode.WorkspaceConfiguration, 'get'>
 ): SettingsSnapshot {
+  const visionProxyComboId =
+    configuration.get<string>('visionProxyComboId')?.trim() ?? DEFAULT_VISION_PROXY_COMBO_ID;
   const issues: SettingsIssue[] = [];
   const rejectedModels: RejectedModelSetting[] = [];
   const rawDisplayModels = configuration.get<unknown>('displayModels');
@@ -250,7 +258,23 @@ export function buildSettingsSnapshot(
     };
 
     displayModels.push(setting);
-    publishedModels.push(createPublishedModel(setting));
+    publishedModels.push(
+      createPublishedModel(setting, {
+        visionProxyConfigured: visionProxyComboId.length > 0
+      })
+    );
+  }
+
+  if (
+    visionProxyComboId.length === 0 &&
+    displayModels.some((model) => model.visionMode === 'proxy')
+  ) {
+    issues.push({
+      scope: 'capability',
+      code: 'MISSING_VISION_PROXY_COMBO',
+      message:
+        'Proxy Vision is disabled until 9router-copilot.visionProxyComboId references an existing 9router combo.'
+    });
   }
 
   if (!runtime) {
@@ -276,7 +300,7 @@ export function buildSettingsSnapshot(
   }
 
   return {
-    state: rejectedModels.length > 0 || invalidKeys.length > 0 ? 'degraded' : 'valid',
+    state: issues.length > 0 ? 'degraded' : 'valid',
     runtime,
     displayModels,
     publishedModels,
@@ -289,6 +313,8 @@ function validateRuntimeSettings(
   configuration: Pick<vscode.WorkspaceConfiguration, 'get'>,
   issues: SettingsIssue[]
 ): RuntimeSettings | undefined {
+  const visionProxyComboId =
+    configuration.get<string>('visionProxyComboId')?.trim() ?? DEFAULT_VISION_PROXY_COMBO_ID;
   const baseUrlInput = configuration.get<string>('baseUrl') ?? DEFAULT_BASE_URL;
   const normalizedBaseUrl = baseUrlInput.trim().length > 0 ? normalizeBaseUrl(baseUrlInput) : '';
 
@@ -328,7 +354,8 @@ function validateRuntimeSettings(
     baseUrl: normalizedBaseUrl,
     maxTokens,
     requestTimeoutMs,
-    debugMode
+    debugMode,
+    visionProxyComboId
   };
 }
 

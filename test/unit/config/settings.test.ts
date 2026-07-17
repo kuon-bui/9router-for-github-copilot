@@ -90,6 +90,14 @@ describe('loadDisplayModelSettings', () => {
 
     expect(loadRuntimeSettings(configuration as never).baseUrl).toBe('https://router.example.com/v1');
   });
+
+  it('loads and trims the shared Vision proxy combo id', () => {
+    const runtime = loadRuntimeSettings({
+      get: (key: string) => (key === 'visionProxyComboId' ? '  combo/vision  ' : undefined)
+    } as never);
+
+    expect(runtime.visionProxyComboId).toBe('combo/vision');
+  });
 });
 
 describe('buildSettingsSnapshot', () => {
@@ -264,5 +272,42 @@ describe('buildSettingsSnapshot', () => {
     expect(snapshot.rejectedModels).toEqual([
       expect.objectContaining({ key: 'daily', code: 'INVALID_COMBO_MAPPING' })
     ]);
+  });
+
+  it('degrades image capability without rejecting a proxy model', () => {
+    const snapshot = buildSettingsSnapshot({
+      get: (key: string) => {
+        if (key === 'displayModels') return ['agent'];
+        if (key === 'modelMappings.agent') return 'combo/agent';
+        if (key === 'visionMode.agent') return 'proxy';
+        return undefined;
+      }
+    } as never);
+
+    expect(snapshot.state).toBe('degraded');
+    expect(snapshot.publishedModels).toHaveLength(1);
+    expect(snapshot.publishedModels[0]?.capabilities.imageInput).toBeUndefined();
+    expect(snapshot.issues).toContainEqual(
+      expect.objectContaining({
+        scope: 'capability',
+        code: 'MISSING_VISION_PROXY_COMBO'
+      })
+    );
+  });
+
+  it('advertises proxy image input when the shared combo is configured', () => {
+    const snapshot = buildSettingsSnapshot({
+      get: (key: string) => {
+        if (key === 'displayModels') return ['agent'];
+        if (key === 'modelMappings.agent') return 'combo/agent';
+        if (key === 'visionMode.agent') return 'proxy';
+        if (key === 'visionProxyComboId') return 'combo/vision';
+        return undefined;
+      }
+    } as never);
+
+    expect(snapshot.state).toBe('valid');
+    expect(snapshot.runtime?.visionProxyComboId).toBe('combo/vision');
+    expect(snapshot.publishedModels[0]?.capabilities.imageInput).toBe(true);
   });
 });

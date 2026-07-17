@@ -29,6 +29,13 @@ describe('release guardrails', () => {
     }
   });
 
+  it('contributes one empty shared Vision proxy combo setting', () => {
+    const setting =
+      manifest.contributes.configuration.properties['9router-copilot.visionProxyComboId'];
+
+    expect(setting).toMatchObject({ type: 'string', default: '' });
+  });
+
   it('documents the native picker without moving reasoning policy into the extension', async () => {
     const readme = await readFile(resolve(process.cwd(), 'README.md'), 'utf8');
     const productionDesign = await readFile(
