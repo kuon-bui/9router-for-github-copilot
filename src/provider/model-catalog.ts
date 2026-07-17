@@ -1,12 +1,12 @@
 import { createThinkingEffortConfigurationSchema } from './thinking-effort';
-import type { DisplayModelSetting, PublishedModel } from '../types/product-model';
+import type { ConfiguredModel, PublishedModel } from '../types/product-model';
 
 export interface PublishedModelOptions {
   visionProxyConfigured?: boolean;
 }
 
 export function createPublishedModel(
-  setting: DisplayModelSetting,
+  setting: ConfiguredModel,
   options: PublishedModelOptions = {}
 ): PublishedModel {
   const exposesImageInput =
@@ -18,10 +18,10 @@ export function createPublishedModel(
   };
 
   return {
-    id: setting.key,
-    name: setting.label,
+    id: setting.id,
+    name: setting.name,
     vendor: '9router',
-    family: setting.key,
+    family: setting.id,
     version: '1',
     maxInputTokens: setting.maxInputTokens,
     maxOutputTokens: setting.maxOutputTokens,
@@ -31,10 +31,8 @@ export function createPublishedModel(
 }
 
 export function resolvePublishedModels(
-  settings: DisplayModelSetting[],
+  settings: ConfiguredModel[],
   options: PublishedModelOptions = {}
 ): PublishedModel[] {
-  return settings
-    .filter((setting) => setting.enabled && setting.comboId.trim().length > 0)
-    .map((setting) => createPublishedModel(setting, options));
+  return settings.map((setting) => createPublishedModel(setting, options));
 }

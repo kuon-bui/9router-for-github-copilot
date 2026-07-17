@@ -1,4 +1,4 @@
-import type { DisplayModelSetting } from '../types/product-model';
+import type { ConfiguredModel } from '../types/product-model';
 import type { RouterToolDefinition } from '../types/router-contract';
 
 export interface HostToolDefinition {
@@ -19,7 +19,7 @@ export interface RouterToolOptions {
   rejectedTools: RejectedToolDefinition[];
 }
 
-export function shouldExposeTools(setting: DisplayModelSetting): boolean {
+export function shouldExposeTools(setting: ConfiguredModel): boolean {
   return setting.toolMode === 'auto';
 }
 
@@ -44,7 +44,7 @@ export function adaptToolsToRouterDefinitions(
 }
 
 export function adaptToolOptionsForRouter(input: {
-  selectedModel: DisplayModelSetting;
+  selectedModel: ConfiguredModel;
   tools?: readonly HostToolDefinition[];
   hostToolMode?: unknown;
 }): RouterToolOptions {
@@ -63,7 +63,7 @@ export function adaptToolOptionsForRouter(input: {
       rejectedTools: tools.map((tool) => ({
         name: typeof tool.name === 'string' ? tool.name : '[unknown]',
         code: 'MODEL_TOOLS_DISABLED',
-        message: `Display model "${input.selectedModel.key}" does not expose tools.`
+        message: `Display model "${input.selectedModel.id}" does not expose tools.`
       }))
     };
   }

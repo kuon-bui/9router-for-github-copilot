@@ -5,6 +5,11 @@ import { handleConfigurationChange } from '../../../src/runtime/activate';
 import type { PublishedModel } from '../../../src/types/product-model';
 import { __createCancellationToken } from '../../support/vscode';
 
+const createSnapshot = (models: unknown[], values: Record<string, unknown> = {}) =>
+  buildSettingsSnapshot({
+    get: (key: string) => (key === 'models' ? models : values[key])
+  } as never);
+
 describe('handleConfigurationChange', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
@@ -25,104 +30,69 @@ describe('handleConfigurationChange', () => {
 });
 
 describe('NineRouterChatProvider snapshot refresh', () => {
-  it('publishes models from the latest validated snapshot after refresh', async () => {
+  const context = { secrets: { get: async () => 'token' } } as never;
+  const routerClient = {
+    async *streamChatCompletion() {
+      yield { type: 'response-complete' };
+    }
+  } as never;
+
+  it('adds, removes, renames, and reorders arbitrary picker models after refresh', async () => {
     const provider = new NineRouterChatProvider(
-      {
-        secrets: {
-          get: async () => 'token'
-        }
-      } as never,
-      {
-        async *streamChatCompletion() {
-          yield { type: 'response-complete' };
-        }
-      } as never,
-      buildSettingsSnapshot(
-        {
-          get: (key: string) => {
-            if (key === 'displayModels') {
-              return ['daily'];
-            }
-
-            if (key === 'modelMappings.daily') {
-              return 'combo/daily';
-            }
-
-            return undefined;
-          }
-        } as never
-      )
+      context,
+      routerClient,
+      createSnapshot([
+        { id: 'research', name: 'Research', modelId: 'router/research' },
+        { id: 'coder', name: 'Coder', modelId: 'router/coder' }
+      ])
     );
 
     const initialModels = await provider.provideLanguageModelChatInformation({} as never, {} as never);
-    expect(initialModels.map((model) => model.id)).toEqual(['daily']);
+    expect(initialModels.map(({ id, name }) => ({ id, name }))).toEqual([
+      { id: 'research', name: 'Research' },
+      { id: 'coder', name: 'Coder' }
+    ]);
 
     provider.refreshFromSnapshot(
-      buildSettingsSnapshot(
-        {
-          get: (key: string) => {
-            if (key === 'displayModels') {
-              return ['fallback'];
-            }
-
-            if (key === 'modelMappings.fallback') {
-              return 'combo/fallback';
-            }
-
-            return undefined;
-          }
-        } as never
-      )
+      createSnapshot([
+        { id: 'coder', name: 'Coding Pro', modelId: 'router/coder' },
+        { id: 'fast', name: 'Fast', modelId: 'router/fast' }
+      ])
     );
 
     const refreshedModels = await provider.provideLanguageModelChatInformation({} as never, {} as never);
-    expect(refreshedModels.map((model) => model.id)).toEqual(['fallback']);
+    expect(refreshedModels.map(({ id, name }) => ({ id, name }))).toEqual([
+      { id: 'coder', name: 'Coding Pro' },
+      { id: 'fast', name: 'Fast' }
+    ]);
   });
 
-  it('refreshes published context window metadata from per-model settings', async () => {
-    const createSnapshot = (maxInputTokens: number, maxOutputTokens: number) =>
-      buildSettingsSnapshot({
-        get: (key: string) => {
-          const values: Record<string, unknown> = {
-            displayModels: ['daily'],
-            'modelMappings.daily': 'combo/daily',
-            'maxInputTokens.daily': maxInputTokens,
-            'maxOutputTokens.daily': maxOutputTokens
-          };
-
-          return values[key];
+  it('refreshes published context window metadata from model objects', async () => {
+    const snapshotWithLimits = (maxInputTokens: number, maxOutputTokens: number) =>
+      createSnapshot([
+        {
+          id: 'coder',
+          name: 'Coder',
+          modelId: 'router/coder',
+          maxInputTokens,
+          maxOutputTokens
         }
-      } as never);
-
+      ]);
     const provider = new NineRouterChatProvider(
-      {
-        secrets: {
-          get: async () => 'token'
-        }
-      } as never,
-      {
-        async *streamChatCompletion() {
-          yield { type: 'response-complete' };
-        }
-      } as never,
-      createSnapshot(32_000, 2_048)
+      context,
+      routerClient,
+      snapshotWithLimits(32_000, 2_048)
     );
 
-    const initialModels = await provider.provideLanguageModelChatInformation(
-      {} as never,
-      {} as never
-    );
+    const initialModels = await provider.provideLanguageModelChatInformation({} as never, {} as never);
     expect(initialModels[0]).toMatchObject({
       maxInputTokens: 32_000,
       maxOutputTokens: 2_048
     });
 
-    provider.refreshFromSnapshot(createSnapshot(64_000, 4_096));
+    provider.refreshFromSnapshot(snapshotWithLimits(64_000, 4_096));
 
-    const refreshedModels = await provider.provideLanguageModelChatInformation(
-      {} as never,
-      {} as never
-    );
+    const refreshedModels = await provider.provideLanguageModelChatInformation({} as never, {} as never);
     expect(refreshedModels[0]).toMatchObject({
       maxInputTokens: 64_000,
       maxOutputTokens: 4_096
@@ -131,44 +101,21 @@ describe('NineRouterChatProvider snapshot refresh', () => {
 
   it('blocks requests when the current snapshot has invalid runtime settings', async () => {
     const provider = new NineRouterChatProvider(
-      {
-        secrets: {
-          get: async () => 'token'
-        }
-      } as never,
-      {
-        async *streamChatCompletion() {
-          yield { type: 'response-complete' };
-        }
-      } as never,
-      buildSettingsSnapshot(
-        {
-          get: (key: string) => {
-            if (key === 'displayModels') {
-              return ['daily'];
-            }
-
-            if (key === 'modelMappings.daily') {
-              return 'combo/daily';
-            }
-
-            if (key === 'baseUrl') {
-              return 'not-a-url';
-            }
-
-            return undefined;
-          }
-        } as never
+      context,
+      routerClient,
+      createSnapshot(
+        [{ id: 'coder', name: 'Coder', modelId: 'router/coder' }],
+        { baseUrl: 'not-a-url' }
       )
     );
 
     await expect(
       provider.provideLanguageModelChatResponse(
         {
-          id: 'daily',
-          name: 'Daily',
+          id: 'coder',
+          name: 'Coder',
           vendor: '9router',
-          family: 'daily',
+          family: 'coder',
           version: '1',
           maxInputTokens: 128000,
           maxOutputTokens: 8192,
@@ -179,47 +126,23 @@ describe('NineRouterChatProvider snapshot refresh', () => {
         { report: () => undefined } as never,
         __createCancellationToken().value as never
       )
-    ).rejects.toMatchObject({
-      code: 'CONFIGURATION_ERROR'
-    });
+    ).rejects.toMatchObject({ code: 'CONFIGURATION_ERROR' });
   });
 
-  it('refreshes proxy image capability when the shared Vision combo is configured', async () => {
-    const createSnapshot = (visionProxyComboId?: string) =>
-      buildSettingsSnapshot(
-        {
-          get: (key: string) => {
-            if (key === 'displayModels') return ['agent'];
-            if (key === 'modelMappings.agent') return 'combo/agent';
-            if (key === 'visionMode.agent') return 'proxy';
-            if (key === 'visionProxyComboId') return visionProxyComboId;
-            return undefined;
-          }
-        } as never
+  it('refreshes proxy image capability when the shared Vision model is configured', async () => {
+    const snapshotWithProxy = (visionProxyModelId?: string) =>
+      createSnapshot(
+        [{ id: 'agent', name: 'Agent', modelId: 'router/agent', visionMode: 'proxy' }],
+        { visionProxyModelId }
       );
-    const provider = new NineRouterChatProvider(
-      {
-        secrets: {
-          get: async () => 'token'
-        }
-      } as never,
-      {
-        async *streamChatCompletion() {
-          yield { type: 'response-complete' };
-        }
-      } as never,
-      createSnapshot()
-    );
+    const provider = new NineRouterChatProvider(context, routerClient, snapshotWithProxy());
 
     const initialModels = await provider.provideLanguageModelChatInformation({} as never, {} as never);
     expect(initialModels[0]?.capabilities.imageInput).toBeUndefined();
 
-    provider.refreshFromSnapshot(createSnapshot('combo/vision'));
+    provider.refreshFromSnapshot(snapshotWithProxy('router/vision'));
 
-    const refreshedModels = await provider.provideLanguageModelChatInformation(
-      {} as never,
-      {} as never
-    );
+    const refreshedModels = await provider.provideLanguageModelChatInformation({} as never, {} as never);
     expect(refreshedModels[0]?.capabilities.imageInput).toBe(true);
   });
 });

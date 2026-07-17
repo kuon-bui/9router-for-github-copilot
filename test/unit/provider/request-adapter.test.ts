@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import * as vscode from 'vscode';
 import { adaptMessagesToRouterRequest } from '../../../src/provider/request-adapter';
-import type { DisplayModelSetting } from '../../../src/types/product-model';
+import type { ConfiguredModel } from '../../../src/types/product-model';
 
-function selectedModel(overrides: Partial<DisplayModelSetting> = {}): DisplayModelSetting {
+function selectedModel(overrides: Partial<ConfiguredModel> = {}): ConfiguredModel {
   return {
-    key: 'agent',
-    label: 'Agent',
-    comboId: '123',
-    enabled: true,
+    sourceIndex: 0,
+    id: 'agent',
+    name: 'Agent',
+    modelId: '123',
     toolMode: 'auto',
     visionMode: 'off',
     thinkingMode: 'off',
@@ -19,12 +19,12 @@ function selectedModel(overrides: Partial<DisplayModelSetting> = {}): DisplayMod
 }
 
 describe('adaptMessagesToRouterRequest', () => {
-  it('maps the selected display model to the configured combo id', () => {
+  it('maps the selected display model to the configured model id', () => {
     const request = adaptMessagesToRouterRequest({
       selectedModel: selectedModel({
-        key: 'daily',
-        label: 'Daily',
-        comboId: 'combo/daily',
+        id: 'daily',
+        name: 'Daily',
+        modelId: 'combo/daily',
         toolMode: 'off'
       }),
       messages: [{ role: 1, content: 'Say hello' }],
@@ -43,7 +43,7 @@ describe('adaptMessagesToRouterRequest', () => {
     expect(request).not.toHaveProperty('reasoning_effort');
   });
 
-  it('keeps the combo id bare and forwards thinking as reasoning_effort', () => {
+  it('keeps the model id bare and forwards thinking as reasoning_effort', () => {
     const request = adaptMessagesToRouterRequest({
       selectedModel: selectedModel({ thinkingMode: 'high' }),
       messages: [{ role: 1, content: 'Solve this carefully' }]
@@ -320,7 +320,7 @@ describe('adaptMessagesToRouterRequest', () => {
 
   it('adds tools and required tool choice only when the selected model exposes tools', () => {
     const request = adaptMessagesToRouterRequest({
-      selectedModel: selectedModel({ comboId: 'combo/agent' }),
+      selectedModel: selectedModel({ modelId: 'combo/agent' }),
       messages: [{ role: 1, content: 'Use a tool' }],
       tools: [
         {
@@ -348,8 +348,8 @@ describe('adaptMessagesToRouterRequest', () => {
 
     const request = adaptMessagesToRouterRequest({
       selectedModel: selectedModel({
-        label: 'Agent Vision',
-        comboId: 'combo/agent-vision',
+        name: 'Agent Vision',
+        modelId: 'combo/agent-vision',
         toolMode: 'off',
         visionMode: 'native'
       }),
@@ -365,8 +365,8 @@ describe('adaptMessagesToRouterRequest', () => {
   it('treats hybrid native image parts as images before generic value text', () => {
     const request = adaptMessagesToRouterRequest({
       selectedModel: selectedModel({
-        label: 'Agent Vision',
-        comboId: 'combo/agent-vision',
+        name: 'Agent Vision',
+        modelId: 'combo/agent-vision',
         toolMode: 'off',
         visionMode: 'native'
       }),

@@ -32,9 +32,9 @@ This project uses a **thin provider adapter** architecture.
 The extension is responsible for:
 
 - registering a `9router` language model provider in VS Code
-- exposing Copilot-facing display models
+- exposing user-defined curated Copilot-facing display models
 - storing secrets securely
-- mapping display models to `9router` combo ids
+- mapping each display model to an opaque `9router` `modelId`
 - adapting host requests into the `9router` API format
 - streaming responses back to the host
 - exposing safe diagnostics and configuration behavior
@@ -52,23 +52,15 @@ Do not move `9router` business logic into the extension.
 
 ## Product Model
 
-The extension should expose curated product models in Copilot Chat, not raw upstream model ids.
-
-Current product model:
-
-- `Daily`
-- `Agent`
-- `Fallback`
-
-These are presentation-layer models only. Each one maps to a `9router` combo id through local per-user VS Code settings.
+The extension exposes an ordered array of user-defined curated models in Copilot Chat, not raw upstream provider ids. Each object keeps its stable Copilot-facing `id` and `name` separate from the opaque `9router` `modelId`. Array order controls picker order; removing an object removes that model.
 
 ## Configuration Rules
 
 Use local per-user VS Code settings for:
 
-- which display models appear in the picker
-- labels and ordering if supported
-- mapping from display models to `9router` combo ids
+- the `9router-copilot.models` array, including each model's `id`, `name`, `modelId`, capabilities, thinking default, and token metadata
+- picker membership and ordering through the model objects themselves
+- the optional shared `9router-copilot.visionProxyModelId`
 - non-secret runtime settings such as base URL, timeout, and debug mode
 
 Use `SecretStorage` only for:

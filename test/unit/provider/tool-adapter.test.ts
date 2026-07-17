@@ -4,14 +4,14 @@ import {
   adaptToolsToRouterDefinitions,
   shouldExposeTools
 } from '../../../src/provider/tool-adapter';
-import type { DisplayModelSetting } from '../../../src/types/product-model';
+import type { ConfiguredModel } from '../../../src/types/product-model';
 
-function selectedModel(overrides: Partial<DisplayModelSetting> = {}): DisplayModelSetting {
+function selectedModel(overrides: Partial<ConfiguredModel> = {}): ConfiguredModel {
   return {
-    key: 'agent',
-    label: 'Agent',
-    comboId: 'combo/agent',
-    enabled: true,
+    sourceIndex: 0,
+    id: 'agent',
+    name: 'Agent',
+    modelId: 'combo/agent',
     toolMode: 'auto',
     visionMode: 'off',
     thinkingMode: 'off',
@@ -112,9 +112,9 @@ describe('adaptToolOptionsForRouter', () => {
   it('does not expose tools when the selected display model has toolMode off', () => {
     const result = adaptToolOptionsForRouter({
       selectedModel: selectedModel({
-        key: 'daily',
-        label: 'Daily',
-        comboId: 'combo/daily',
+        id: 'daily',
+        name: 'Daily',
+        modelId: 'combo/daily',
         toolMode: 'off'
       }),
       tools: [

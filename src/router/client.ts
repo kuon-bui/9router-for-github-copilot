@@ -167,8 +167,8 @@ function classifyStatusError(status: number, requestId: string | undefined, resp
 
   if (status === 404 && isExplicitMissingModelError(responseText)) {
     return new NineRouterError(
-      'COMBO_MAPPING_ERROR',
-      '9router combo mapping was not found',
+      'MODEL_MAPPING_ERROR',
+      '9router model mapping was not found',
       buildErrorOptions(requestId, details)
     );
   }

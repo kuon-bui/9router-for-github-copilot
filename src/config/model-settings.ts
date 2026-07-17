@@ -143,7 +143,8 @@ export function parseModelSettings(input: unknown): ParsedModelSettings {
       return;
     }
 
-    const id = typeof item.id === 'string' ? item.id : undefined;
+    const candidateId = typeof item.id === 'string' ? item.id : undefined;
+    const id = candidateId && MODEL_ID_PATTERN.test(candidateId) ? candidateId : undefined;
     const unknownField = Object.keys(item).find((field) => !ALLOWED_FIELDS.has(field));
     if (unknownField) {
       reject(
@@ -155,7 +156,7 @@ export function parseModelSettings(input: unknown): ParsedModelSettings {
       );
       return;
     }
-    if (!id || !MODEL_ID_PATTERN.test(id)) {
+    if (!id) {
       reject(
         sourceIndex,
         id,
@@ -194,7 +195,7 @@ export function parseModelSettings(input: unknown): ParsedModelSettings {
       return;
     }
 
-    const toolMode = item.toolMode ?? DEFAULT_MODEL_TOOL_MODE;
+    const toolMode = item.toolMode === undefined ? DEFAULT_MODEL_TOOL_MODE : item.toolMode;
     if (typeof toolMode !== 'string' || !TOOL_MODES.has(toolMode as ToolMode)) {
       reject(
         sourceIndex,
@@ -205,7 +206,7 @@ export function parseModelSettings(input: unknown): ParsedModelSettings {
       );
       return;
     }
-    const visionMode = item.visionMode ?? DEFAULT_MODEL_VISION_MODE;
+    const visionMode = item.visionMode === undefined ? DEFAULT_MODEL_VISION_MODE : item.visionMode;
     if (typeof visionMode !== 'string' || !VISION_MODES.has(visionMode as VisionMode)) {
       reject(
         sourceIndex,
@@ -216,7 +217,8 @@ export function parseModelSettings(input: unknown): ParsedModelSettings {
       );
       return;
     }
-    const thinkingMode = item.thinkingMode ?? DEFAULT_MODEL_THINKING_MODE;
+    const thinkingMode =
+      item.thinkingMode === undefined ? DEFAULT_MODEL_THINKING_MODE : item.thinkingMode;
     if (typeof thinkingMode !== 'string' || !THINKING_MODE_SET.has(thinkingMode)) {
       reject(
         sourceIndex,
@@ -227,7 +229,10 @@ export function parseModelSettings(input: unknown): ParsedModelSettings {
       );
       return;
     }
-    const maxInputTokens = item.maxInputTokens ?? DEFAULT_MODEL_MAX_INPUT_TOKENS;
+    const maxInputTokens =
+      item.maxInputTokens === undefined
+        ? DEFAULT_MODEL_MAX_INPUT_TOKENS
+        : item.maxInputTokens;
     if (!isPositiveInteger(maxInputTokens)) {
       reject(
         sourceIndex,
@@ -238,7 +243,10 @@ export function parseModelSettings(input: unknown): ParsedModelSettings {
       );
       return;
     }
-    const maxOutputTokens = item.maxOutputTokens ?? DEFAULT_MODEL_MAX_OUTPUT_TOKENS;
+    const maxOutputTokens =
+      item.maxOutputTokens === undefined
+        ? DEFAULT_MODEL_MAX_OUTPUT_TOKENS
+        : item.maxOutputTokens;
     if (!isPositiveInteger(maxOutputTokens)) {
       reject(
         sourceIndex,

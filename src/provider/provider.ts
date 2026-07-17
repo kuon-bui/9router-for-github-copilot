@@ -11,7 +11,7 @@ import { resolveEffectiveThinkingMode } from './thinking-effort';
 import { VisionProxyService } from './vision-proxy';
 import type { RouterClient } from '../router/client';
 import type { SettingsSnapshot } from '../config/settings';
-import type { DisplayModelSetting, PublishedModel } from '../types/product-model';
+import type { ConfiguredModel, PublishedModel } from '../types/product-model';
 import type { ModelConfigurationResponseOptions } from '../types/vscode-chat-compat';
 import type { HostToolDefinition } from './tool-adapter';
 import type { HostChatRequestMessage } from './vision-proxy';
@@ -101,7 +101,7 @@ export class NineRouterChatProvider
       );
     }
 
-    const selectedModel = this.snapshot.displayModels.find((setting) => setting.key === model.id);
+    const selectedModel = this.snapshot.models.find((setting) => setting.id === model.id);
     if (!selectedModel) {
       throw new NineRouterError(
         'CONFIGURATION_ERROR',
@@ -110,7 +110,7 @@ export class NineRouterChatProvider
     }
 
     const effectiveThinking = resolveEffectiveThinkingMode(options, selectedModel.thinkingMode);
-    const requestSelectedModel: DisplayModelSetting = {
+    const requestSelectedModel: ConfiguredModel = {
       ...selectedModel,
       thinkingMode: effectiveThinking.thinkingMode
     };
@@ -121,7 +121,7 @@ export class NineRouterChatProvider
       const visionResult = await this.visionProxyService.prepare({
         selectedModel: requestSelectedModel,
         messages: messages as readonly HostChatRequestMessage[],
-        visionProxyComboId: this.snapshot.runtime.visionProxyComboId,
+        visionProxyModelId: this.snapshot.runtime.visionProxyModelId,
         baseUrl: this.snapshot.runtime.baseUrl,
         apiKey,
         ...(typeof this.snapshot.runtime.maxTokens === 'number'
@@ -132,7 +132,7 @@ export class NineRouterChatProvider
       });
 
       logDebugEvent(this.snapshot.runtime.debugMode, 'Vision compatibility resolved', {
-        displayModel: selectedModel.key,
+        displayModel: selectedModel.id,
         visionMode: selectedModel.visionMode,
         visionOutcome: visionResult.outcome,
         hasVisionInput: visionResult.hasVisionInput,
@@ -148,8 +148,8 @@ export class NineRouterChatProvider
           visionResult.blockReason ?? 'The selected 9router display model cannot accept image inputs.',
           {
             details: {
-              displayModel: selectedModel.key,
-              comboId: selectedModel.comboId,
+              displayModel: selectedModel.id,
+              modelId: selectedModel.modelId,
               visionMode: selectedModel.visionMode,
               visionOutcome: visionResult.outcome
             }
@@ -189,8 +189,8 @@ export class NineRouterChatProvider
       const request = adaptMessagesToRouterRequest(requestInput);
 
       logDebugEvent(this.snapshot.runtime.debugMode, 'Submitting request to 9router', {
-        displayModel: selectedModel.key,
-        comboId: selectedModel.comboId,
+        displayModel: selectedModel.id,
+        modelId: selectedModel.modelId,
         configuredThinkingMode: selectedModel.thinkingMode,
         effectiveThinkingMode: effectiveThinking.thinkingMode,
         thinkingModeSource: effectiveThinking.source,
@@ -237,14 +237,14 @@ export class NineRouterChatProvider
 }
 
 export function findSelectedModelSetting(
-  settings: DisplayModelSetting[],
+  settings: ConfiguredModel[],
   model: PublishedModel
-): DisplayModelSetting | undefined {
-  return settings.find((setting) => setting.key === model.id);
+): ConfiguredModel | undefined {
+  return settings.find((setting) => setting.id === model.id);
 }
 
-function mapProviderError(error: unknown, selectedModel: DisplayModelSetting): NineRouterError {
-  if (!(error instanceof NineRouterError) || error.code !== 'COMBO_MAPPING_ERROR') {
+function mapProviderError(error: unknown, selectedModel: ConfiguredModel): NineRouterError {
+  if (!(error instanceof NineRouterError) || error.code !== 'MODEL_MAPPING_ERROR') {
     if (error instanceof NineRouterError) {
       return error;
     }
@@ -252,31 +252,20 @@ function mapProviderError(error: unknown, selectedModel: DisplayModelSetting): N
     throw error;
   }
 
+  const settingsKey = `9router-copilot.models[${selectedModel.sourceIndex}].modelId`;
   return new NineRouterError(
     'CONFIGURATION_ERROR',
-    `9router combo mapping for display model "${selectedModel.key}" was not found. Update 9router-copilot.modelMappings.${selectedModel.key} to a valid combo id.`,
-    buildMissingComboMappingOptions(error, selectedModel)
-  );
-}
-
-function buildMissingComboMappingOptions(
-  error: NineRouterError,
-  selectedModel: DisplayModelSetting
-): { requestId?: string; details: Record<string, unknown> } {
-  const options: { requestId?: string; details: Record<string, unknown> } = {
-    details: {
-      ...error.details,
-      displayModel: selectedModel.key,
-      comboId: selectedModel.comboId,
-      settingsKey: `9router-copilot.modelMappings.${selectedModel.key}`
+    `9router model mapping for display model "${selectedModel.id}" was not found. Update ${settingsKey}.`,
+    {
+      ...(error.requestId ? { requestId: error.requestId } : {}),
+      details: {
+        ...(typeof error.details?.status === 'number' ? { status: error.details.status } : {}),
+        displayModel: selectedModel.id,
+        modelId: selectedModel.modelId,
+        settingsKey
+      }
     }
-  };
-
-  if (error.requestId) {
-    options.requestId = error.requestId;
-  }
-
-  return options;
+  );
 }
 
 function flattenRequestContent(content: string | readonly unknown[]): string {

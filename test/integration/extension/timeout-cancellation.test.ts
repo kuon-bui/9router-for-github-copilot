@@ -12,8 +12,7 @@ describe('NineRouterChatProvider cancellation flow', () => {
   beforeEach(() => {
     __resetVscodeState();
     __setConfigurationValues({
-      displayModels: ['daily'],
-      'modelMappings.daily': 'combo/daily',
+      models: [{ id: 'daily', name: 'Daily', modelId: 'combo/daily' }],
       baseUrl: 'https://router.example.com/v1',
       maxTokens: 128,
       requestTimeoutMs: 5000,
@@ -73,10 +72,15 @@ describe('NineRouterChatProvider cancellation flow', () => {
 
   it('cancels Vision before the primary combo starts', async () => {
     __setConfigurationValues({
-      displayModels: ['agent'],
-      'modelMappings.agent': 'combo/agent',
-      'visionMode.agent': 'proxy',
-      visionProxyComboId: 'combo/vision',
+      models: [
+        {
+          id: 'agent',
+          name: 'Agent',
+          modelId: 'combo/agent',
+          visionMode: 'proxy'
+        }
+      ],
+      visionProxyModelId: 'combo/vision',
       baseUrl: 'https://router.example.com/v1',
       maxTokens: 128,
       requestTimeoutMs: 5000,

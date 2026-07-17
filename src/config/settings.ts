@@ -2,70 +2,52 @@ import * as vscode from 'vscode';
 import {
   DEFAULT_BASE_URL,
   DEFAULT_DEBUG_MODE,
-  DEFAULT_DISPLAY_MODELS,
-  DEFAULT_MAX_INPUT_TOKENS,
-  DEFAULT_MAX_OUTPUT_TOKENS,
   DEFAULT_MAX_TOKENS,
-  DEFAULT_MODEL_LABELS,
-  DEFAULT_MODEL_MAPPINGS,
+  DEFAULT_MODELS,
   DEFAULT_REQUEST_TIMEOUT_MS,
-  DEFAULT_THINKING_MODES,
-  DEFAULT_TOOL_MODES,
-  DEFAULT_VISION_MODES,
-  DEFAULT_VISION_PROXY_COMBO_ID
+  DEFAULT_VISION_PROXY_MODEL_ID
 } from './defaults';
+import { parseModelSettings } from './model-settings';
 import { createPublishedModel } from '../provider/model-catalog';
-import { PRODUCT_MODEL_KEYS, THINKING_MODES } from '../types/product-model';
 import type {
-  DisplayModelSetting,
-  ProductModelKey,
-  PublishedModel,
-  ThinkingMode
-} from '../types/product-model';
+  ModelSettingsIssue,
+  RejectedModelSetting
+} from './model-settings';
+import type { ConfiguredModel, PublishedModel } from '../types/product-model';
 
 const SECTION = '9router-copilot';
-const PRODUCT_MODEL_KEY_SET = new Set<ProductModelKey>(PRODUCT_MODEL_KEYS);
-const THINKING_MODE_SET = new Set<string>(THINKING_MODES);
-const THINKING_SUFFIX_PATTERN = new RegExp(`\\((?:${THINKING_MODES.join('|')})\\)$`, 'i');
 
 export interface RuntimeSettings {
   baseUrl: string;
   maxTokens?: number;
   requestTimeoutMs: number;
   debugMode: 'minimal' | 'metadata' | 'verbose';
-  visionProxyComboId: string;
+  visionProxyModelId: string;
 }
 
-export interface SettingsIssue {
-  scope: 'runtime' | 'model' | 'capability';
-  code:
-    | 'INVALID_BASE_URL'
-    | 'INVALID_REQUEST_TIMEOUT'
-    | 'INVALID_MAX_TOKENS'
-    | 'INVALID_DISPLAY_MODEL_KEY'
-    | 'INVALID_COMBO_MAPPING'
-    | 'INVALID_MAX_INPUT_TOKENS'
-    | 'INVALID_MAX_OUTPUT_TOKENS'
-    | 'INVALID_THINKING_MODE'
-    | 'MISSING_VISION_PROXY_COMBO';
+interface RuntimeSettingsIssue {
+  scope: 'runtime';
+  code: 'INVALID_BASE_URL' | 'INVALID_REQUEST_TIMEOUT' | 'INVALID_MAX_TOKENS';
   message: string;
-  modelKey?: string;
+  path: string;
 }
 
-export interface RejectedModelSetting {
-  key: string;
-  code:
-    | 'INVALID_COMBO_MAPPING'
-    | 'INVALID_THINKING_MODE'
-    | 'INVALID_MAX_INPUT_TOKENS'
-    | 'INVALID_MAX_OUTPUT_TOKENS';
+interface CapabilitySettingsIssue {
+  scope: 'capability';
+  code: 'MISSING_VISION_PROXY_MODEL';
   message: string;
+  path: string;
 }
+
+export type SettingsIssue =
+  | ModelSettingsIssue
+  | RuntimeSettingsIssue
+  | CapabilitySettingsIssue;
 
 export interface SettingsSnapshot {
   state: 'valid' | 'degraded' | 'empty' | 'invalid-runtime';
   runtime: RuntimeSettings | undefined;
-  displayModels: DisplayModelSetting[];
+  models: ConfiguredModel[];
   publishedModels: PublishedModel[];
   rejectedModels: RejectedModelSetting[];
   issues: SettingsIssue[];
@@ -76,138 +58,25 @@ export function normalizeBaseUrl(input: string): string {
   return trimmed.endsWith('/v1') ? trimmed : `${trimmed}/v1`;
 }
 
-function normalizeDisplayModelKeys(input: unknown): ProductModelKey[] {
-  if (!Array.isArray(input)) {
-    return DEFAULT_DISPLAY_MODELS;
-  }
-
-  const keys = input.filter((value): value is ProductModelKey => {
-    return typeof value === 'string' && PRODUCT_MODEL_KEY_SET.has(value as ProductModelKey);
-  });
-
-  return Array.from(new Set(keys));
-}
-
-function collectConfiguredDisplayModelKeys(input: unknown): { validKeys: ProductModelKey[]; invalidKeys: string[] } {
-  if (!Array.isArray(input)) {
-    return {
-      validKeys: DEFAULT_DISPLAY_MODELS,
-      invalidKeys: []
-    };
-  }
-
-  const validKeys: ProductModelKey[] = [];
-  const invalidKeys: string[] = [];
-
-  for (const value of input) {
-    if (typeof value === 'string' && PRODUCT_MODEL_KEY_SET.has(value as ProductModelKey)) {
-      validKeys.push(value as ProductModelKey);
-      continue;
-    }
-
-    invalidKeys.push(String(value));
-  }
-
-  return {
-    validKeys: Array.from(new Set(validKeys)),
-    invalidKeys
-  };
-}
-
-function getConfiguredThinkingMode(
-  configuration: Pick<vscode.WorkspaceConfiguration, 'get'>,
-  key: ProductModelKey
-): unknown {
-  const configured = configuration.get<unknown>(`thinkingMode.${key}`);
-  return configured === undefined ? DEFAULT_THINKING_MODES[key] : configured;
-}
-
-type ModelTokenLimitSetting = 'maxInputTokens' | 'maxOutputTokens';
-
-function getConfiguredModelTokenLimit(
-  configuration: Pick<vscode.WorkspaceConfiguration, 'get'>,
-  setting: ModelTokenLimitSetting,
-  key: ProductModelKey
-): unknown {
-  const configured = configuration.get<unknown>(`${setting}.${key}`);
-  if (configured !== undefined) {
-    return configured;
-  }
-
-  return setting === 'maxInputTokens'
-    ? DEFAULT_MAX_INPUT_TOKENS[key]
-    : DEFAULT_MAX_OUTPUT_TOKENS[key];
-}
-
-function isThinkingMode(value: unknown): value is ThinkingMode {
-  return typeof value === 'string' && THINKING_MODE_SET.has(value);
-}
-
-function isPositiveInteger(value: unknown): value is number {
-  return typeof value === 'number' && Number.isFinite(value) && Number.isInteger(value) && value > 0;
-}
-
-function hasThinkingSuffix(comboId: string): boolean {
-  return THINKING_SUFFIX_PATTERN.test(comboId);
-}
-
-export function loadDisplayModelSettings(
-  configuration: Pick<vscode.WorkspaceConfiguration, 'get'>
-): DisplayModelSetting[] {
-  const configuredKeys = normalizeDisplayModelKeys(configuration.get<unknown>('displayModels'));
-
-  return configuredKeys.map((key) => {
-    const configuredThinkingMode = getConfiguredThinkingMode(configuration, key);
-    const configuredMaxInputTokens = getConfiguredModelTokenLimit(
-      configuration,
-      'maxInputTokens',
-      key
-    );
-    const configuredMaxOutputTokens = getConfiguredModelTokenLimit(
-      configuration,
-      'maxOutputTokens',
-      key
-    );
-
-    return {
-      key,
-      label: configuration.get<string>(`labels.${key}`)?.trim() || DEFAULT_MODEL_LABELS[key],
-      comboId:
-        configuration.get<string>(`modelMappings.${key}`)?.trim() || DEFAULT_MODEL_MAPPINGS[key],
-      enabled: true,
-      toolMode: configuration.get<'auto' | 'off'>(`toolMode.${key}`) ?? DEFAULT_TOOL_MODES[key],
-      visionMode:
-        configuration.get<'native' | 'proxy' | 'off'>(`visionMode.${key}`) ??
-        DEFAULT_VISION_MODES[key],
-      thinkingMode: isThinkingMode(configuredThinkingMode)
-        ? configuredThinkingMode
-        : DEFAULT_THINKING_MODES[key],
-      maxInputTokens: isPositiveInteger(configuredMaxInputTokens)
-        ? configuredMaxInputTokens
-        : DEFAULT_MAX_INPUT_TOKENS[key],
-      maxOutputTokens: isPositiveInteger(configuredMaxOutputTokens)
-        ? configuredMaxOutputTokens
-        : DEFAULT_MAX_OUTPUT_TOKENS[key]
-    };
-  });
-}
-
 export function loadRuntimeSettings(
   configuration: Pick<vscode.WorkspaceConfiguration, 'get'>
 ): RuntimeSettings {
-  const visionProxyComboId =
-    configuration.get<string>('visionProxyComboId')?.trim() ?? DEFAULT_VISION_PROXY_COMBO_ID;
   const baseUrl = normalizeBaseUrl(configuration.get<string>('baseUrl') ?? DEFAULT_BASE_URL);
   const maxTokens = configuration.get<number>('maxTokens') ?? DEFAULT_MAX_TOKENS;
-  const requestTimeoutMs = configuration.get<number>('requestTimeoutMs') ?? DEFAULT_REQUEST_TIMEOUT_MS;
-  const debugMode = configuration.get<'minimal' | 'metadata' | 'verbose'>('debugMode') ?? DEFAULT_DEBUG_MODE;
+  const requestTimeoutMs =
+    configuration.get<number>('requestTimeoutMs') ?? DEFAULT_REQUEST_TIMEOUT_MS;
+  const debugMode =
+    configuration.get<'minimal' | 'metadata' | 'verbose'>('debugMode') ?? DEFAULT_DEBUG_MODE;
+  const visionProxyModelId =
+    configuration.get<string>('visionProxyModelId')?.trim() ??
+    DEFAULT_VISION_PROXY_MODEL_ID;
 
   return {
     baseUrl,
     maxTokens,
     requestTimeoutMs,
     debugMode,
-    visionProxyComboId
+    visionProxyModelId
   };
 }
 
@@ -218,143 +87,32 @@ export function getExtensionConfiguration(): vscode.WorkspaceConfiguration {
 export function buildSettingsSnapshot(
   configuration: Pick<vscode.WorkspaceConfiguration, 'get'>
 ): SettingsSnapshot {
-  const visionProxyComboId =
-    configuration.get<string>('visionProxyComboId')?.trim() ?? DEFAULT_VISION_PROXY_COMBO_ID;
-  const issues: SettingsIssue[] = [];
-  const rejectedModels: RejectedModelSetting[] = [];
-  const rawDisplayModels = configuration.get<unknown>('displayModels');
-  const { validKeys, invalidKeys } = collectConfiguredDisplayModelKeys(rawDisplayModels);
-
-  for (const invalidKey of invalidKeys) {
-    issues.push({
-      scope: 'model',
-      code: 'INVALID_DISPLAY_MODEL_KEY',
-      message: `Unsupported display model key: ${invalidKey}`,
-      modelKey: invalidKey
-    });
-  }
-
+  const rawModels = configuration.get<unknown>('models');
+  const parsedModels = parseModelSettings(
+    rawModels === undefined ? DEFAULT_MODELS : rawModels
+  );
+  const issues: SettingsIssue[] = [...parsedModels.issues];
   const runtime = validateRuntimeSettings(configuration, issues);
-  const displayModels: DisplayModelSetting[] = [];
-  const publishedModels: PublishedModel[] = [];
+  const visionProxyModelId =
+    configuration.get<string>('visionProxyModelId')?.trim() ??
+    DEFAULT_VISION_PROXY_MODEL_ID;
 
-  for (const key of validKeys) {
-    const comboId = configuration.get<string>(`modelMappings.${key}`)?.trim() || '';
-
-    if (comboId.length === 0) {
-      const message = `Display model "${key}" is missing a valid 9router combo mapping.`;
-      issues.push({
-        scope: 'model',
-        code: 'INVALID_COMBO_MAPPING',
-        message,
-        modelKey: key
-      });
-      rejectedModels.push({
-        key,
-        code: 'INVALID_COMBO_MAPPING',
-        message
-      });
-      continue;
-    }
-
-    if (hasThinkingSuffix(comboId)) {
-      const message = `Display model "${key}" must use a base combo id without a thinking suffix. Remove the suffix from 9router-copilot.modelMappings.${key} and configure 9router-copilot.thinkingMode.${key}.`;
-      issues.push({
-        scope: 'model',
-        code: 'INVALID_COMBO_MAPPING',
-        message,
-        modelKey: key
-      });
-      rejectedModels.push({
-        key,
-        code: 'INVALID_COMBO_MAPPING',
-        message
-      });
-      continue;
-    }
-
-    const configuredThinkingMode = getConfiguredThinkingMode(configuration, key);
-    if (!isThinkingMode(configuredThinkingMode)) {
-      const message = `Display model "${key}" has an unsupported thinking mode. Update 9router-copilot.thinkingMode.${key} to off, minimal, low, medium, high, xhigh, or max.`;
-      issues.push({
-        scope: 'model',
-        code: 'INVALID_THINKING_MODE',
-        message,
-        modelKey: key
-      });
-      rejectedModels.push({
-        key,
-        code: 'INVALID_THINKING_MODE',
-        message
-      });
-      continue;
-    }
-
-    const maxInputTokens = getConfiguredModelTokenLimit(configuration, 'maxInputTokens', key);
-    if (!isPositiveInteger(maxInputTokens)) {
-      const message = `Display model "${key}" must configure 9router-copilot.maxInputTokens.${key} as a positive integer.`;
-      issues.push({
-        scope: 'model',
-        code: 'INVALID_MAX_INPUT_TOKENS',
-        message,
-        modelKey: key
-      });
-      rejectedModels.push({
-        key,
-        code: 'INVALID_MAX_INPUT_TOKENS',
-        message
-      });
-      continue;
-    }
-
-    const maxOutputTokens = getConfiguredModelTokenLimit(configuration, 'maxOutputTokens', key);
-    if (!isPositiveInteger(maxOutputTokens)) {
-      const message = `Display model "${key}" must configure 9router-copilot.maxOutputTokens.${key} as a positive integer.`;
-      issues.push({
-        scope: 'model',
-        code: 'INVALID_MAX_OUTPUT_TOKENS',
-        message,
-        modelKey: key
-      });
-      rejectedModels.push({
-        key,
-        code: 'INVALID_MAX_OUTPUT_TOKENS',
-        message
-      });
-      continue;
-    }
-
-    const setting: DisplayModelSetting = {
-      key,
-      label: configuration.get<string>(`labels.${key}`)?.trim() || DEFAULT_MODEL_LABELS[key],
-      comboId,
-      enabled: true,
-      toolMode: configuration.get<'auto' | 'off'>(`toolMode.${key}`) ?? DEFAULT_TOOL_MODES[key],
-      visionMode:
-        configuration.get<'native' | 'proxy' | 'off'>(`visionMode.${key}`) ??
-        DEFAULT_VISION_MODES[key],
-      thinkingMode: configuredThinkingMode,
-      maxInputTokens,
-      maxOutputTokens
-    };
-
-    displayModels.push(setting);
-    publishedModels.push(
-      createPublishedModel(setting, {
-        visionProxyConfigured: visionProxyComboId.length > 0
-      })
-    );
-  }
+  const publishedModels = parsedModels.models.map((model) =>
+    createPublishedModel(model, {
+      visionProxyConfigured: visionProxyModelId.length > 0
+    })
+  );
 
   if (
-    visionProxyComboId.length === 0 &&
-    displayModels.some((model) => model.visionMode === 'proxy')
+    visionProxyModelId.length === 0 &&
+    parsedModels.models.some((model) => model.visionMode === 'proxy')
   ) {
     issues.push({
       scope: 'capability',
-      code: 'MISSING_VISION_PROXY_COMBO',
+      code: 'MISSING_VISION_PROXY_MODEL',
       message:
-        'Proxy Vision is disabled until 9router-copilot.visionProxyComboId references an existing 9router combo.'
+        'Proxy Vision is disabled until 9router-copilot.visionProxyModelId references an existing 9router model.',
+      path: '9router-copilot.visionProxyModelId'
     });
   }
 
@@ -362,9 +120,9 @@ export function buildSettingsSnapshot(
     return {
       state: 'invalid-runtime',
       runtime: undefined,
-      displayModels,
+      models: parsedModels.models,
       publishedModels: [],
-      rejectedModels,
+      rejectedModels: parsedModels.rejectedModels,
       issues
     };
   }
@@ -373,9 +131,9 @@ export function buildSettingsSnapshot(
     return {
       state: 'empty',
       runtime,
-      displayModels,
+      models: parsedModels.models,
       publishedModels,
-      rejectedModels,
+      rejectedModels: parsedModels.rejectedModels,
       issues
     };
   }
@@ -383,9 +141,9 @@ export function buildSettingsSnapshot(
   return {
     state: issues.length > 0 ? 'degraded' : 'valid',
     runtime,
-    displayModels,
+    models: parsedModels.models,
     publishedModels,
-    rejectedModels,
+    rejectedModels: parsedModels.rejectedModels,
     issues
   };
 }
@@ -394,8 +152,7 @@ function validateRuntimeSettings(
   configuration: Pick<vscode.WorkspaceConfiguration, 'get'>,
   issues: SettingsIssue[]
 ): RuntimeSettings | undefined {
-  const visionProxyComboId =
-    configuration.get<string>('visionProxyComboId')?.trim() ?? DEFAULT_VISION_PROXY_COMBO_ID;
+  const runtime = loadRuntimeSettings(configuration);
   const baseUrlInput = configuration.get<string>('baseUrl') ?? DEFAULT_BASE_URL;
   const normalizedBaseUrl = baseUrlInput.trim().length > 0 ? normalizeBaseUrl(baseUrlInput) : '';
 
@@ -403,40 +160,40 @@ function validateRuntimeSettings(
     issues.push({
       scope: 'runtime',
       code: 'INVALID_BASE_URL',
-      message: 'The configured 9router base URL must be a valid http or https URL.'
+      message: 'The configured 9router base URL must be a valid http or https URL.',
+      path: '9router-copilot.baseUrl'
     });
   }
 
-  const requestTimeoutMs = configuration.get<number>('requestTimeoutMs') ?? DEFAULT_REQUEST_TIMEOUT_MS;
-  if (!Number.isFinite(requestTimeoutMs) || requestTimeoutMs <= 0) {
+  if (!Number.isFinite(runtime.requestTimeoutMs) || runtime.requestTimeoutMs <= 0) {
     issues.push({
       scope: 'runtime',
       code: 'INVALID_REQUEST_TIMEOUT',
-      message: 'The request timeout must be a positive number of milliseconds.'
+      message: 'The request timeout must be a positive number of milliseconds.',
+      path: '9router-copilot.requestTimeoutMs'
     });
   }
 
-  const maxTokens = configuration.get<number>('maxTokens') ?? DEFAULT_MAX_TOKENS;
-  if (!Number.isFinite(maxTokens) || maxTokens <= 0) {
+  if (
+    typeof runtime.maxTokens !== 'number' ||
+    !Number.isFinite(runtime.maxTokens) ||
+    runtime.maxTokens <= 0
+  ) {
     issues.push({
       scope: 'runtime',
       code: 'INVALID_MAX_TOKENS',
-      message: 'The maxTokens setting must be a positive number.'
+      message: 'The maxTokens setting must be a positive number.',
+      path: '9router-copilot.maxTokens'
     });
   }
-
-  const debugMode = configuration.get<'minimal' | 'metadata' | 'verbose'>('debugMode') ?? DEFAULT_DEBUG_MODE;
 
   if (issues.some((issue) => issue.scope === 'runtime')) {
     return undefined;
   }
 
   return {
-    baseUrl: normalizedBaseUrl,
-    maxTokens,
-    requestTimeoutMs,
-    debugMode,
-    visionProxyComboId
+    ...runtime,
+    baseUrl: normalizedBaseUrl
   };
 }
 

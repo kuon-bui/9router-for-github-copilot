@@ -14,8 +14,7 @@ describe('NineRouterChatProvider', () => {
   beforeEach(() => {
     __resetVscodeState();
     __setConfigurationValues({
-      displayModels: ['daily'],
-      'modelMappings.daily': 'combo/daily',
+      models: [{ id: 'daily', name: 'Daily', modelId: 'combo/daily' }],
       baseUrl: 'https://router.example.com/v1',
       maxTokens: 128,
       requestTimeoutMs: 5000,
@@ -68,9 +67,14 @@ describe('NineRouterChatProvider', () => {
 
   it('lets the Copilot picker override the selected model thinking default', async () => {
     __setConfigurationValues({
-      displayModels: ['daily'],
-      'modelMappings.daily': 'combo/daily',
-      'thinkingMode.daily': 'xhigh',
+      models: [
+        {
+          id: 'daily',
+          name: 'Daily',
+          modelId: 'combo/daily',
+          thinkingMode: 'xhigh'
+        }
+      ],
       baseUrl: 'https://router.example.com/v1',
       maxTokens: 128,
       requestTimeoutMs: 5000,
@@ -123,11 +127,16 @@ describe('NineRouterChatProvider', () => {
     });
   });
 
-  it('sends the base combo id when the Copilot picker selects None', async () => {
+  it('sends the base model id when the Copilot picker selects None', async () => {
     __setConfigurationValues({
-      displayModels: ['daily'],
-      'modelMappings.daily': 'combo/daily',
-      'thinkingMode.daily': 'high',
+      models: [
+        {
+          id: 'daily',
+          name: 'Daily',
+          modelId: 'combo/daily',
+          thinkingMode: 'high'
+        }
+      ],
       baseUrl: 'https://router.example.com/v1',
       maxTokens: 128,
       requestTimeoutMs: 5000,
@@ -175,9 +184,14 @@ describe('NineRouterChatProvider', () => {
 
   it('logs configured and effective thinking metadata without dumping host configuration', async () => {
     __setConfigurationValues({
-      displayModels: ['daily'],
-      'modelMappings.daily': 'combo/daily',
-      'thinkingMode.daily': 'low',
+      models: [
+        {
+          id: 'daily',
+          name: 'Daily',
+          modelId: 'combo/daily',
+          thinkingMode: 'low'
+        }
+      ],
       baseUrl: 'https://router.example.com/v1',
       maxTokens: 128,
       requestTimeoutMs: 5000,
@@ -277,13 +291,19 @@ describe('NineRouterChatProvider', () => {
     expect(streamCalled).toBe(false);
   });
 
-  it('summarizes images before calling the selected combo', async () => {
+  it('summarizes images before calling the selected model', async () => {
     __setConfigurationValues({
-      displayModels: ['agent'],
-      'modelMappings.agent': 'combo/agent',
-      'visionMode.agent': 'proxy',
-      visionProxyComboId: 'combo/vision',
-      'thinkingMode.agent': 'high',
+      models: [
+        {
+          id: 'agent',
+          name: 'Agent',
+          modelId: 'combo/agent',
+          toolMode: 'auto',
+          visionMode: 'proxy',
+          thinkingMode: 'high'
+        }
+      ],
+      visionProxyModelId: 'combo/vision',
       baseUrl: 'https://router.example.com/v1',
       maxTokens: 128,
       requestTimeoutMs: 5000,
@@ -385,10 +405,15 @@ describe('NineRouterChatProvider', () => {
 
   it('fails closed before the primary call when the Vision stream is truncated', async () => {
     __setConfigurationValues({
-      displayModels: ['agent'],
-      'modelMappings.agent': 'combo/agent',
-      'visionMode.agent': 'proxy',
-      visionProxyComboId: 'combo/vision',
+      models: [
+        {
+          id: 'agent',
+          name: 'Agent',
+          modelId: 'combo/agent',
+          visionMode: 'proxy'
+        }
+      ],
+      visionProxyModelId: 'combo/vision',
       baseUrl: 'https://router.example.com/v1',
       maxTokens: 128,
       requestTimeoutMs: 5000,
@@ -429,11 +454,16 @@ describe('NineRouterChatProvider', () => {
     expect(modelsCalled).toEqual(['combo/vision']);
   });
 
-  it('fails before any router call when the shared Vision combo is empty', async () => {
+  it('fails before any router call when the shared Vision model is empty', async () => {
     __setConfigurationValues({
-      displayModels: ['agent'],
-      'modelMappings.agent': 'combo/agent',
-      'visionMode.agent': 'proxy',
+      models: [
+        {
+          id: 'agent',
+          name: 'Agent',
+          modelId: 'combo/agent',
+          visionMode: 'proxy'
+        }
+      ],
       baseUrl: 'https://router.example.com/v1',
       maxTokens: 128,
       requestTimeoutMs: 5000,
@@ -470,18 +500,23 @@ describe('NineRouterChatProvider', () => {
     ).rejects.toMatchObject({
       code: 'CONFIGURATION_ERROR',
       details: expect.objectContaining({
-        settingsKey: '9router-copilot.visionProxyComboId'
+        settingsKey: '9router-copilot.visionProxyModelId'
       })
     });
     expect(calls).toBe(0);
   });
 
-  it('fails closed when the shared Vision combo mapping is missing', async () => {
+  it('fails closed when the shared Vision model mapping is missing', async () => {
     __setConfigurationValues({
-      displayModels: ['agent'],
-      'modelMappings.agent': 'combo/agent',
-      'visionMode.agent': 'proxy',
-      visionProxyComboId: 'combo/vision',
+      models: [
+        {
+          id: 'agent',
+          name: 'Agent',
+          modelId: 'combo/agent',
+          visionMode: 'proxy'
+        }
+      ],
+      visionProxyModelId: 'combo/vision',
       baseUrl: 'https://router.example.com/v1',
       maxTokens: 128,
       requestTimeoutMs: 5000,
@@ -493,7 +528,7 @@ describe('NineRouterChatProvider', () => {
       {
         async *streamChatCompletion(input: { request: RouterChatCompletionRequest }) {
           modelsCalled.push(input.request.model);
-          throw new NineRouterError('COMBO_MAPPING_ERROR', 'missing', {
+          throw new NineRouterError('MODEL_MAPPING_ERROR', 'missing', {
             requestId: 'vision-404',
             details: { status: 404, responseText: 'must-not-leak' }
           });
@@ -521,11 +556,11 @@ describe('NineRouterChatProvider', () => {
     await expect(responsePromise).rejects.toMatchObject({
       code: 'CONFIGURATION_ERROR',
       requestId: 'vision-404',
-      message: expect.stringContaining('9router-copilot.visionProxyComboId'),
+      message: expect.stringContaining('9router-copilot.visionProxyModelId'),
       details: {
         phase: 'vision-proxy',
         status: 404,
-        settingsKey: '9router-copilot.visionProxyComboId'
+        settingsKey: '9router-copilot.visionProxyModelId'
       }
     });
     expect(modelsCalled).toEqual(['combo/vision']);
@@ -533,10 +568,15 @@ describe('NineRouterChatProvider', () => {
 
   it('logs only safe Vision metadata', async () => {
     __setConfigurationValues({
-      displayModels: ['agent'],
-      'modelMappings.agent': 'combo/agent',
-      'visionMode.agent': 'proxy',
-      visionProxyComboId: 'combo/vision',
+      models: [
+        {
+          id: 'agent',
+          name: 'Agent',
+          modelId: 'combo/agent',
+          visionMode: 'proxy'
+        }
+      ],
+      visionProxyModelId: 'combo/vision',
       baseUrl: 'https://router.example.com/v1',
       maxTokens: 128,
       requestTimeoutMs: 5000,
@@ -595,7 +635,7 @@ describe('NineRouterChatProvider', () => {
     }
   });
 
-  it('reclassifies missing combo mappings as actionable configuration errors', async () => {
+  it('reclassifies missing model mappings as actionable configuration errors', async () => {
     const provider = new NineRouterChatProvider(
       {
         secrets: {
@@ -604,11 +644,11 @@ describe('NineRouterChatProvider', () => {
       } as never,
       {
         async *streamChatCompletion() {
-          throw new NineRouterError('COMBO_MAPPING_ERROR', '9router combo mapping was not found', {
+          throw new NineRouterError('MODEL_MAPPING_ERROR', '9router model mapping was not found', {
             requestId: 'req-404',
             details: {
               status: 404,
-              responseText: '{"error":"missing combo"}'
+              responseText: '{"error":"missing model"}'
             }
           });
         }
@@ -636,13 +676,33 @@ describe('NineRouterChatProvider', () => {
       code: 'CONFIGURATION_ERROR',
       requestId: 'req-404',
       message:
-        '9router combo mapping for display model "daily" was not found. Update 9router-copilot.modelMappings.daily to a valid combo id.',
+        '9router model mapping for display model "daily" was not found. Update 9router-copilot.models[0].modelId.',
       details: expect.objectContaining({
         displayModel: 'daily',
-        comboId: 'combo/daily',
-        settingsKey: '9router-copilot.modelMappings.daily',
+        modelId: 'combo/daily',
+        settingsKey: '9router-copilot.models[0].modelId',
         status: 404
       })
+    });
+    await expect(
+      provider.provideLanguageModelChatResponse(
+        {
+          id: 'daily',
+          name: 'Daily',
+          vendor: '9router',
+          family: 'daily',
+          version: '1',
+          maxInputTokens: 128000,
+          maxOutputTokens: 8192,
+          capabilities: {}
+        },
+        [{ role: 1, content: 'Say hello' }] as never,
+        {} as never,
+        { report: () => undefined } as never,
+        __createCancellationToken().value as never
+      )
+    ).rejects.not.toMatchObject({
+      details: expect.objectContaining({ responseText: expect.anything() })
     });
   });
 });

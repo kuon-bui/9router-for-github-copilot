@@ -39,13 +39,13 @@ describe('createRouterClient', () => {
     expect(events).toEqual([{ type: 'response-complete' }]);
   });
 
-  it('classifies an explicit missing combo 404 as a combo mapping error', async () => {
+  it('classifies an explicit missing model 404 as a model mapping error', async () => {
     const client = createRouterClient({
       fetch: vi.fn().mockResolvedValue({
         ok: false,
         status: 404,
-        headers: new Headers({ 'x-request-id': 'req-missing-combo' }),
-        text: async () => '{"error":{"message":"Combo 123 not found"}}'
+        headers: new Headers({ 'x-request-id': 'req-missing-model' }),
+        text: async () => '{"error":{"message":"Model router/missing not found"}}'
       }) as never
     });
 
@@ -53,7 +53,7 @@ describe('createRouterClient', () => {
       for await (const event of client.streamChatCompletion({
         baseUrl: 'https://router.example.com/v1',
         apiKey: 'secret-token',
-        request: { model: 'missing-combo', messages: [], stream: true },
+        request: { model: 'router/missing', messages: [], stream: true },
         timeoutMs: 1000,
         signal: new AbortController().signal
       })) {
@@ -62,8 +62,8 @@ describe('createRouterClient', () => {
     };
 
     await expect(consume()).rejects.toMatchObject({
-      code: 'COMBO_MAPPING_ERROR',
-      requestId: 'req-missing-combo'
+      code: 'MODEL_MAPPING_ERROR',
+      requestId: 'req-missing-model'
     });
   });
 

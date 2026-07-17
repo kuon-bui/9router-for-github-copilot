@@ -123,6 +123,32 @@ describe('parseModelSettings', () => {
     ]);
   });
 
+  it.each([
+    ['toolMode', 'INVALID_TOOL_MODE'],
+    ['visionMode', 'INVALID_VISION_MODE'],
+    ['thinkingMode', 'INVALID_THINKING_MODE'],
+    ['maxInputTokens', 'INVALID_MAX_INPUT_TOKENS'],
+    ['maxOutputTokens', 'INVALID_MAX_OUTPUT_TOKENS']
+  ])('rejects explicit null for optional field %s', (field, code) => {
+    const result = parseModelSettings([
+      { id: 'agent', name: 'Agent', modelId: 'router/agent', [field]: null }
+    ]);
+
+    expect(result.models).toEqual([]);
+    expect(result.rejectedModels).toEqual([
+      expect.objectContaining({ sourceIndex: 0, code })
+    ]);
+  });
+
+  it('does not retain an unvalidated id in issues or rejected diagnostics', () => {
+    const result = parseModelSettings([
+      { id: 'api-key\nforged-line', name: 'Agent', modelId: 'router/agent' }
+    ]);
+
+    expect(result.rejectedModels[0]).not.toHaveProperty('id');
+    expect(result.issues[0]).not.toHaveProperty('displayModelId');
+  });
+
   it.each([[null], [[]], [new Date()]])('rejects a non-plain model entry', (entry) => {
     const result = parseModelSettings([entry]);
 

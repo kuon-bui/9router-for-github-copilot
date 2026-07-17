@@ -6,7 +6,7 @@ import {
   isHostImageDataPart
 } from './image-input-adapter';
 import type { RouterClient } from '../router/client';
-import type { DisplayModelSetting } from '../types/product-model';
+import type { ConfiguredModel } from '../types/product-model';
 import type {
   RouterChatCompletionRequest,
   RouterContentPart
@@ -35,9 +35,9 @@ export interface VisionCompatibilityResult {
 }
 
 export interface VisionProxyInput {
-  selectedModel: DisplayModelSetting;
+  selectedModel: ConfiguredModel;
   messages: readonly HostChatRequestMessage[];
-  visionProxyComboId: string;
+  visionProxyModelId: string;
   baseUrl: string;
   apiKey: string;
   maxTokens?: number;
@@ -55,7 +55,7 @@ const VISION_PROXY_INSTRUCTION =
 
 export function buildVisionProxyRequest(
   message: HostChatRequestMessage,
-  comboId: string,
+  modelId: string,
   maxTokens?: number
 ): RouterChatCompletionRequest {
   const userContent: RouterContentPart[] = [];
@@ -77,7 +77,7 @@ export function buildVisionProxyRequest(
   }
 
   const request: RouterChatCompletionRequest = {
-    model: comboId,
+    model: modelId,
     stream: true,
     messages: [
       { role: 'system', content: VISION_PROXY_INSTRUCTION },
@@ -103,7 +103,7 @@ function inspectVisionInput(messages: readonly HostChatRequestMessage[]): Vision
 }
 
 function resolveNonProxyResult(
-  selectedModel: DisplayModelSetting,
+  selectedModel: ConfiguredModel,
   messages: readonly HostChatRequestMessage[],
   counts: VisionInputCounts
 ): VisionCompatibilityResult | undefined {
@@ -137,7 +137,7 @@ function resolveNonProxyResult(
       imageCount: counts.imageCount,
       imageMessageCount: counts.imageMessageCount,
       requestIds: [],
-      blockReason: `Display model "${selectedModel.key}" cannot accept image inputs because visionMode is off.`
+      blockReason: `Display model "${selectedModel.id}" cannot accept image inputs because visionMode is off.`
     };
   }
 
@@ -178,11 +178,11 @@ function mapVisionProxyError(error: unknown): NineRouterError {
     options.requestId = error.requestId;
   }
 
-  if (error.code === 'COMBO_MAPPING_ERROR') {
-    details.settingsKey = '9router-copilot.visionProxyComboId';
+  if (error.code === 'MODEL_MAPPING_ERROR') {
+    details.settingsKey = '9router-copilot.visionProxyModelId';
     return new NineRouterError(
       'CONFIGURATION_ERROR',
-      'The configured 9router Vision proxy combo was not found. Update 9router-copilot.visionProxyComboId to a valid combo id.',
+      'The configured 9router Vision proxy model was not found. Update 9router-copilot.visionProxyModelId to a valid model id.',
       options
     );
   }
@@ -204,15 +204,15 @@ export class VisionProxyService {
       return nonProxyResult;
     }
 
-    const comboId = input.visionProxyComboId.trim();
-    if (comboId.length === 0) {
+    const modelId = input.visionProxyModelId.trim();
+    if (modelId.length === 0) {
       throw new NineRouterError(
         'CONFIGURATION_ERROR',
-        'Proxy Vision requires 9router-copilot.visionProxyComboId to reference an existing 9router combo.',
+        'Proxy Vision requires 9router-copilot.visionProxyModelId to reference an existing 9router model.',
         {
           details: {
             phase: 'vision-proxy',
-            settingsKey: '9router-copilot.visionProxyComboId'
+            settingsKey: '9router-copilot.visionProxyModelId'
           }
         }
       );
@@ -234,7 +234,7 @@ export class VisionProxyService {
         );
       }
 
-      const result = await this.summarizeMessage(message, comboId, input);
+      const result = await this.summarizeMessage(message, modelId, input);
       messages.push(replaceImagesWithSummary(message, result.summary));
       if (result.requestId) {
         requestIds.push(result.requestId);
@@ -253,7 +253,7 @@ export class VisionProxyService {
 
   private async summarizeMessage(
     message: HostChatRequestMessage,
-    comboId: string,
+    modelId: string,
     input: VisionProxyInput
   ): Promise<{ summary: string; requestId?: string }> {
     let summary = '';
@@ -264,7 +264,7 @@ export class VisionProxyService {
       const stream = this.routerClient.streamChatCompletion({
         baseUrl: input.baseUrl,
         apiKey: input.apiKey,
-        request: buildVisionProxyRequest(message, comboId, input.maxTokens),
+        request: buildVisionProxyRequest(message, modelId, input.maxTokens),
         timeoutMs: input.requestTimeoutMs,
         signal: input.signal
       });

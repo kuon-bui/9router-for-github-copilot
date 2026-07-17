@@ -1,198 +1,131 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildSettingsSnapshot,
-  loadDisplayModelSettings,
-  loadRuntimeSettings
+  loadRuntimeSettings,
+  normalizeBaseUrl
 } from '../../../src/config/settings';
-import { DEFAULT_MODEL_MAPPINGS } from '../../../src/config/defaults';
 
-describe('loadDisplayModelSettings', () => {
-  it('returns only enabled curated models with stable keys', () => {
-    const configuration = {
-      get: (key: string) => {
-        if (key === 'displayModels') {
-          return ['daily', 'fallback'];
-        }
+function configuration(values: Record<string, unknown>) {
+  return {
+    get: (key: string) => values[key]
+  } as never;
+}
 
-        if (key === 'modelMappings.daily') {
-          return 'combo/daily-default';
-        }
-
-        if (key === 'modelMappings.fallback') {
-          return 'combo/fallback-default';
-        }
-
-        return undefined;
-      }
-    };
-
-    expect(loadDisplayModelSettings(configuration as never)).toEqual([
-      expect.objectContaining({ key: 'daily', comboId: 'combo/daily-default', enabled: true }),
-      expect.objectContaining({ key: 'fallback', comboId: 'combo/fallback-default', enabled: true })
-    ]);
-  });
-
-  it('does not invent backend combo ids for unconfigured display models', () => {
-    const configuration = {
-      get: () => undefined
-    };
-
-    expect(DEFAULT_MODEL_MAPPINGS).toEqual({
-      daily: '',
-      agent: '',
-      fallback: ''
-    });
-    expect(loadDisplayModelSettings(configuration as never).map((model) => model.comboId)).toEqual([
-      '',
-      '',
-      ''
-    ]);
-  });
-
-  it('loads a thinking mode for each curated display model', () => {
-    const configuration = {
-      get: (key: string) => {
-        if (key === 'displayModels') {
-          return ['daily', 'agent'];
-        }
-
-        if (key === 'modelMappings.daily') {
-          return 'combo/daily';
-        }
-
-        if (key === 'modelMappings.agent') {
-          return 'combo/agent';
-        }
-
-        if (key === 'thinkingMode.agent') {
-          return 'high';
-        }
-
-        return undefined;
-      }
-    };
-
-    expect(
-      loadDisplayModelSettings(configuration as never).map(({ key, thinkingMode }) => ({
-        key,
-        thinkingMode
-      }))
-    ).toEqual([
-      { key: 'daily', thinkingMode: 'off' },
-      { key: 'agent', thinkingMode: 'high' }
-    ]);
-  });
-
-  it('loads the approved default token limits for every curated model', () => {
-    const models = loadDisplayModelSettings({ get: () => undefined } as never);
-
-    expect(
-      models.map(({ key, maxInputTokens, maxOutputTokens }) => ({
-        key,
-        maxInputTokens,
-        maxOutputTokens
-      }))
-    ).toEqual([
-      { key: 'daily', maxInputTokens: 128_000, maxOutputTokens: 8_192 },
-      { key: 'agent', maxInputTokens: 128_000, maxOutputTokens: 8_192 },
-      { key: 'fallback', maxInputTokens: 128_000, maxOutputTokens: 8_192 }
-    ]);
-  });
-
-  it('loads configured token limits independently for each model', () => {
-    const models = loadDisplayModelSettings({
-      get: (key: string) => {
-        const values: Record<string, unknown> = {
-          displayModels: ['daily', 'agent', 'fallback'],
-          'maxInputTokens.daily': 32_000,
-          'maxOutputTokens.daily': 2_048,
-          'maxInputTokens.agent': 64_000,
-          'maxOutputTokens.agent': 4_096,
-          'maxInputTokens.fallback': 96_000,
-          'maxOutputTokens.fallback': 6_144
-        };
-
-        return values[key];
-      }
-    } as never);
-
-    expect(
-      models.map(({ key, maxInputTokens, maxOutputTokens }) => ({
-        key,
-        maxInputTokens,
-        maxOutputTokens
-      }))
-    ).toEqual([
-      { key: 'daily', maxInputTokens: 32_000, maxOutputTokens: 2_048 },
-      { key: 'agent', maxInputTokens: 64_000, maxOutputTokens: 4_096 },
-      { key: 'fallback', maxInputTokens: 96_000, maxOutputTokens: 6_144 }
-    ]);
-  });
-
+describe('runtime settings', () => {
   it('normalizes the router base url to /v1', () => {
-    const configuration = {
-      get: (key: string) => (key === 'baseUrl' ? 'https://router.example.com' : undefined)
-    };
-
-    expect(loadRuntimeSettings(configuration as never).baseUrl).toBe('https://router.example.com/v1');
+    expect(normalizeBaseUrl('https://router.example.com')).toBe('https://router.example.com/v1');
   });
 
-  it('loads and trims the shared Vision proxy combo id', () => {
-    const runtime = loadRuntimeSettings({
-      get: (key: string) => (key === 'visionProxyComboId' ? '  combo/vision  ' : undefined)
-    } as never);
+  it('loads and trims the shared Vision proxy model id', () => {
+    const runtime = loadRuntimeSettings(
+      configuration({ visionProxyModelId: '  router/vision  ' })
+    );
 
-    expect(runtime.visionProxyComboId).toBe('combo/vision');
+    expect(runtime.visionProxyModelId).toBe('router/vision');
   });
 });
 
 describe('buildSettingsSnapshot', () => {
-  it('derives each published picker default from that model thinking setting', () => {
-    const snapshot = buildSettingsSnapshot(
-      {
-        get: (key: string) => {
-          const values: Record<string, unknown> = {
-            displayModels: ['daily', 'agent'],
-            'modelMappings.daily': 'combo/daily',
-            'modelMappings.agent': 'combo/agent',
-            'thinkingMode.daily': 'low',
-            'thinkingMode.agent': 'xhigh'
-          };
+  it('defaults to one rejected agent until its modelId is configured', () => {
+    const snapshot = buildSettingsSnapshot(configuration({}));
 
-          return values[key];
-        }
-      } as never
-    );
-
-    expect(
-      snapshot.publishedModels.map((model) => ({
-        id: model.id,
-        defaultEffort: model.configurationSchema?.properties.reasoningEffort.default
-      }))
-    ).toEqual([
-      { id: 'daily', defaultEffort: 'low' },
-      { id: 'agent', defaultEffort: 'xhigh' }
+    expect(snapshot.state).toBe('empty');
+    expect(snapshot.models).toEqual([]);
+    expect(snapshot.publishedModels).toEqual([]);
+    expect(snapshot.rejectedModels).toEqual([
+      expect.objectContaining({
+        sourceIndex: 0,
+        id: 'agent',
+        code: 'INVALID_MODEL_MAPPING',
+        path: '9router-copilot.models[0].modelId'
+      })
     ]);
   });
 
+  it('rejects an explicit null models setting instead of loading defaults', () => {
+    const snapshot = buildSettingsSnapshot(configuration({ models: null }));
+
+    expect(snapshot.state).toBe('empty');
+    expect(snapshot.models).toEqual([]);
+    expect(snapshot.rejectedModels).toEqual([
+      expect.objectContaining({ code: 'INVALID_MODELS_SETTING' })
+    ]);
+    expect(snapshot.issues).toEqual([
+      expect.objectContaining({ code: 'INVALID_MODELS_SETTING' })
+    ]);
+  });
+
+  it('publishes arbitrary configured models in array order', () => {
+    const snapshot = buildSettingsSnapshot(
+      configuration({
+        models: [
+          { id: 'research', name: 'Research', modelId: 'router/research' },
+          { id: 'coder', name: 'Coder', modelId: 'router/coder', toolMode: 'auto' }
+        ]
+      })
+    );
+
+    expect(snapshot.state).toBe('valid');
+    expect(snapshot.models.map((model) => model.id)).toEqual(['research', 'coder']);
+    expect(snapshot.publishedModels.map((model) => model.id)).toEqual(['research', 'coder']);
+  });
+
+  it('derives each picker default from the model thinkingMode field', () => {
+    const snapshot = buildSettingsSnapshot(
+      configuration({
+        models: [
+          {
+            id: 'coder',
+            name: 'Coder',
+            modelId: 'router/coder',
+            thinkingMode: 'xhigh'
+          }
+        ]
+      })
+    );
+
+    expect(snapshot.models[0]?.thinkingMode).toBe('xhigh');
+    expect(
+      snapshot.publishedModels[0]?.configurationSchema?.properties.reasoningEffort.default
+    ).toBe('xhigh');
+  });
+
+  it('publishes configured context limits from each model object', () => {
+    const snapshot = buildSettingsSnapshot(
+      configuration({
+        models: [
+          {
+            id: 'coder',
+            name: 'Coder',
+            modelId: 'router/coder',
+            maxInputTokens: 64_000,
+            maxOutputTokens: 4_096
+          }
+        ]
+      })
+    );
+
+    expect(snapshot.models[0]).toMatchObject({
+      maxInputTokens: 64_000,
+      maxOutputTokens: 4_096
+    });
+    expect(snapshot.publishedModels[0]).toMatchObject({
+      maxInputTokens: 64_000,
+      maxOutputTokens: 4_096
+    });
+  });
+
   it('marks the snapshot invalid when runtime settings are malformed', () => {
-    const configuration = {
-      get: (key: string) => {
-        if (key === 'baseUrl') {
-          return 'not-a-url';
-        }
-
-        if (key === 'requestTimeoutMs') {
-          return 0;
-        }
-
-        return undefined;
-      }
-    };
-
-    const snapshot = buildSettingsSnapshot(configuration as never);
+    const snapshot = buildSettingsSnapshot(
+      configuration({
+        models: [{ id: 'coder', name: 'Coder', modelId: 'router/coder' }],
+        baseUrl: 'not-a-url',
+        requestTimeoutMs: 0
+      })
+    );
 
     expect(snapshot.state).toBe('invalid-runtime');
+    expect(snapshot.models.map((model) => model.id)).toEqual(['coder']);
     expect(snapshot.publishedModels).toEqual([]);
     expect(snapshot.issues).toEqual(
       expect.arrayContaining([
@@ -202,197 +135,40 @@ describe('buildSettingsSnapshot', () => {
     );
   });
 
-  it('degrades one broken model mapping without removing valid models from publication', () => {
-    const configuration = {
-      get: (key: string) => {
-        if (key === 'displayModels') {
-          return ['daily', 'agent'];
-        }
-
-        if (key === 'modelMappings.daily') {
-          return 'combo/daily';
-        }
-
-        if (key === 'modelMappings.agent') {
-          return '   ';
-        }
-
-        return undefined;
-      }
-    };
-
-    const snapshot = buildSettingsSnapshot(configuration as never);
-
-    expect(snapshot.state).toBe('degraded');
-    expect(snapshot.publishedModels.map((model) => model.id)).toEqual(['daily']);
-    expect(snapshot.rejectedModels).toEqual([
-      expect.objectContaining({ key: 'agent', code: 'INVALID_COMBO_MAPPING' })
-    ]);
-  });
-
-  it('degrades only the model with an unsupported thinking mode', () => {
-    const configuration = {
-      get: (key: string) => {
-        if (key === 'displayModels') {
-          return ['daily', 'agent'];
-        }
-
-        if (key === 'modelMappings.daily') {
-          return 'combo/daily';
-        }
-
-        if (key === 'modelMappings.agent') {
-          return 'combo/agent';
-        }
-
-        if (key === 'thinkingMode.agent') {
-          return 'turbo';
-        }
-
-        return undefined;
-      }
-    };
-
-    const snapshot = buildSettingsSnapshot(configuration as never);
-
-    expect(snapshot.state).toBe('degraded');
-    expect(snapshot.publishedModels.map((model) => model.id)).toEqual(['daily']);
-    expect(snapshot.rejectedModels).toEqual([
-      expect.objectContaining({ key: 'agent', code: 'INVALID_THINKING_MODE' })
-    ]);
-    expect(snapshot.issues).toEqual([
-      expect.objectContaining({
-        modelKey: 'agent',
-        code: 'INVALID_THINKING_MODE',
-        message: expect.stringContaining('9router-copilot.thinkingMode.agent')
-      })
-    ]);
-  });
-
-  it.each([
-    ['zero', 0],
-    ['negative', -1],
-    ['fractional', 1.5],
-    ['non-finite', Number.POSITIVE_INFINITY],
-    ['non-number', '128000']
-  ])('degrades only the model with a %s max input token limit', (_label, invalidValue) => {
-    const snapshot = buildSettingsSnapshot({
-      get: (key: string) => {
-        const values: Record<string, unknown> = {
-          displayModels: ['daily', 'fallback'],
-          'modelMappings.daily': 'combo/daily',
-          'modelMappings.fallback': 'combo/fallback',
-          'maxInputTokens.daily': invalidValue
-        };
-
-        return values[key];
-      }
-    } as never);
-
-    expect(snapshot.state).toBe('degraded');
-    expect(snapshot.publishedModels.map((model) => model.id)).toEqual(['fallback']);
-    expect(snapshot.rejectedModels).toContainEqual(
-      expect.objectContaining({ key: 'daily', code: 'INVALID_MAX_INPUT_TOKENS' })
-    );
-    expect(snapshot.issues).toContainEqual(
-      expect.objectContaining({
-        scope: 'model',
-        modelKey: 'daily',
-        code: 'INVALID_MAX_INPUT_TOKENS',
-        message: expect.stringContaining('9router-copilot.maxInputTokens.daily')
+  it('degrades one broken model without removing valid models', () => {
+    const snapshot = buildSettingsSnapshot(
+      configuration({
+        models: [
+          { id: 'broken', name: 'Broken', modelId: '' },
+          { id: 'coder', name: 'Coder', modelId: 'router/coder' }
+        ]
       })
     );
-  });
-
-  it('degrades only the model with an invalid max output token limit', () => {
-    const snapshot = buildSettingsSnapshot({
-      get: (key: string) => {
-        const values: Record<string, unknown> = {
-          displayModels: ['daily', 'fallback'],
-          'modelMappings.daily': 'combo/daily',
-          'modelMappings.fallback': 'combo/fallback',
-          'maxOutputTokens.daily': 0
-        };
-
-        return values[key];
-      }
-    } as never);
 
     expect(snapshot.state).toBe('degraded');
-    expect(snapshot.publishedModels.map((model) => model.id)).toEqual(['fallback']);
-    expect(snapshot.rejectedModels).toContainEqual(
-      expect.objectContaining({ key: 'daily', code: 'INVALID_MAX_OUTPUT_TOKENS' })
-    );
-    expect(snapshot.issues).toContainEqual(
-      expect.objectContaining({
-        scope: 'model',
-        modelKey: 'daily',
-        code: 'INVALID_MAX_OUTPUT_TOKENS',
-        message: expect.stringContaining('9router-copilot.maxOutputTokens.daily')
-      })
-    );
-  });
-
-  it('rejects a combo mapping that already contains a thinking suffix', () => {
-    const configuration = {
-      get: (key: string) => {
-        if (key === 'displayModels') {
-          return ['daily'];
-        }
-
-        if (key === 'modelMappings.daily') {
-          return 'combo/daily(high)';
-        }
-
-        return undefined;
-      }
-    };
-
-    const snapshot = buildSettingsSnapshot(configuration as never);
-
-    expect(snapshot.state).toBe('empty');
+    expect(snapshot.publishedModels.map((model) => model.id)).toEqual(['coder']);
     expect(snapshot.rejectedModels).toEqual([
       expect.objectContaining({
-        key: 'daily',
-        code: 'INVALID_COMBO_MAPPING',
-        message: expect.stringContaining('9router-copilot.thinkingMode.daily')
+        sourceIndex: 0,
+        id: 'broken',
+        code: 'INVALID_MODEL_MAPPING'
       })
-    ]);
-  });
-
-  it('returns an empty publication state when no display models are valid', () => {
-    const configuration = {
-      get: (key: string) => {
-        if (key === 'displayModels') {
-          return ['daily'];
-        }
-
-        if (key === 'modelMappings.daily') {
-          return '';
-        }
-
-        return undefined;
-      }
-    };
-
-    const snapshot = buildSettingsSnapshot(configuration as never);
-
-    expect(snapshot.state).toBe('empty');
-    expect(snapshot.publishedModels).toEqual([]);
-    expect(snapshot.rejectedModels).toEqual([
-      expect.objectContaining({ key: 'daily', code: 'INVALID_COMBO_MAPPING' })
     ]);
   });
 
   it('degrades image capability without rejecting a proxy model', () => {
-    const snapshot = buildSettingsSnapshot({
-      get: (key: string) => {
-        if (key === 'displayModels') return ['agent'];
-        if (key === 'modelMappings.agent') return 'combo/agent';
-        if (key === 'visionMode.agent') return 'proxy';
-        return undefined;
-      }
-    } as never);
+    const snapshot = buildSettingsSnapshot(
+      configuration({
+        models: [
+          {
+            id: 'coder',
+            name: 'Coder',
+            modelId: 'router/coder',
+            visionMode: 'proxy'
+          }
+        ]
+      })
+    );
 
     expect(snapshot.state).toBe('degraded');
     expect(snapshot.publishedModels).toHaveLength(1);
@@ -400,24 +176,29 @@ describe('buildSettingsSnapshot', () => {
     expect(snapshot.issues).toContainEqual(
       expect.objectContaining({
         scope: 'capability',
-        code: 'MISSING_VISION_PROXY_COMBO'
+        code: 'MISSING_VISION_PROXY_MODEL',
+        path: '9router-copilot.visionProxyModelId'
       })
     );
   });
 
-  it('advertises proxy image input when the shared combo is configured', () => {
-    const snapshot = buildSettingsSnapshot({
-      get: (key: string) => {
-        if (key === 'displayModels') return ['agent'];
-        if (key === 'modelMappings.agent') return 'combo/agent';
-        if (key === 'visionMode.agent') return 'proxy';
-        if (key === 'visionProxyComboId') return 'combo/vision';
-        return undefined;
-      }
-    } as never);
+  it('advertises proxy image input when the shared model is configured', () => {
+    const snapshot = buildSettingsSnapshot(
+      configuration({
+        models: [
+          {
+            id: 'coder',
+            name: 'Coder',
+            modelId: 'router/coder',
+            visionMode: 'proxy'
+          }
+        ],
+        visionProxyModelId: 'router/vision'
+      })
+    );
 
     expect(snapshot.state).toBe('valid');
-    expect(snapshot.runtime?.visionProxyComboId).toBe('combo/vision');
+    expect(snapshot.runtime?.visionProxyModelId).toBe('router/vision');
     expect(snapshot.publishedModels[0]?.capabilities.imageInput).toBe(true);
   });
 });

@@ -32,8 +32,8 @@ This repository must preserve the approved thin provider adapter architecture.
 The extension is allowed to:
 
 - register the `9router` language model provider
-- expose curated display models in Copilot Chat
-- map display models to `9router` combo ids
+- expose user-defined curated display models in Copilot Chat
+- map display models to opaque `9router` `modelId` values
 - adapt host requests into the `9router` API format
 - stream responses back to the host
 - expose diagnostics and local configuration behavior
@@ -118,15 +118,7 @@ src/
 
 ### Product naming
 
-User-facing model names should remain curated product names, not raw backend or upstream ids.
-
-Primary product names:
-
-- `Daily`
-- `Agent`
-- `Fallback`
-
-Internal combo ids must stay separate from user-facing labels.
+User-defined curated model names are allowed and must remain separate from backend or upstream ids. Keep the Copilot-facing `id` and `name` distinct from the opaque backend `modelId`; never derive one from another.
 
 ## TypeScript Rules
 
@@ -307,7 +299,7 @@ Every significant change should be reviewed against this checklist:
 
 - Does the change preserve the thin adapter architecture?
 - Does the change keep `9router` as the only routing authority?
-- Does the change keep user-facing display models separate from backend combo ids?
+- Does the change keep user-facing display models separate from backend `modelId` values?
 - Does the change keep secrets out of settings, logs, and dumps?
 - Does the change keep capability exposure conservative?
 - Does the change isolate adapter logic enough to test directly?

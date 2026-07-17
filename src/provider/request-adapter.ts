@@ -1,5 +1,5 @@
 import { adaptToolOptionsForRouter } from './tool-adapter';
-import type { DisplayModelSetting } from '../types/product-model';
+import type { ConfiguredModel } from '../types/product-model';
 import type {
   RouterChatCompletionRequest,
   RouterContentPart,
@@ -76,7 +76,7 @@ function adaptNativeVisionContent(content: HostChatRequestMessage['content']): R
 
 function adaptOrdinaryMessage(
   message: HostChatRequestMessage,
-  selectedModel: DisplayModelSetting
+  selectedModel: ConfiguredModel
 ): RouterMessage {
   const routerMessage: RouterMessage = {
     role: mapRole(message.role),
@@ -213,7 +213,7 @@ function extractToolResultText(toolResult: ToolResultLike): string {
 }
 
 export function adaptMessagesToRouterRequest(input: {
-  selectedModel: DisplayModelSetting;
+  selectedModel: ConfiguredModel;
   messages: readonly HostChatRequestMessage[];
   tools?: readonly HostToolDefinition[];
   hostToolMode?: unknown;
@@ -290,7 +290,7 @@ export function adaptMessagesToRouterRequest(input: {
   }
 
   const request: RouterChatCompletionRequest = {
-    model: input.selectedModel.comboId,
+    model: input.selectedModel.modelId,
     stream: true,
     stream_options: {
       include_usage: true

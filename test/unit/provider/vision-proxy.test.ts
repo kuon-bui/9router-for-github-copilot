@@ -7,10 +7,10 @@ import {
 } from '../../../src/provider/vision-proxy';
 
 const proxyModel = {
-  key: 'agent',
-  label: 'Agent',
-  comboId: 'combo/agent',
-  enabled: true,
+  sourceIndex: 0,
+  id: 'agent',
+  name: 'Agent',
+  modelId: 'combo/agent',
   toolMode: 'auto',
   visionMode: 'proxy',
   thinkingMode: 'max',
@@ -53,7 +53,7 @@ describe('VisionProxyService', () => {
           ]
         }
       ],
-      visionProxyComboId: 'combo/vision',
+      visionProxyModelId: 'combo/vision',
       baseUrl: 'https://router.example.com/v1',
       apiKey: 'secret',
       maxTokens: 128,
@@ -80,7 +80,7 @@ describe('VisionProxyService', () => {
     ]);
   });
 
-  it('rejects a missing shared combo before calling 9router', async () => {
+  it('rejects a missing shared model before calling 9router', async () => {
     let called = false;
     const service = new VisionProxyService({
       async *streamChatCompletion() {
@@ -93,7 +93,7 @@ describe('VisionProxyService', () => {
       service.prepare({
         selectedModel: proxyModel,
         messages: [{ role: 1, content: [image('image/png', 1)] }],
-        visionProxyComboId: '',
+        visionProxyModelId: '',
         baseUrl: 'https://router.example.com/v1',
         apiKey: 'secret',
         maxTokens: 128,
@@ -104,7 +104,7 @@ describe('VisionProxyService', () => {
       code: 'CONFIGURATION_ERROR',
       details: expect.objectContaining({
         phase: 'vision-proxy',
-        settingsKey: '9router-copilot.visionProxyComboId'
+        settingsKey: '9router-copilot.visionProxyModelId'
       })
     });
     expect(called).toBe(false);
@@ -125,7 +125,7 @@ describe('VisionProxyService', () => {
     const result = await service.prepare({
       selectedModel: { ...proxyModel, visionMode },
       messages,
-      visionProxyComboId: 'combo/vision',
+      visionProxyModelId: 'combo/vision',
       baseUrl: 'https://router.example.com/v1',
       apiKey: 'secret',
       maxTokens: 128,
@@ -147,7 +147,7 @@ describe('VisionProxyService', () => {
     const result = await service.prepare({
       selectedModel: proxyModel,
       messages: [{ role: 2, content: [{ callId: 'call-1', name: 'tool', input: {} }] }],
-      visionProxyComboId: 'combo/vision',
+      visionProxyModelId: 'combo/vision',
       baseUrl: 'https://router.example.com/v1',
       apiKey: 'secret',
       maxTokens: 128,
@@ -169,7 +169,7 @@ describe('VisionProxyService', () => {
       service.prepare({
         selectedModel: proxyModel,
         messages: [{ role: 1, content: [image('image/png', 1)] }],
-        visionProxyComboId: 'combo/vision',
+        visionProxyModelId: 'combo/vision',
         baseUrl: 'https://router.example.com/v1',
         apiKey: 'secret',
         maxTokens: 128,
@@ -192,7 +192,7 @@ describe('VisionProxyService', () => {
     const promise = service.prepare({
       selectedModel: proxyModel,
       messages: [{ role: 1, content: [image('image/png', 1)] }],
-      visionProxyComboId: 'combo/vision',
+      visionProxyModelId: 'combo/vision',
       baseUrl: 'https://router.example.com/v1',
       apiKey: 'secret',
       maxTokens: 128,
@@ -212,10 +212,10 @@ describe('VisionProxyService', () => {
     await expect(promise).rejects.not.toThrow('partial-summary-secret');
   });
 
-  it('maps a missing Vision combo to the shared setting without raw response text', async () => {
+  it('maps a missing Vision model to the shared setting without raw response text', async () => {
     const service = new VisionProxyService({
       async *streamChatCompletion() {
-        throw new NineRouterError('COMBO_MAPPING_ERROR', 'missing', {
+        throw new NineRouterError('MODEL_MAPPING_ERROR', 'missing', {
           requestId: 'req-404',
           details: { status: 404, responseText: 'raw-secret' }
         });
@@ -224,7 +224,7 @@ describe('VisionProxyService', () => {
     const promise = service.prepare({
       selectedModel: proxyModel,
       messages: [{ role: 1, content: [image('image/png', 1)] }],
-      visionProxyComboId: 'combo/missing',
+      visionProxyModelId: 'combo/missing',
       baseUrl: 'https://router.example.com/v1',
       apiKey: 'secret',
       maxTokens: 128,
@@ -238,7 +238,7 @@ describe('VisionProxyService', () => {
       details: {
         phase: 'vision-proxy',
         status: 404,
-        settingsKey: '9router-copilot.visionProxyComboId'
+        settingsKey: '9router-copilot.visionProxyModelId'
       }
     });
     await expect(promise).rejects.not.toMatchObject({
@@ -265,7 +265,7 @@ describe('VisionProxyService', () => {
       service.prepare({
         selectedModel: proxyModel,
         messages: [{ role: 1, content: [image('image/png', 1)] }],
-        visionProxyComboId: 'combo/vision',
+        visionProxyModelId: 'combo/vision',
         baseUrl: 'https://router.example.com/v1',
         apiKey: 'secret',
         maxTokens: 128,
@@ -286,7 +286,7 @@ describe('VisionProxyService', () => {
       service.prepare({
         selectedModel: proxyModel,
         messages: [{ role: 1, content: [image('image/png', 1)] }],
-        visionProxyComboId: 'combo/vision',
+        visionProxyModelId: 'combo/vision',
         baseUrl: 'https://router.example.com/v1',
         apiKey: 'secret',
         maxTokens: 128,
@@ -302,7 +302,7 @@ describe('VisionProxyService', () => {
 });
 
 describe('buildVisionProxyRequest', () => {
-  it('builds a bare-combo multimodal request without tools or reasoning', () => {
+  it('builds a bare-model multimodal request without tools or reasoning', () => {
     const request = buildVisionProxyRequest(
       { role: 1, content: [{ value: 'read this' }, image('image/png', 97)] },
       'combo/vision',

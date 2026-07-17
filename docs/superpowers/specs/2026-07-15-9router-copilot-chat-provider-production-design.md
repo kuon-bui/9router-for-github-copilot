@@ -9,7 +9,7 @@
 
 ## Objective
 
-Build a VS Code extension that exposes `9router` as a custom provider inside GitHub Copilot Chat while preserving the native Copilot Chat experience. The extension should let users select curated product models from the Copilot model picker, while `9router` continues to own routing combos, fallback policy, quota behavior, and upstream model execution.
+Build a VS Code extension that exposes `9router` as a custom provider inside GitHub Copilot Chat while preserving the native Copilot Chat experience. The extension lets users publish an ordered array of user-defined curated models in the Copilot picker, while `9router` continues to own routing combos, fallback policy, quota behavior, and upstream model execution.
 
 ## Context
 
@@ -31,7 +31,7 @@ Documented `9router` behavior that influences this design:
 - Expose `9router` models directly in the Copilot Chat model picker.
 - Use `9router` as the single routing and execution backend.
 - Support local per-user configuration of which display models appear in the picker.
-- Allow local per-user mapping from display models to `9router` combo ids.
+- Allow each local display model to map to an opaque `9router` `modelId`.
 - Keep the extension thin, streaming-first, and operationally simple.
 - Provide a production path for tools, vision compatibility, diagnostics, and compatibility hardening.
 
@@ -44,17 +44,9 @@ Documented `9router` behavior that influences this design:
 
 ## Product Model
 
-The extension will register a `9router` vendor in VS Code and expose curated product models in the Copilot Chat picker.
+The extension registers a `9router` vendor in VS Code and exposes an ordered array of user-defined curated product models in the Copilot Chat picker.
 
-The first production release will support up to three displayed models:
-
-- `Daily`
-- `Agent`
-- `Fallback`
-
-These are presentation-layer product models, not raw upstream model ids.
-
-Each displayed model maps to a `9router` combo id through local per-user VS Code settings. This means the user controls what appears in the picker and what routing combo each displayed model targets, while the backend remains the source of truth for routing behavior.
+Each presentation object defines a stable Copilot-facing `id`, a user-facing `name`, and an opaque backend `modelId`. The user controls membership, display order, names, and mappings through local per-user settings. The extension sends `modelId` unchanged; `9router` remains the source of truth for routing behavior.
 
 ## Control Boundaries
 
@@ -70,9 +62,9 @@ Each displayed model maps to a `9router` combo id through local per-user VS Code
 ### VS Code extension responsibilities
 
 - register the provider with the host
-- expose Copilot-facing display models
+- expose user-defined curated Copilot-facing display models
 - store API credentials securely
-- map display models to backend combo ids
+- map display models to opaque backend `modelId` values
 - adapt Copilot Chat requests into the `9router` API format
 - stream responses back into the host
 - expose safe diagnostics and configuration state
@@ -157,7 +149,7 @@ On activation, the extension should:
 When VS Code asks for model information through `provideLanguageModelChatInformation`, the extension should:
 
 - read the locally configured display models
-- resolve their configured combo ids
+- validate their configured `modelId` values
 - expose only valid models to the picker
 - optionally degrade invalid entries instead of breaking the entire provider
 
@@ -167,7 +159,7 @@ When the user sends a prompt in Copilot Chat:
 
 - VS Code calls `provideLanguageModelChatResponse`
 - the extension receives the selected display model, messages, and tool context
-- the extension resolves the selected display model to its configured `9router` combo id
+- the extension resolves the selected display model to its configured `9router` `modelId`
 - the adapter converts the request into the OpenAI-compatible payload used by `9router`
 - the request is sent to the configured `9router` `/v1` endpoint
 
@@ -193,23 +185,8 @@ Secrets must be stored only in VS Code `SecretStorage`.
 Recommended configuration keys:
 
 - `9router-copilot.baseUrl`
-- `9router-copilot.displayModels`
-- `9router-copilot.modelMappings.daily`
-- `9router-copilot.modelMappings.agent`
-- `9router-copilot.modelMappings.fallback`
-- `9router-copilot.visionMode.daily`
-- `9router-copilot.visionMode.agent`
-- `9router-copilot.visionMode.fallback`
-- `9router-copilot.visionProxyComboId`
-- `9router-copilot.thinkingMode.daily`
-- `9router-copilot.thinkingMode.agent`
-- `9router-copilot.thinkingMode.fallback`
-- `9router-copilot.maxInputTokens.daily`
-- `9router-copilot.maxInputTokens.agent`
-- `9router-copilot.maxInputTokens.fallback`
-- `9router-copilot.maxOutputTokens.daily`
-- `9router-copilot.maxOutputTokens.agent`
-- `9router-copilot.maxOutputTokens.fallback`
+- `9router-copilot.models`: ordered objects containing `id`, `name`, `modelId`, `toolMode`, `visionMode`, `thinkingMode`, `maxInputTokens`, and `maxOutputTokens`
+- `9router-copilot.visionProxyModelId`
 - `9router-copilot.maxTokens`
 - `9router-copilot.requestTimeoutMs`
 - `9router-copilot.debugMode`
@@ -240,15 +217,15 @@ global setting continues to control the requested `max_tokens` field sent to
 
 Every valid published model exposes a `configurationSchema` navigation property named `reasoningEffort`. Copilot Chat renders the property as an independent per-model **Thinking Effort** submenu with `None`, `Minimal`, `Low`, `Medium`, `High`, `XHigh`, and `Max`.
 
-The validated `9router-copilot.thinkingMode.<model>` value supplies that model's schema default and request fallback. A valid `modelConfiguration.reasoningEffort` value overrides the local default for the current request; `none` maps to internal `off`, while the remaining values map directly.
+The validated model object's `thinkingMode` value supplies that model's schema default and request fallback. A valid `modelConfiguration.reasoningEffort` value overrides the local default for the current request; `none` maps to internal `off`, while the remaining values map directly.
 
-The extension keeps the resolved combo id unchanged in `model`. For a non-`off` effective level, it sets the OpenAI-compatible `reasoning_effort` request field. `9router` owns provider-specific reasoning translation and compatibility policy. Reasoning deltas remain hidden.
+The extension keeps the configured `modelId` unchanged in `model`. For a non-`off` effective level, it sets the OpenAI-compatible `reasoning_effort` request field. `9router` owns provider-specific reasoning translation and compatibility policy. Reasoning deltas remain hidden.
 
 ### Recommended behavior
 
-- Ship default display model labels, but keep combo mapping defaults empty.
-- Require each published display model to reference an existing user-configured `9router` combo id.
-- Let the user override which models are shown and what combo ids they resolve to.
+- Ship one default `agent` object with an empty `modelId`, so it remains unpublished until configured.
+- Require each published display model to reference an existing user-configured `9router` model.
+- Let users add, remove, rename, and reorder user-defined curated model objects.
 - Refresh the picker when settings change, without requiring reload where possible.
 - If a mapping is invalid, degrade that single model entry rather than disabling the whole provider.
 
@@ -274,14 +251,14 @@ Authorization: Bearer <9router_api_key>
 
 Recommended request shape:
 
-- `model`: resolved combo id
+- `model`: configured opaque `modelId`
 - `messages`
 - `stream`
 - `tools` when supported
 - `max_tokens`
 - optional generation parameters that `9router` documents as compatible
 
-Thinking preferences are configured per curated display model. The extension keeps the resolved combo id unchanged and sends a validated non-`off` level through `reasoning_effort`. `9router` owns provider-specific reasoning translation, normalization, limits, and upstream compatibility.
+Thinking preferences are configured per curated display model. The extension keeps `modelId` unchanged and sends a validated non-`off` level through `reasoning_effort`. `9router` owns provider-specific reasoning translation, normalization, limits, and upstream compatibility.
 
 ### Compatibility note
 
@@ -326,14 +303,14 @@ If a mapped combo is not approved for tools, the extension should degrade gracef
 
 ## Vision Compatibility Strategy
 
-Some `9router` combos may not reliably support native multimodal input. To avoid blocking image-driven workflows entirely, the extension supports a Vision proxy path through one shared `9router` combo configured by `9router-copilot.visionProxyComboId`.
+Some `9router` models may not reliably support native multimodal input. To avoid blocking image-driven workflows entirely, the extension supports a Vision proxy path through one shared `9router` model configured by `9router-copilot.visionProxyModelId`.
 
 Recommended vision proxy flow:
 
 1. detect image attachments in the host request
 2. check the selected display model's local `visionMode` configuration
 3. send image inputs directly to `9router` when `visionMode` is `native`
-4. when `visionMode` is `proxy`, have `VisionProxyService` process each image-bearing message sequentially through the shared combo from `9router-copilot.visionProxyComboId`
+4. when `visionMode` is `proxy`, have `VisionProxyService` process each image-bearing message sequentially through the shared model from `9router-copilot.visionProxyModelId`
 5. use `image-input-adapter.ts` to convert each VS Code `LanguageModelDataPart` into an OpenAI-compatible `image_url` data URL; batch multiple images from the same message into one Vision request
 6. replace the raw images in each successfully processed message with a `[Vision proxy summary]` text block
 7. send the transformed conversation to the selected display model's primary `9router` combo
@@ -398,7 +375,7 @@ Recommended debug levels:
 - `metadata`
   - request id
   - selected display model
-  - resolved combo id
+  - configured opaque `modelId`
   - token or latency summaries when available
 
 - `verbose`
@@ -469,7 +446,7 @@ This minimizes local operational burden and keeps installation simple for end us
 ### Phase 1: Foundation
 
 - register the `9router` provider
-- publish three display models
+- publish validated user-defined curated display models
 - implement API key flow
 - support text-only streaming through `9router`
 

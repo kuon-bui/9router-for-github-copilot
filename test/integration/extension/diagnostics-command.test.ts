@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { buildSettingsSnapshot } from '../../../src/config/settings';
+import { formatSettingsSnapshotDiagnostics } from '../../../src/debug/output-channel';
 import { registerCommands } from '../../../src/runtime/commands';
 import {
   __getCommandHandler,
@@ -29,19 +30,14 @@ describe('9routerCopilot.showDiagnostics', () => {
           buildSettingsSnapshot(
             {
               get: (key: string) => {
-                if (key === 'displayModels') {
-                  return ['daily', 'agent'];
+                if (key === 'models') {
+                  return [
+                    { id: 'daily', name: 'Daily', modelId: 'combo/daily' },
+                    { id: 'agent', name: 'Agent', modelId: '' }
+                  ];
                 }
 
-                if (key === 'modelMappings.daily') {
-                  return 'combo/daily';
-                }
-
-                if (key === 'modelMappings.agent') {
-                  return '';
-                }
-
-                if (key === 'visionProxyComboId') {
+                if (key === 'visionProxyModelId') {
                   return 'combo/vision-private';
                 }
 
@@ -56,8 +52,29 @@ describe('9routerCopilot.showDiagnostics', () => {
     await handler?.();
 
     expect(__getOutputLines().join('\n')).toContain('Snapshot state: degraded');
-    expect(__getOutputLines().join('\n')).toContain('Rejected models: agent (INVALID_COMBO_MAPPING)');
+    expect(__getOutputLines().join('\n')).toContain('Rejected models: agent (INVALID_MODEL_MAPPING)');
     expect(__getOutputLines().join('\n')).toContain('"visionProxyConfigured":true');
     expect(__getOutputLines().join('\n')).not.toContain('combo/vision-private');
+  });
+
+  it('reports one broken model without hiding unrelated valid models', () => {
+    const snapshot = buildSettingsSnapshot({
+      get: (key: string) =>
+        key === 'models'
+          ? [
+              { id: 'broken', name: 'Broken', modelId: '' },
+              { id: 'coder', name: 'Coder', modelId: 'router/coder' }
+            ]
+          : undefined
+    } as never);
+
+    expect(snapshot.state).toBe('degraded');
+    expect(snapshot.publishedModels.map((model) => model.id)).toEqual(['coder']);
+    expect(formatSettingsSnapshotDiagnostics(snapshot)).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining('Published models: coder'),
+        expect.stringContaining('INVALID_MODEL_MAPPING')
+      ])
+    );
   });
 });

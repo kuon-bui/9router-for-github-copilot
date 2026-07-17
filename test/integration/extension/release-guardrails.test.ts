@@ -5,51 +5,60 @@ import { describe, expect, it } from 'vitest';
 import manifest from '../../../package.json';
 
 describe('release guardrails', () => {
-  it('does not contribute placeholder combo ids as executable defaults', () => {
-    const properties = manifest.contributes.configuration.properties;
+  it('contributes one ordered dynamic model setting with a safe agent default', () => {
+    const properties = manifest.contributes.configuration.properties as Record<string, unknown>;
+    const models = properties['9router-copilot.models'] as {
+      type: string;
+      default: unknown[];
+      items: { type: string; additionalProperties: boolean; required: string[] };
+    };
 
-    expect(properties['9router-copilot.modelMappings.daily'].default).toBe('');
-    expect(properties['9router-copilot.modelMappings.agent'].default).toBe('');
-    expect(properties['9router-copilot.modelMappings.fallback'].default).toBe('');
+    expect(models).toMatchObject({
+      type: 'array',
+      default: [
+        {
+          id: 'agent',
+          name: 'Agent',
+          modelId: '',
+          toolMode: 'auto',
+          visionMode: 'off',
+          thinkingMode: 'off',
+          maxInputTokens: 128_000,
+          maxOutputTokens: 8_192
+        }
+      ],
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['id', 'name', 'modelId']
+      }
+    });
+    expect(properties['9router-copilot.visionProxyModelId']).toMatchObject({
+      type: 'string',
+      default: ''
+    });
   });
 
-  it('contributes per-model thinking settings with safe defaults', () => {
-    const properties = manifest.contributes.configuration.properties as Record<
-      string,
-      { default?: unknown; enum?: unknown[] }
-    >;
-    const acceptedModes = ['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'];
+  it('does not contribute legacy fixed-model settings', () => {
+    const properties = manifest.contributes.configuration.properties as Record<string, unknown>;
+    const legacyKeys = [
+      '9router-copilot.displayModels',
+      '9router-copilot.labels.daily',
+      '9router-copilot.modelMappings.agent',
+      '9router-copilot.toolMode.agent',
+      '9router-copilot.visionMode.agent',
+      '9router-copilot.visionProxyComboId',
+      '9router-copilot.thinkingMode.agent',
+      '9router-copilot.maxInputTokens.agent',
+      '9router-copilot.maxOutputTokens.agent'
+    ];
 
-    for (const modelKey of ['daily', 'agent', 'fallback'] as const) {
-      const setting = properties[`9router-copilot.thinkingMode.${modelKey}`];
-      expect(setting).toMatchObject({
-        default: 'off',
-        enum: acceptedModes
-      });
+    for (const key of legacyKeys) {
+      expect(properties).not.toHaveProperty(key);
     }
   });
 
-  it('contributes per-model context window settings with stable defaults', () => {
-    const properties = manifest.contributes.configuration.properties as Record<
-      string,
-      { type?: string; minimum?: number; default?: unknown }
-    >;
-
-    for (const modelKey of ['daily', 'agent', 'fallback'] as const) {
-      expect(properties[`9router-copilot.maxInputTokens.${modelKey}`]).toMatchObject({
-        type: 'integer',
-        minimum: 1,
-        default: 128_000
-      });
-      expect(properties[`9router-copilot.maxOutputTokens.${modelKey}`]).toMatchObject({
-        type: 'integer',
-        minimum: 1,
-        default: 8_192
-      });
-    }
-  });
-
-  it('documents context window metadata separately from request max tokens', async () => {
+  it('documents the breaking dynamic model contract without legacy settings', async () => {
     const readme = await readFile(resolve(process.cwd(), 'README.md'), 'utf8');
     const productionDesign = await readFile(
       resolve(
@@ -58,67 +67,26 @@ describe('release guardrails', () => {
       ),
       'utf8'
     );
+    const agentGuidance = await readFile(resolve(process.cwd(), 'AGENTS.md'), 'utf8');
+    const convention = await readFile(resolve(process.cwd(), 'CODE_CONVENTION.md'), 'utf8');
 
-    for (const document of [readme, productionDesign]) {
-      expect(document).toContain('9router-copilot.maxInputTokens.daily');
-      expect(document).toContain('9router-copilot.maxOutputTokens.fallback');
-      expect(document).toContain('9router-copilot.maxTokens');
-      expect(document).toContain('independent');
+    for (const document of [readme, productionDesign, agentGuidance, convention]) {
+      expect(document).toContain('user-defined curated');
     }
-  });
-
-  it('contributes one empty shared Vision proxy combo setting', () => {
-    const setting =
-      manifest.contributes.configuration.properties['9router-copilot.visionProxyComboId'];
-
-    expect(setting).toMatchObject({ type: 'string', default: '' });
-  });
-
-  it('documents the native picker without moving reasoning policy into the extension', async () => {
-    const readme = await readFile(resolve(process.cwd(), 'README.md'), 'utf8');
-    const productionDesign = await readFile(
-      resolve(
-        process.cwd(),
-        'docs/superpowers/specs/2026-07-15-9router-copilot-chat-provider-production-design.md'
-      ),
-      'utf8'
-    );
-
-    expect(readme).toContain('Thinking Effort');
-    expect(readme).toContain('None');
-    expect(readme).toContain('XHigh');
-    expect(readme).toContain('9router-copilot.thinkingMode.agent');
-    expect(readme).toContain('default and fallback');
-    expect(readme).toContain('base combo id');
+    expect(readme).toContain('9router-copilot.models');
+    expect(readme).toContain('"modelId"');
+    expect(readme).toContain('9router-copilot.visionProxyModelId');
+    expect(readme).toContain('Breaking configuration change');
+    expect(readme).toContain('toolMode');
+    expect(readme).toContain('visionMode');
+    expect(readme).toContain('thinkingMode');
+    expect(readme).toContain('maxInputTokens');
+    expect(readme).toContain('maxOutputTokens');
     expect(readme).toContain('reasoning_effort');
-    expect(readme).toContain('keeps that id unchanged');
-    expect(productionDesign).toContain('configurationSchema');
-    expect(productionDesign).toContain('modelConfiguration.reasoningEffort');
-    expect(productionDesign).toContain('resolved combo id unchanged in `model`');
-    expect(productionDesign).toContain('reasoning_effort');
-    expect(productionDesign).toContain('provider-specific reasoning translation');
-    expect(productionDesign).toContain('Reasoning deltas remain hidden');
-  });
-
-  it('documents the shared fail-closed 9router Vision proxy', async () => {
-    const readme = await readFile(resolve(process.cwd(), 'README.md'), 'utf8');
-    const productionDesign = await readFile(
-      resolve(
-        process.cwd(),
-        'docs/superpowers/specs/2026-07-15-9router-copilot-chat-provider-production-design.md'
-      ),
-      'utf8'
-    );
-
-    for (const document of [readme, productionDesign]) {
-      expect(document).toContain('9router-copilot.visionProxyComboId');
-      expect(document).toContain('shared');
-      expect(document).toContain('fail-closed');
-      expect(document).toContain('image_url');
-    }
-    expect(readme).toContain('Vision proxy summary');
-    expect(productionDesign).toContain('VisionProxyService');
-    expect(productionDesign).toContain('must not reach the primary combo');
+    expect(readme).toContain('fail-closed');
+    expect(readme).toContain('stream_options.include_usage');
+    expect(readme).not.toContain('9router-copilot.displayModels');
+    expect(readme).not.toContain('9router-copilot.modelMappings.');
   });
 
   it('keeps the VSIX package command explicit about local repository metadata', () => {
