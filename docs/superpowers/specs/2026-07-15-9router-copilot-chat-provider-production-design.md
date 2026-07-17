@@ -210,7 +210,7 @@ Every valid published model exposes a `configurationSchema` navigation property 
 
 The validated `9router-copilot.thinkingMode.<model>` value supplies that model's schema default and request fallback. A valid `modelConfiguration.reasoningEffort` value overrides the local default for the current request; `none` maps to internal `off`, while the remaining values map directly.
 
-The extension continues to express the effective level only through the `9router` model suffix. `9router` owns provider-specific reasoning translation and compatibility policy. Reasoning deltas remain hidden.
+The extension keeps the resolved combo id unchanged in `model`. For a non-`off` effective level, it sets the OpenAI-compatible `reasoning_effort` request field. `9router` owns provider-specific reasoning translation and compatibility policy. Reasoning deltas remain hidden.
 
 ### Recommended behavior
 
@@ -249,7 +249,7 @@ Recommended request shape:
 - `max_tokens`
 - optional generation parameters that `9router` documents as compatible
 
-Thinking preferences are configured per curated display model. The extension appends a validated non-`off` level to the resolved combo id using the `model(level)` contract. `9router` owns provider-specific reasoning translation, normalization, limits, and upstream compatibility.
+Thinking preferences are configured per curated display model. The extension keeps the resolved combo id unchanged and sends a validated non-`off` level through `reasoning_effort`. `9router` owns provider-specific reasoning translation, normalization, limits, and upstream compatibility.
 
 ### Compatibility note
 
