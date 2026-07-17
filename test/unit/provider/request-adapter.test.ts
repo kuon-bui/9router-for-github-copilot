@@ -24,14 +24,15 @@ describe('adaptMessagesToRouterRequest', () => {
       max_tokens: 256,
       messages: [{ role: 'user', content: 'Say hello' }]
     });
+    expect(request).not.toHaveProperty('reasoning_effort');
   });
 
-  it('appends the configured thinking mode to the router model name', () => {
+  it('keeps the combo id bare and forwards thinking as reasoning_effort', () => {
     const request = adaptMessagesToRouterRequest({
       selectedModel: {
         key: 'agent',
         label: 'Agent',
-        comboId: 'combo/agent',
+        comboId: '123',
         enabled: true,
         toolMode: 'auto',
         visionMode: 'off',
@@ -40,7 +41,10 @@ describe('adaptMessagesToRouterRequest', () => {
       messages: [{ role: 1, content: 'Solve this carefully' }]
     });
 
-    expect(request.model).toBe('combo/agent(high)');
+    expect(request).toMatchObject({
+      model: '123',
+      reasoning_effort: 'high'
+    });
   });
 
   it('preserves matching assistant tool calls and tool results', () => {

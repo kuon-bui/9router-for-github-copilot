@@ -207,14 +207,6 @@ function extractToolResultText(toolResult: ToolResultLike): string {
     .join('\n');
 }
 
-function resolveRouterModelName(selectedModel: DisplayModelSetting): string {
-  if (selectedModel.thinkingMode === 'off') {
-    return selectedModel.comboId;
-  }
-
-  return `${selectedModel.comboId}(${selectedModel.thinkingMode})`;
-}
-
 export function adaptMessagesToRouterRequest(input: {
   selectedModel: DisplayModelSetting;
   messages: readonly HostChatRequestMessage[];
@@ -293,10 +285,14 @@ export function adaptMessagesToRouterRequest(input: {
   }
 
   const request: RouterChatCompletionRequest = {
-    model: resolveRouterModelName(input.selectedModel),
+    model: input.selectedModel.comboId,
     stream: true,
     messages
   };
+
+  if (input.selectedModel.thinkingMode !== 'off') {
+    request.reasoning_effort = input.selectedModel.thinkingMode;
+  }
 
   if (typeof input.maxTokens === 'number') {
     request.max_tokens = input.maxTokens;

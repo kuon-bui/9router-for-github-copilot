@@ -34,6 +34,7 @@ export interface RouterChatCompletionRequest {
   messages: RouterMessage[];
   stream: true;
   max_tokens?: number;
+  reasoning_effort?: 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
   tools?: RouterToolDefinition[];
   tool_choice?: 'auto' | 'required';
 }
