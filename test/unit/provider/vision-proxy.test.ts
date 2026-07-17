@@ -3,7 +3,6 @@ import { NineRouterError } from '../../../src/router/errors';
 import type { RouterChatCompletionRequest } from '../../../src/types/router-contract';
 import {
   buildVisionProxyRequest,
-  prepareVisionCompatibleMessages,
   VisionProxyService
 } from '../../../src/provider/vision-proxy';
 
@@ -306,19 +305,5 @@ describe('buildVisionProxyRequest', () => {
 
     expect(JSON.stringify(request.messages)).toContain('data:image/png;base64,YQ==');
     expect(JSON.stringify(request.messages)).not.toContain('must-not-replace-image');
-  });
-});
-
-describe('prepareVisionCompatibleMessages compatibility', () => {
-  it('fails closed for proxy mode without transport inputs', async () => {
-    await expect(
-      prepareVisionCompatibleMessages({
-        selectedModel: proxyModel,
-        messages: [{ role: 1, content: [image('image/png', 1)] }]
-      })
-    ).rejects.toMatchObject({
-      code: 'CONFIGURATION_ERROR',
-      details: { phase: 'vision-proxy' }
-    });
   });
 });

@@ -8,7 +8,7 @@ import { adaptMessagesToRouterRequest } from './request-adapter';
 import { createRouterEventEmitter } from './stream-adapter';
 import { createAbortSignalFromToken } from './cancellation';
 import { resolveEffectiveThinkingMode } from './thinking-effort';
-import { prepareVisionCompatibleMessages } from './vision-proxy';
+import { VisionProxyService } from './vision-proxy';
 import type { RouterClient } from '../router/client';
 import type { SettingsSnapshot } from '../config/settings';
 import type { DisplayModelSetting, PublishedModel } from '../types/product-model';
@@ -49,6 +49,7 @@ export class NineRouterChatProvider
   implements vscode.LanguageModelChatProvider<PublishedModel>
 {
   private readonly onDidChangeEmitter = new vscode.EventEmitter<void>();
+  private readonly visionProxyService: VisionProxyService;
 
   public readonly onDidChangeLanguageModelChatInformation = this.onDidChangeEmitter.event;
 
@@ -56,7 +57,9 @@ export class NineRouterChatProvider
     private readonly context: Pick<vscode.ExtensionContext, 'secrets'>,
     private readonly routerClient: RouterClient,
     private snapshot: SettingsSnapshot = buildSettingsSnapshot(getExtensionConfiguration())
-  ) {}
+  ) {
+    this.visionProxyService = new VisionProxyService(routerClient);
+  }
 
   public refresh(): void {
     this.snapshot = buildSettingsSnapshot(getExtensionConfiguration());
@@ -111,79 +114,96 @@ export class NineRouterChatProvider
       ...selectedModel,
       thinkingMode: effectiveThinking.thinkingMode
     };
-
-    const visionResult = await prepareVisionCompatibleMessages({
-      selectedModel: requestSelectedModel,
-      messages: messages as readonly HostChatRequestMessage[]
-    });
-
-    logDebugEvent(this.snapshot.runtime.debugMode, 'Vision compatibility resolved', {
-      displayModel: selectedModel.key,
-      comboId: selectedModel.comboId,
-      visionMode: selectedModel.visionMode,
-      visionOutcome: visionResult.outcome,
-      hasVisionInput: visionResult.hasVisionInput
-    });
-
-    if (visionResult.outcome === 'vision-blocked') {
-      throw new NineRouterError(
-        'CONFIGURATION_ERROR',
-        visionResult.blockReason ?? 'The selected 9router display model cannot accept image inputs.',
-        {
-          details: {
-            displayModel: selectedModel.key,
-            comboId: selectedModel.comboId,
-            visionMode: selectedModel.visionMode,
-            visionOutcome: visionResult.outcome
-          }
-        }
-      );
-    }
-
-    const requestInput: Parameters<typeof adaptMessagesToRouterRequest>[0] = {
-      selectedModel: requestSelectedModel,
-      messages: visionResult.messages
-    };
-
-    const requestTools = getRequestTools(options);
-    if (requestTools) {
-      requestInput.tools = requestTools;
-      requestInput.hostToolMode = getRequestToolMode(options);
-
-      const toolOptions = adaptToolOptionsForRouter({
-        selectedModel: requestSelectedModel,
-        tools: requestTools,
-        hostToolMode: getRequestToolMode(options)
-      });
-
-      if (toolOptions.rejectedTools.length > 0) {
-        logDebugEvent(this.snapshot.runtime.debugMode, 'Some tools were not exposed to 9router', {
-          rejectedTools: toolOptions.rejectedTools.map((tool) => `${tool.name}:${tool.code}`).join(', ')
-        });
-      }
-    }
-
-    if (typeof this.snapshot.runtime.maxTokens === 'number') {
-      requestInput.maxTokens = this.snapshot.runtime.maxTokens;
-    }
-
-    const request = adaptMessagesToRouterRequest(requestInput);
-
-    logDebugEvent(this.snapshot.runtime.debugMode, 'Submitting request to 9router', {
-      displayModel: selectedModel.key,
-      comboId: selectedModel.comboId,
-      configuredThinkingMode: selectedModel.thinkingMode,
-      effectiveThinkingMode: effectiveThinking.thinkingMode,
-      thinkingModeSource: effectiveThinking.source,
-      baseUrl: this.snapshot.runtime.baseUrl,
-      snapshotState: this.snapshot.state,
-      issueCount: this.snapshot.issues.length
-    });
-
-    const emitter = createRouterEventEmitter(progress);
     const requestCancellation = createAbortSignalFromToken(token);
+    const visionStartedAt = Date.now();
 
     try {
+      const visionResult = await this.visionProxyService.prepare({
+        selectedModel: requestSelectedModel,
+        messages: messages as readonly HostChatRequestMessage[],
+        visionProxyComboId: this.snapshot.runtime.visionProxyComboId,
+        baseUrl: this.snapshot.runtime.baseUrl,
+        apiKey,
+        ...(typeof this.snapshot.runtime.maxTokens === 'number'
+          ? { maxTokens: this.snapshot.runtime.maxTokens }
+          : {}),
+        requestTimeoutMs: this.snapshot.runtime.requestTimeoutMs,
+        signal: requestCancellation.signal
+      });
+
+      logDebugEvent(this.snapshot.runtime.debugMode, 'Vision compatibility resolved', {
+        displayModel: selectedModel.key,
+        visionMode: selectedModel.visionMode,
+        visionOutcome: visionResult.outcome,
+        hasVisionInput: visionResult.hasVisionInput,
+        imageCount: visionResult.imageCount,
+        imageMessageCount: visionResult.imageMessageCount,
+        visionRequestIds: visionResult.requestIds.join(','),
+        durationMs: Date.now() - visionStartedAt
+      });
+
+      if (visionResult.outcome === 'vision-blocked') {
+        throw new NineRouterError(
+          'CONFIGURATION_ERROR',
+          visionResult.blockReason ?? 'The selected 9router display model cannot accept image inputs.',
+          {
+            details: {
+              displayModel: selectedModel.key,
+              comboId: selectedModel.comboId,
+              visionMode: selectedModel.visionMode,
+              visionOutcome: visionResult.outcome
+            }
+          }
+        );
+      }
+
+      const requestInput: Parameters<typeof adaptMessagesToRouterRequest>[0] = {
+        selectedModel: requestSelectedModel,
+        messages: visionResult.messages
+      };
+
+      const requestTools = getRequestTools(options);
+      if (requestTools) {
+        requestInput.tools = requestTools;
+        requestInput.hostToolMode = getRequestToolMode(options);
+
+        const toolOptions = adaptToolOptionsForRouter({
+          selectedModel: requestSelectedModel,
+          tools: requestTools,
+          hostToolMode: getRequestToolMode(options)
+        });
+
+        if (toolOptions.rejectedTools.length > 0) {
+          logDebugEvent(this.snapshot.runtime.debugMode, 'Some tools were not exposed to 9router', {
+            rejectedTools: toolOptions.rejectedTools
+              .map((tool) => `${tool.name}:${tool.code}`)
+              .join(', ')
+          });
+        }
+      }
+
+      if (typeof this.snapshot.runtime.maxTokens === 'number') {
+        requestInput.maxTokens = this.snapshot.runtime.maxTokens;
+      }
+
+      const request = adaptMessagesToRouterRequest(requestInput);
+
+      logDebugEvent(this.snapshot.runtime.debugMode, 'Submitting request to 9router', {
+        displayModel: selectedModel.key,
+        comboId: selectedModel.comboId,
+        configuredThinkingMode: selectedModel.thinkingMode,
+        effectiveThinkingMode: effectiveThinking.thinkingMode,
+        thinkingModeSource: effectiveThinking.source,
+        baseUrl: this.snapshot.runtime.baseUrl,
+        snapshotState: this.snapshot.state,
+        issueCount: this.snapshot.issues.length
+      });
+
+      if (requestCancellation.signal.aborted) {
+        throw new NineRouterError('CANCELLATION_ERROR', '9router request was cancelled');
+      }
+
+      const emitter = createRouterEventEmitter(progress);
       const stream = this.routerClient.streamChatCompletion({
         baseUrl: this.snapshot.runtime.baseUrl,
         apiKey,

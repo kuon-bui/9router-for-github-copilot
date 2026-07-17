@@ -307,20 +307,3 @@ export class VisionProxyService {
     return requestId ? { summary: trimmed, requestId } : { summary: trimmed };
   }
 }
-
-export async function prepareVisionCompatibleMessages(input: {
-  selectedModel: DisplayModelSetting;
-  messages: readonly HostChatRequestMessage[];
-}): Promise<VisionCompatibilityResult> {
-  const counts = inspectVisionInput(input.messages);
-  const nonProxyResult = resolveNonProxyResult(input.selectedModel, input.messages, counts);
-  if (nonProxyResult) {
-    return nonProxyResult;
-  }
-
-  throw new NineRouterError(
-    'CONFIGURATION_ERROR',
-    'Proxy Vision requires the 9router Vision proxy transport service.',
-    { details: { phase: 'vision-proxy' } }
-  );
-}

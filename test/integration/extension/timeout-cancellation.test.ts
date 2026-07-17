@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { NineRouterError } from '../../../src/router/errors';
 import { NineRouterChatProvider } from '../../../src/provider/provider';
+import type { RouterChatCompletionRequest } from '../../../src/types/router-contract';
 import {
   __createCancellationToken,
   __resetVscodeState,
@@ -68,5 +69,66 @@ describe('NineRouterChatProvider cancellation flow', () => {
     ).rejects.toMatchObject({
       code: 'CANCELLATION_ERROR'
     });
+  });
+
+  it('cancels Vision before the primary combo starts', async () => {
+    __setConfigurationValues({
+      displayModels: ['agent'],
+      'modelMappings.agent': 'combo/agent',
+      'visionMode.agent': 'proxy',
+      visionProxyComboId: 'combo/vision',
+      baseUrl: 'https://router.example.com/v1',
+      maxTokens: 128,
+      requestTimeoutMs: 5000,
+      debugMode: 'minimal'
+    });
+    const cancellation = __createCancellationToken();
+    const modelsCalled: string[] = [];
+    let visionSignal: AbortSignal | undefined;
+    let markVisionStarted: (() => void) | undefined;
+    const visionStarted = new Promise<void>((resolve) => {
+      markVisionStarted = resolve;
+    });
+    const provider = new NineRouterChatProvider(
+      { secrets: { get: async () => 'token' } } as never,
+      {
+        async *streamChatCompletion(input: {
+          request: RouterChatCompletionRequest;
+          signal: AbortSignal;
+        }) {
+          modelsCalled.push(input.request.model);
+          visionSignal = input.signal;
+          markVisionStarted?.();
+          await new Promise<void>((resolve) => {
+            if (input.signal.aborted) resolve();
+            else input.signal.addEventListener('abort', () => resolve(), { once: true });
+          });
+          throw new NineRouterError('CANCELLATION_ERROR', '9router request was cancelled');
+        }
+      } as never
+    );
+
+    const responsePromise = provider.provideLanguageModelChatResponse(
+      {
+        id: 'agent',
+        name: 'Agent',
+        vendor: '9router',
+        family: 'agent',
+        version: '1',
+        maxInputTokens: 128000,
+        maxOutputTokens: 8192,
+        capabilities: {}
+      },
+      [{ role: 1, content: [{ mimeType: 'image/png', data: new Uint8Array([1]) }] }] as never,
+      {} as never,
+      { report: () => undefined } as never,
+      cancellation.value as never
+    );
+    await visionStarted;
+    cancellation.cancel();
+
+    await expect(responsePromise).rejects.toMatchObject({ code: 'CANCELLATION_ERROR' });
+    expect(modelsCalled).toEqual(['combo/vision']);
+    expect(visionSignal?.aborted).toBe(true);
   });
 });
