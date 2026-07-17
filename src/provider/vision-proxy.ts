@@ -64,6 +64,8 @@ export function buildVisionProxyRequest(
   for (const part of parts) {
     if (typeof part === 'string') {
       userContent.push({ type: 'text', text: part });
+    } else if (isHostImageDataPart(part)) {
+      userContent.push(createRouterImagePart(part));
     } else if (
       typeof part === 'object' &&
       part !== null &&
@@ -71,8 +73,6 @@ export function buildVisionProxyRequest(
       typeof part.value === 'string'
     ) {
       userContent.push({ type: 'text', text: part.value });
-    } else if (isHostImageDataPart(part)) {
-      userContent.push(createRouterImagePart(part));
     }
   }
 

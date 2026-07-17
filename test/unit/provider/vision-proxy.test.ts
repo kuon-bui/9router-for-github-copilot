@@ -288,6 +288,25 @@ describe('buildVisionProxyRequest', () => {
     expect(request).not.toHaveProperty('reasoning_effort');
     expect(JSON.stringify(request.messages)).toContain('data:image/png;base64,YQ==');
   });
+
+  it('treats hybrid image parts as images before generic value text', () => {
+    const request = buildVisionProxyRequest(
+      {
+        role: 1,
+        content: [
+          {
+            mimeType: 'image/png',
+            data: new Uint8Array([97]),
+            value: 'must-not-replace-image'
+          }
+        ]
+      },
+      'combo/vision'
+    );
+
+    expect(JSON.stringify(request.messages)).toContain('data:image/png;base64,YQ==');
+    expect(JSON.stringify(request.messages)).not.toContain('must-not-replace-image');
+  });
 });
 
 describe('prepareVisionCompatibleMessages compatibility', () => {
