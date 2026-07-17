@@ -5,6 +5,25 @@ export const DEFAULT_REQUEST_TIMEOUT_MS = 60_000;
 export const DEFAULT_MAX_TOKENS = 4_096;
 export const DEFAULT_DEBUG_MODE = 'minimal' as const;
 export const DEFAULT_VISION_PROXY_COMBO_ID = '';
+export const DEFAULT_MODEL_TOOL_MODE = 'off' as const;
+export const DEFAULT_MODEL_VISION_MODE = 'off' as const;
+export const DEFAULT_MODEL_THINKING_MODE = 'off' as const;
+export const DEFAULT_MODEL_MAX_INPUT_TOKENS = 128_000;
+export const DEFAULT_MODEL_MAX_OUTPUT_TOKENS = 8_192;
+export const DEFAULT_VISION_PROXY_MODEL_ID = '';
+
+export const DEFAULT_MODELS = [
+  {
+    id: 'agent',
+    name: 'Agent',
+    modelId: '',
+    toolMode: 'auto',
+    visionMode: 'off',
+    thinkingMode: 'off',
+    maxInputTokens: DEFAULT_MODEL_MAX_INPUT_TOKENS,
+    maxOutputTokens: DEFAULT_MODEL_MAX_OUTPUT_TOKENS
+  }
+] as const;
 
 export const DEFAULT_DISPLAY_MODELS: ProductModelKey[] = ['daily', 'agent', 'fallback'];
 
