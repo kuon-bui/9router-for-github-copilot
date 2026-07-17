@@ -9,6 +9,7 @@ import type {
 } from '../types/router-contract';
 import type { HostToolDefinition } from './tool-adapter';
 import type { HostChatRequestMessage } from './vision-proxy';
+import { createRouterImagePart, isHostImageDataPart } from './image-input-adapter';
 
 function mapRole(role: unknown): RouterMessage['role'] {
   if (role === 0 || role === 'system') {
@@ -59,6 +60,10 @@ function adaptNativeVisionContent(content: HostChatRequestMessage['content']): R
 
     if (typeof part === 'object' && part !== null && 'value' in part && typeof part.value === 'string') {
       return { type: 'text', text: part.value };
+    }
+
+    if (isHostImageDataPart(part)) {
+      return createRouterImagePart(part);
     }
 
     if (typeof part === 'object' && part !== null) {

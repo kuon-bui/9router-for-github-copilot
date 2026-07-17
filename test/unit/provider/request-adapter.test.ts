@@ -406,10 +406,8 @@ describe('adaptMessagesToRouterRequest', () => {
 
   it('preserves structured multimodal content when the selected model supports native vision', () => {
     const imagePart = {
-      type: 'image_url',
-      image_url: {
-        url: 'data:image/png;base64,abc123'
-      }
+      mimeType: 'image/png',
+      data: new Uint8Array([97, 98, 99])
     };
 
     const request = adaptMessagesToRouterRequest({
@@ -427,7 +425,7 @@ describe('adaptMessagesToRouterRequest', () => {
 
     expect(request.messages[0]?.content).toEqual([
       { type: 'text', text: 'What is in this image?' },
-      imagePart
+      { type: 'image_url', image_url: { url: 'data:image/png;base64,YWJj' } }
     ]);
   });
 });
