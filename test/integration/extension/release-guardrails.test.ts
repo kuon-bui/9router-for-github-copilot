@@ -62,6 +62,27 @@ describe('release guardrails', () => {
     expect(productionDesign).toContain('Reasoning deltas remain hidden');
   });
 
+  it('documents the shared fail-closed 9router Vision proxy', async () => {
+    const readme = await readFile(resolve(process.cwd(), 'README.md'), 'utf8');
+    const productionDesign = await readFile(
+      resolve(
+        process.cwd(),
+        'docs/superpowers/specs/2026-07-15-9router-copilot-chat-provider-production-design.md'
+      ),
+      'utf8'
+    );
+
+    for (const document of [readme, productionDesign]) {
+      expect(document).toContain('9router-copilot.visionProxyComboId');
+      expect(document).toContain('shared');
+      expect(document).toContain('fail-closed');
+      expect(document).toContain('image_url');
+    }
+    expect(readme).toContain('Vision proxy summary');
+    expect(productionDesign).toContain('VisionProxyService');
+    expect(productionDesign).toContain('must not reach the primary combo');
+  });
+
   it('keeps the VSIX package command explicit about local repository metadata', () => {
     const packageCommand = manifest.scripts.package;
     const hasRepositoryMetadata = 'repository' in manifest;

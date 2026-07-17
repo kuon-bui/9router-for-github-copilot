@@ -197,6 +197,10 @@ Recommended configuration keys:
 - `9router-copilot.modelMappings.daily`
 - `9router-copilot.modelMappings.agent`
 - `9router-copilot.modelMappings.fallback`
+- `9router-copilot.visionMode.daily`
+- `9router-copilot.visionMode.agent`
+- `9router-copilot.visionMode.fallback`
+- `9router-copilot.visionProxyComboId`
 - `9router-copilot.thinkingMode.daily`
 - `9router-copilot.thinkingMode.agent`
 - `9router-copilot.thinkingMode.fallback`
@@ -294,21 +298,27 @@ If a mapped combo is not approved for tools, the extension should degrade gracef
 
 ## Vision Compatibility Strategy
 
-Some `9router` combos may not reliably support native multimodal input. To avoid blocking image-driven workflows entirely, the extension should support a vision proxy path.
+Some `9router` combos may not reliably support native multimodal input. To avoid blocking image-driven workflows entirely, the extension supports a Vision proxy path through one shared `9router` combo configured by `9router-copilot.visionProxyComboId`.
 
 Recommended vision proxy flow:
 
 1. detect image attachments in the host request
 2. check the selected display model's local `visionMode` configuration
 3. send image inputs directly to `9router` when `visionMode` is `native`
-4. use an available host-compatible vision model to generate a textual description when `visionMode` is `proxy`
-5. inject that description into the text request sent to `9router`
-6. block image inputs when `visionMode` is `off`
-7. mark the request as native-vision, vision-proxied, or vision-blocked in diagnostics when debug mode allows it
+4. when `visionMode` is `proxy`, have `VisionProxyService` process each image-bearing message sequentially through the shared combo from `9router-copilot.visionProxyComboId`
+5. use `image-input-adapter.ts` to convert each VS Code `LanguageModelDataPart` into an OpenAI-compatible `image_url` data URL; batch multiple images from the same message into one Vision request
+6. replace the raw images in each successfully processed message with a `[Vision proxy summary]` text block
+7. send the transformed conversation to the selected display model's primary `9router` combo
+8. block image inputs when `visionMode` is `off`
+9. mark the request as native-vision, vision-proxied, or vision-blocked in diagnostics when debug mode allows it
 
-This keeps the UX coherent, but it comes with higher cost and latency. Vision proxying should therefore be explicit, optional, and operationally visible.
+The shared combo must already exist in `9router` and accept `image_url` data URLs. One sequential Vision request runs per image-bearing message. Tools and Thinking Effort are omitted from Vision-stage requests and apply only to the primary request. Diagnostics may record counts, timing, outcomes, and request ids, but must never contain image data, prompt content, or Vision proxy summary content.
 
-Native vision must be configured only for display models whose mapped `9router` combo can accept image inputs directly. Proxy mode is reserved for text-only combos that need image inputs converted to textual context before reaching `9router`.
+All Vision-stage errors are fail-closed. A missing shared combo, 404, timeout, cancellation, malformed stream, or upstream error stops processing, and the transformed request must not reach the primary combo. The extension must not retry images through the primary combo or create local MIME, size, routing, or fallback policy.
+
+This keeps the UX coherent, but it comes with higher cost and latency. Vision proxying should therefore be explicit, optional, operationally visible, and independently testable through `VisionProxyService` and `image-input-adapter.ts`.
+
+Native vision remains explicit and must be configured only for display models whose mapped `9router` combo is confirmed to accept image inputs directly. Proxy mode is reserved for text-only primary combos that need image inputs converted to textual context before reaching `9router`. In both modes, `9router` retains ownership of combo routing, provider selection, and fallback behavior.
 
 ## Reliability and Error Handling
 

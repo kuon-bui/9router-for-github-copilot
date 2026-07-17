@@ -75,6 +75,7 @@ Example `settings.json`:
   "9router-copilot.visionMode.daily": "off",
   "9router-copilot.visionMode.agent": "proxy",
   "9router-copilot.visionMode.fallback": "off",
+  "9router-copilot.visionProxyComboId": "replace-with-existing-vision-combo-id",
   "9router-copilot.thinkingMode.daily": "off",
   "9router-copilot.thinkingMode.agent": "high",
   "9router-copilot.thinkingMode.fallback": "off",
@@ -106,10 +107,14 @@ Use `auto` only for combos that are expected to support tool calling through `9r
 `visionMode` controls how image inputs are handled.
 
 - `native`: Send image inputs directly to `9router`. Use only when the mapped combo can accept image inputs.
-- `proxy`: Convert image inputs into textual context before sending to a text-only combo.
+- `proxy`: Send each image-bearing message to the shared combo configured by `9router-copilot.visionProxyComboId`, replace raw images with a `[Vision proxy summary]` text block, then send the transformed conversation to the selected `Daily`, `Agent`, or `Fallback` combo.
 - `off`: Block image inputs for that model.
 
-Proxy mode is intended for text-only combos. Native vision should be configured only for combos that can handle image inputs directly.
+The shared Vision proxy combo must already exist in `9router` and accept OpenAI-compatible `image_url` data URLs. Proxy requests run sequentially, one per image-bearing message; multiple images in one message are batched into that message's single Vision request.
+
+Proxy mode is fail-closed. A missing shared combo, 404, timeout, cancellation, malformed stream, or upstream error stops the request before the transformed conversation can reach the primary combo. Tools and Thinking Effort apply only to the primary request, not the Vision-stage requests. Diagnostics may include counts, timing, outcomes, and request ids, but image data, prompt content, and Vision proxy summary content never appear in diagnostics.
+
+Proxy mode is intended for text-only primary combos. Native vision should be configured only for a selected combo that is confirmed to handle image inputs directly; `9router` remains responsible for routing and fallback within every combo.
 
 ### Thinking Effort
 
@@ -151,6 +156,8 @@ Common issues:
 - Empty combo mapping: configure the relevant `9router-copilot.modelMappings.<model>` setting with an existing combo id.
 - Combo not found: the configured id no longer exists in `9router`; recreate the backend combo or update the setting.
 - Image input blocked: set the selected model's `visionMode` to `native` or `proxy` when appropriate.
+- Missing shared Vision combo: set `9router-copilot.visionProxyComboId` to an existing `9router` combo that accepts `image_url` data URLs; proxy mode fails closed until it is configured.
+- Vision MIME type or size rejected upstream: choose a shared Vision combo that accepts the attached image format and size. The extension does not add a local image fallback or retry through the primary combo.
 - Invalid thinking mode: select `off`, `minimal`, `low`, `medium`, `high`, `xhigh`, or `max`.
 - Suffixed combo mapping: remove the `(level)` suffix from `modelMappings.<model>` and set `thinkingMode.<model>` instead.
 
