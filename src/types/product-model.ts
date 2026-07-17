@@ -23,6 +23,8 @@ export interface DisplayModelSetting {
   toolMode: 'auto' | 'off';
   visionMode: 'native' | 'proxy' | 'off';
   thinkingMode: ThinkingMode;
+  maxInputTokens: number;
+  maxOutputTokens: number;
 }
 
 export interface PublishedModel extends vscode.LanguageModelChatInformation {

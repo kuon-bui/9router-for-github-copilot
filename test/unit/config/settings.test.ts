@@ -83,6 +83,52 @@ describe('loadDisplayModelSettings', () => {
     ]);
   });
 
+  it('loads the approved default token limits for every curated model', () => {
+    const models = loadDisplayModelSettings({ get: () => undefined } as never);
+
+    expect(
+      models.map(({ key, maxInputTokens, maxOutputTokens }) => ({
+        key,
+        maxInputTokens,
+        maxOutputTokens
+      }))
+    ).toEqual([
+      { key: 'daily', maxInputTokens: 128_000, maxOutputTokens: 8_192 },
+      { key: 'agent', maxInputTokens: 128_000, maxOutputTokens: 8_192 },
+      { key: 'fallback', maxInputTokens: 128_000, maxOutputTokens: 8_192 }
+    ]);
+  });
+
+  it('loads configured token limits independently for each model', () => {
+    const models = loadDisplayModelSettings({
+      get: (key: string) => {
+        const values: Record<string, unknown> = {
+          displayModels: ['daily', 'agent', 'fallback'],
+          'maxInputTokens.daily': 32_000,
+          'maxOutputTokens.daily': 2_048,
+          'maxInputTokens.agent': 64_000,
+          'maxOutputTokens.agent': 4_096,
+          'maxInputTokens.fallback': 96_000,
+          'maxOutputTokens.fallback': 6_144
+        };
+
+        return values[key];
+      }
+    } as never);
+
+    expect(
+      models.map(({ key, maxInputTokens, maxOutputTokens }) => ({
+        key,
+        maxInputTokens,
+        maxOutputTokens
+      }))
+    ).toEqual([
+      { key: 'daily', maxInputTokens: 32_000, maxOutputTokens: 2_048 },
+      { key: 'agent', maxInputTokens: 64_000, maxOutputTokens: 4_096 },
+      { key: 'fallback', maxInputTokens: 96_000, maxOutputTokens: 6_144 }
+    ]);
+  });
+
   it('normalizes the router base url to /v1', () => {
     const configuration = {
       get: (key: string) => (key === 'baseUrl' ? 'https://router.example.com' : undefined)
@@ -221,6 +267,70 @@ describe('buildSettingsSnapshot', () => {
         message: expect.stringContaining('9router-copilot.thinkingMode.agent')
       })
     ]);
+  });
+
+  it.each([
+    ['zero', 0],
+    ['negative', -1],
+    ['fractional', 1.5],
+    ['non-finite', Number.POSITIVE_INFINITY],
+    ['non-number', '128000']
+  ])('degrades only the model with a %s max input token limit', (_label, invalidValue) => {
+    const snapshot = buildSettingsSnapshot({
+      get: (key: string) => {
+        const values: Record<string, unknown> = {
+          displayModels: ['daily', 'fallback'],
+          'modelMappings.daily': 'combo/daily',
+          'modelMappings.fallback': 'combo/fallback',
+          'maxInputTokens.daily': invalidValue
+        };
+
+        return values[key];
+      }
+    } as never);
+
+    expect(snapshot.state).toBe('degraded');
+    expect(snapshot.publishedModels.map((model) => model.id)).toEqual(['fallback']);
+    expect(snapshot.rejectedModels).toContainEqual(
+      expect.objectContaining({ key: 'daily', code: 'INVALID_MAX_INPUT_TOKENS' })
+    );
+    expect(snapshot.issues).toContainEqual(
+      expect.objectContaining({
+        scope: 'model',
+        modelKey: 'daily',
+        code: 'INVALID_MAX_INPUT_TOKENS',
+        message: expect.stringContaining('9router-copilot.maxInputTokens.daily')
+      })
+    );
+  });
+
+  it('degrades only the model with an invalid max output token limit', () => {
+    const snapshot = buildSettingsSnapshot({
+      get: (key: string) => {
+        const values: Record<string, unknown> = {
+          displayModels: ['daily', 'fallback'],
+          'modelMappings.daily': 'combo/daily',
+          'modelMappings.fallback': 'combo/fallback',
+          'maxOutputTokens.daily': 0
+        };
+
+        return values[key];
+      }
+    } as never);
+
+    expect(snapshot.state).toBe('degraded');
+    expect(snapshot.publishedModels.map((model) => model.id)).toEqual(['fallback']);
+    expect(snapshot.rejectedModels).toContainEqual(
+      expect.objectContaining({ key: 'daily', code: 'INVALID_MAX_OUTPUT_TOKENS' })
+    );
+    expect(snapshot.issues).toContainEqual(
+      expect.objectContaining({
+        scope: 'model',
+        modelKey: 'daily',
+        code: 'INVALID_MAX_OUTPUT_TOKENS',
+        message: expect.stringContaining('9router-copilot.maxOutputTokens.daily')
+      })
+    );
   });
 
   it('rejects a combo mapping that already contains a thinking suffix', () => {

@@ -20,6 +20,18 @@ export const DEFAULT_MODEL_MAPPINGS: Record<ProductModelKey, string> = {
   fallback: ''
 };
 
+export const DEFAULT_MAX_INPUT_TOKENS: Record<ProductModelKey, number> = {
+  daily: 128_000,
+  agent: 128_000,
+  fallback: 128_000
+};
+
+export const DEFAULT_MAX_OUTPUT_TOKENS: Record<ProductModelKey, number> = {
+  daily: 8_192,
+  agent: 8_192,
+  fallback: 8_192
+};
+
 export const DEFAULT_TOOL_MODES: Record<ProductModelKey, 'auto' | 'off'> = {
   daily: 'off',
   agent: 'auto',

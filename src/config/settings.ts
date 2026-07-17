@@ -3,6 +3,8 @@ import {
   DEFAULT_BASE_URL,
   DEFAULT_DEBUG_MODE,
   DEFAULT_DISPLAY_MODELS,
+  DEFAULT_MAX_INPUT_TOKENS,
+  DEFAULT_MAX_OUTPUT_TOKENS,
   DEFAULT_MAX_TOKENS,
   DEFAULT_MODEL_LABELS,
   DEFAULT_MODEL_MAPPINGS,
@@ -42,6 +44,8 @@ export interface SettingsIssue {
     | 'INVALID_MAX_TOKENS'
     | 'INVALID_DISPLAY_MODEL_KEY'
     | 'INVALID_COMBO_MAPPING'
+    | 'INVALID_MAX_INPUT_TOKENS'
+    | 'INVALID_MAX_OUTPUT_TOKENS'
     | 'INVALID_THINKING_MODE'
     | 'MISSING_VISION_PROXY_COMBO';
   message: string;
@@ -50,7 +54,11 @@ export interface SettingsIssue {
 
 export interface RejectedModelSetting {
   key: string;
-  code: 'INVALID_COMBO_MAPPING' | 'INVALID_THINKING_MODE';
+  code:
+    | 'INVALID_COMBO_MAPPING'
+    | 'INVALID_THINKING_MODE'
+    | 'INVALID_MAX_INPUT_TOKENS'
+    | 'INVALID_MAX_OUTPUT_TOKENS';
   message: string;
 }
 
@@ -114,8 +122,29 @@ function getConfiguredThinkingMode(
   return configured === undefined ? DEFAULT_THINKING_MODES[key] : configured;
 }
 
+type ModelTokenLimitSetting = 'maxInputTokens' | 'maxOutputTokens';
+
+function getConfiguredModelTokenLimit(
+  configuration: Pick<vscode.WorkspaceConfiguration, 'get'>,
+  setting: ModelTokenLimitSetting,
+  key: ProductModelKey
+): unknown {
+  const configured = configuration.get<unknown>(`${setting}.${key}`);
+  if (configured !== undefined) {
+    return configured;
+  }
+
+  return setting === 'maxInputTokens'
+    ? DEFAULT_MAX_INPUT_TOKENS[key]
+    : DEFAULT_MAX_OUTPUT_TOKENS[key];
+}
+
 function isThinkingMode(value: unknown): value is ThinkingMode {
   return typeof value === 'string' && THINKING_MODE_SET.has(value);
+}
+
+function isPositiveInteger(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value) && Number.isInteger(value) && value > 0;
 }
 
 function hasThinkingSuffix(comboId: string): boolean {
@@ -129,6 +158,16 @@ export function loadDisplayModelSettings(
 
   return configuredKeys.map((key) => {
     const configuredThinkingMode = getConfiguredThinkingMode(configuration, key);
+    const configuredMaxInputTokens = getConfiguredModelTokenLimit(
+      configuration,
+      'maxInputTokens',
+      key
+    );
+    const configuredMaxOutputTokens = getConfiguredModelTokenLimit(
+      configuration,
+      'maxOutputTokens',
+      key
+    );
 
     return {
       key,
@@ -142,7 +181,13 @@ export function loadDisplayModelSettings(
         DEFAULT_VISION_MODES[key],
       thinkingMode: isThinkingMode(configuredThinkingMode)
         ? configuredThinkingMode
-        : DEFAULT_THINKING_MODES[key]
+        : DEFAULT_THINKING_MODES[key],
+      maxInputTokens: isPositiveInteger(configuredMaxInputTokens)
+        ? configuredMaxInputTokens
+        : DEFAULT_MAX_INPUT_TOKENS[key],
+      maxOutputTokens: isPositiveInteger(configuredMaxOutputTokens)
+        ? configuredMaxOutputTokens
+        : DEFAULT_MAX_OUTPUT_TOKENS[key]
     };
   });
 }
@@ -245,6 +290,40 @@ export function buildSettingsSnapshot(
       continue;
     }
 
+    const maxInputTokens = getConfiguredModelTokenLimit(configuration, 'maxInputTokens', key);
+    if (!isPositiveInteger(maxInputTokens)) {
+      const message = `Display model "${key}" must configure 9router-copilot.maxInputTokens.${key} as a positive integer.`;
+      issues.push({
+        scope: 'model',
+        code: 'INVALID_MAX_INPUT_TOKENS',
+        message,
+        modelKey: key
+      });
+      rejectedModels.push({
+        key,
+        code: 'INVALID_MAX_INPUT_TOKENS',
+        message
+      });
+      continue;
+    }
+
+    const maxOutputTokens = getConfiguredModelTokenLimit(configuration, 'maxOutputTokens', key);
+    if (!isPositiveInteger(maxOutputTokens)) {
+      const message = `Display model "${key}" must configure 9router-copilot.maxOutputTokens.${key} as a positive integer.`;
+      issues.push({
+        scope: 'model',
+        code: 'INVALID_MAX_OUTPUT_TOKENS',
+        message,
+        modelKey: key
+      });
+      rejectedModels.push({
+        key,
+        code: 'INVALID_MAX_OUTPUT_TOKENS',
+        message
+      });
+      continue;
+    }
+
     const setting: DisplayModelSetting = {
       key,
       label: configuration.get<string>(`labels.${key}`)?.trim() || DEFAULT_MODEL_LABELS[key],
@@ -254,7 +333,9 @@ export function buildSettingsSnapshot(
       visionMode:
         configuration.get<'native' | 'proxy' | 'off'>(`visionMode.${key}`) ??
         DEFAULT_VISION_MODES[key],
-      thinkingMode: configuredThinkingMode
+      thinkingMode: configuredThinkingMode,
+      maxInputTokens,
+      maxOutputTokens
     };
 
     displayModels.push(setting);
