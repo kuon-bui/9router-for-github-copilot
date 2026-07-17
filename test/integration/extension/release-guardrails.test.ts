@@ -99,6 +99,23 @@ describe('release guardrails', () => {
     expect(readme).not.toContain('9router-copilot.modelMappings.');
   });
 
+  it('documents unlimited maxTokens semantics', async () => {
+    const readme = await readFile(resolve(process.cwd(), 'README.md'), 'utf8');
+    const productionDesign = await readFile(
+      resolve(
+        process.cwd(),
+        'docs/superpowers/specs/2026-07-15-9router-copilot-chat-provider-production-design.md'
+      ),
+      'utf8'
+    );
+
+    for (const document of [readme, productionDesign]) {
+      expect(document).toContain('default is `0`');
+      expect(document).toContain('omits `max_tokens`');
+      expect(document).toContain('upstream');
+    }
+  });
+
   it('keeps the VSIX package command explicit about local repository metadata', () => {
     const packageCommand = manifest.scripts.package;
     const hasRepositoryMetadata = 'repository' in manifest;

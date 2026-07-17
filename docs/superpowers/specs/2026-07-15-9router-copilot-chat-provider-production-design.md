@@ -210,8 +210,10 @@ without failing an otherwise valid response.
 widget.
 
 The per-model metadata is independent from `9router-copilot.maxTokens`. The
-global setting continues to control the requested `max_tokens` field sent to
-`9router`; context-window publication does not change request limits.
+setting's default is `0`. Only a positive safe integer is sent as `max_tokens`;
+`0` or a malformed value omits `max_tokens`, so the extension applies no
+response-token limit. `9router` or an upstream provider may still enforce its
+own limit.
 
 ### Native thinking effort picker
 
