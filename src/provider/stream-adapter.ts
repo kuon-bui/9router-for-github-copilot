@@ -23,6 +23,21 @@ export function createRouterEventEmitter(
         return;
       }
 
+      if (event.type === 'usage') {
+        const usage = {
+          prompt_tokens: event.promptTokens,
+          completion_tokens: event.completionTokens,
+          total_tokens: event.totalTokens
+        };
+        progress.report(
+          new vscode.LanguageModelDataPart(
+            new TextEncoder().encode(JSON.stringify(usage)),
+            'usage'
+          )
+        );
+        return;
+      }
+
       if (event.type === 'tool-call-delta') {
         const key = getToolAccumulatorKey(event);
         const previous = toolCalls.get(key) ?? {

@@ -3,6 +3,11 @@ import type { RouterStreamEvent } from '../types/router-contract';
 
 interface RouterSsePayload {
   id?: string;
+  usage?: {
+    prompt_tokens?: unknown;
+    completion_tokens?: unknown;
+    total_tokens?: unknown;
+  };
   error?: {
     message?: string;
   };
@@ -72,12 +77,25 @@ function parseSseFrame(frame: string): RouterStreamEvent[] {
     return [event];
   }
 
-  const choice = parsed.choices?.[0];
-  if (!choice) {
-    return [];
+  const events: RouterStreamEvent[] = [];
+  if (
+    isNonNegativeInteger(parsed.usage?.prompt_tokens) &&
+    isNonNegativeInteger(parsed.usage.completion_tokens) &&
+    isNonNegativeInteger(parsed.usage.total_tokens)
+  ) {
+    events.push({
+      type: 'usage',
+      promptTokens: parsed.usage.prompt_tokens,
+      completionTokens: parsed.usage.completion_tokens,
+      totalTokens: parsed.usage.total_tokens
+    });
   }
 
-  const events: RouterStreamEvent[] = [];
+  const choice = parsed.choices?.[0];
+  if (!choice) {
+    return events;
+  }
+
   const text = choice.delta?.content;
   if (typeof text === 'string' && text.length > 0) {
     events.push({ type: 'text-delta', text });
@@ -125,6 +143,10 @@ function parseSseFrame(frame: string): RouterStreamEvent[] {
   }
 
   return events;
+}
+
+function isNonNegativeInteger(value: unknown): value is number {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
 }
 
 export async function* parseRouterEventStream(

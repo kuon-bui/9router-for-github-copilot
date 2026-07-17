@@ -292,6 +292,9 @@ export function adaptMessagesToRouterRequest(input: {
   const request: RouterChatCompletionRequest = {
     model: input.selectedModel.comboId,
     stream: true,
+    stream_options: {
+      include_usage: true
+    },
     messages
   };
 

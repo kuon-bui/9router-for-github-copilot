@@ -218,9 +218,19 @@ Recommended configuration keys:
 
 Every valid published model exposes its validated per-model
 `maxInputTokens` and `maxOutputTokens` values through
-`LanguageModelChatInformation`. VS Code combines this metadata with the
-provider's token counting implementation to render native Context Window
-information in Copilot Chat.
+`LanguageModelChatInformation`. These values provide the native Context Window
+denominator in Copilot Chat.
+
+For the used-token numerator, every primary streaming request sets
+`stream_options.include_usage` to `true`. The SSE boundary validates the final
+OpenAI-compatible usage chunk, normalizes `prompt_tokens`, `completion_tokens`,
+and `total_tokens`, and forwards it as a `LanguageModelDataPart` with the
+Copilot-compatible `usage` MIME type. Malformed or missing usage is ignored
+without failing an otherwise valid response.
+
+`provideTokenCount` remains available for host token-count calls, but VS Code
+1.129 does not use it as the response usage source for the native Session Info
+widget.
 
 The per-model metadata is independent from `9router-copilot.maxTokens`. The
 global setting continues to control the requested `max_tokens` field sent to

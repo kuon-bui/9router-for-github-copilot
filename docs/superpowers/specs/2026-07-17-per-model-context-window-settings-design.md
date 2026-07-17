@@ -23,8 +23,9 @@ Every published model currently reports hard-coded metadata:
 - `maxOutputTokens: 8192`
 
 The provider also implements `provideTokenCount` using the existing heuristic.
-VS Code uses these provider APIs to calculate and render context usage in its
-native Session Info UI.
+VS Code 1.129 uses the published limits for the Context Window denominator, but
+uses response usage metadata—not `provideTokenCount`—for the used-token
+numerator in its native Session Info UI.
 
 The hard-coded metadata cannot describe different token limits for `Daily`,
 `Agent`, and `Fallback`.
@@ -72,9 +73,12 @@ VS Code user settings
 the values from its `DisplayModelSetting`. The host remains responsible for the
 exact Session Info rendering and context-usage calculation.
 
-The existing `provideTokenCount` implementation remains unchanged. Improving
-tokenizer accuracy or querying usage from `9router` is outside this feature's
-scope.
+The existing `provideTokenCount` implementation remains unchanged. Primary
+requests additionally set `stream_options.include_usage`; the router SSE parser
+validates and normalizes the final OpenAI-compatible usage chunk, and the
+provider emits it through a `LanguageModelDataPart` with MIME type `usage`.
+Malformed or absent usage degrades to no numerator update without breaking the
+response stream.
 
 ## Validation and Degradation
 
@@ -165,7 +169,7 @@ field sent to `9router`.
   curated model.
 - Published model metadata reflects the validated values.
 - Copilot Chat can render its native Context Window information from that
-  metadata and the provider's existing token counter.
+  metadata and valid OpenAI-compatible response usage.
 - Defaults preserve the current `128000` input and `8192` output metadata.
 - One invalid model limit does not prevent other valid models from being
   published.

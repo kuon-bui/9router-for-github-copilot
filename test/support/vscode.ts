@@ -61,6 +61,16 @@ class LanguageModelToolResultPart {
   }
 }
 
+class LanguageModelDataPart {
+  public readonly data: Uint8Array;
+  public readonly mimeType: string;
+
+  public constructor(data: Uint8Array, mimeType: string) {
+    this.data = data;
+    this.mimeType = mimeType;
+  }
+}
+
 class OutputChannel {
   public readonly lines: string[] = [];
 
@@ -182,6 +192,7 @@ export {
   Disposable,
   EventEmitter,
   LanguageModelTextPart,
+  LanguageModelDataPart,
   LanguageModelToolCallPart,
   LanguageModelToolResultPart
 };

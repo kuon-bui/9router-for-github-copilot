@@ -34,6 +34,9 @@ describe('adaptMessagesToRouterRequest', () => {
     expect(request).toMatchObject({
       model: 'combo/daily',
       stream: true,
+      stream_options: {
+        include_usage: true
+      },
       max_tokens: 256,
       messages: [{ role: 'user', content: 'Say hello' }]
     });

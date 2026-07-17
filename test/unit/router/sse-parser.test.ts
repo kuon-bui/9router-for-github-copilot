@@ -14,6 +14,29 @@ describe('parseSseChunk', () => {
     expect(events).toEqual([{ type: 'response-complete' }]);
   });
 
+  it('extracts normalized token usage from the final usage chunk', () => {
+    const events = parseSseChunk(
+      'data: {"choices":[],"usage":{"prompt_tokens":321,"completion_tokens":17,"total_tokens":338}}\n\n'
+    );
+
+    expect(events).toEqual([
+      {
+        type: 'usage',
+        promptTokens: 321,
+        completionTokens: 17,
+        totalTokens: 338
+      }
+    ]);
+  });
+
+  it('ignores malformed token usage instead of exposing untrusted values', () => {
+    const events = parseSseChunk(
+      'data: {"choices":[],"usage":{"prompt_tokens":321,"completion_tokens":-1,"total_tokens":320}}\n\n'
+    );
+
+    expect(events).toEqual([]);
+  });
+
   it('extracts tool-call deltas with stable index information', () => {
     const events = parseSseChunk(
       'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call-1","function":{"name":"lookupUser","arguments":"{\\"id\\""}}]}}]}\n\n'

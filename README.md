@@ -104,7 +104,12 @@ Invalid or empty mappings are degraded per model. One broken model mapping shoul
 Use `9router-copilot.maxInputTokens.<model>` and
 `9router-copilot.maxOutputTokens.<model>` to publish each curated model's token
 limits to VS Code. Copilot Chat consumes this metadata together with the
-provider's token counter to render its native Context Window information.
+validated usage returned by `9router` to render its native Context Window
+information. Streaming requests set `stream_options.include_usage`, and the
+extension forwards the final OpenAI-compatible usage chunk to Copilot Chat.
+
+If the selected combo or upstream provider does not return streaming usage,
+Copilot Chat cannot update the used-token numerator for that response.
 
 These per-model capability values are independent from
 `9router-copilot.maxTokens`. The global `maxTokens` setting remains the

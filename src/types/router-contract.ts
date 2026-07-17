@@ -33,6 +33,9 @@ export interface RouterChatCompletionRequest {
   model: string;
   messages: RouterMessage[];
   stream: true;
+  stream_options?: {
+    include_usage: true;
+  };
   max_tokens?: number;
   reasoning_effort?: 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
   tools?: RouterToolDefinition[];
@@ -41,6 +44,12 @@ export interface RouterChatCompletionRequest {
 
 export type RouterStreamEvent =
   | { type: 'text-delta'; text: string }
+  | {
+      type: 'usage';
+      promptTokens: number;
+      completionTokens: number;
+      totalTokens: number;
+    }
   | {
       type: 'tool-call-delta';
       toolCallIndex?: number;
