@@ -376,6 +376,8 @@ describe('NineRouterChatProvider', () => {
     );
 
     expect(calls).toHaveLength(2);
+    expect(calls[0]?.request.max_tokens).toBe(128);
+    expect(calls[1]?.request.max_tokens).toBe(128);
     expect(calls[0]?.request.model).toBe('combo/vision');
     expect(calls[0]?.request).not.toHaveProperty('reasoning_effort');
     expect(calls[0]?.request).not.toHaveProperty('tools');
@@ -401,6 +403,67 @@ describe('NineRouterChatProvider', () => {
     expect(JSON.stringify(calls[1]?.request.messages)).toContain('[Vision proxy summary]');
     expect(JSON.stringify(calls[1]?.request.messages)).not.toContain('data:image/png');
     expect(visible).toEqual(['Primary answer']);
+  });
+
+  it('omits max_tokens from Vision and primary requests when maxTokens is zero', async () => {
+    __setConfigurationValues({
+      models: [
+        {
+          id: 'agent',
+          name: 'Agent',
+          modelId: 'router/agent',
+          visionMode: 'proxy'
+        }
+      ],
+      visionProxyModelId: 'router/vision',
+      baseUrl: 'https://router.example.com/v1',
+      maxTokens: 0,
+      requestTimeoutMs: 5_000,
+      debugMode: 'minimal'
+    });
+
+    const requests: RouterChatCompletionRequest[] = [];
+    const provider = new NineRouterChatProvider(
+      { secrets: { get: async () => 'token' } } as never,
+      {
+        async *streamChatCompletion(input: { request: RouterChatCompletionRequest }) {
+          requests.push(input.request);
+          if (input.request.model === 'router/vision') {
+            yield { type: 'text-delta', text: 'safe image summary' };
+          }
+          yield { type: 'response-complete' };
+        }
+      } as never
+    );
+
+    await provider.provideLanguageModelChatResponse(
+      {
+        id: 'agent',
+        name: 'Agent',
+        vendor: '9router',
+        family: 'agent',
+        version: '1',
+        maxInputTokens: 128_000,
+        maxOutputTokens: 8_192,
+        capabilities: { imageInput: true }
+      },
+      [
+        {
+          role: 1,
+          content: [{ mimeType: 'image/png', data: new Uint8Array([1]) }]
+        }
+      ] as never,
+      {} as never,
+      { report: () => undefined } as never,
+      __createCancellationToken().value as never
+    );
+
+    expect(requests.map((request) => request.model)).toEqual([
+      'router/vision',
+      'router/agent'
+    ]);
+    expect(requests[0]).not.toHaveProperty('max_tokens');
+    expect(requests[1]).not.toHaveProperty('max_tokens');
   });
 
   it('fails closed before the primary call when the Vision stream is truncated', async () => {

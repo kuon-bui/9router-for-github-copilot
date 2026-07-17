@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   buildSettingsSnapshot,
   loadRuntimeSettings,
-  normalizeBaseUrl
+  normalizeBaseUrl,
+  normalizeMaxTokens
 } from '../../../src/config/settings';
 
 function configuration(values: Record<string, unknown>) {
@@ -22,6 +23,31 @@ describe('runtime settings', () => {
     );
 
     expect(runtime.visionProxyModelId).toBe('router/vision');
+  });
+});
+
+describe('max token normalization', () => {
+  it.each([
+    ['missing', undefined],
+    ['zero', 0],
+    ['negative', -1],
+    ['decimal', 1.5],
+    ['NaN', Number.NaN],
+    ['infinity', Number.POSITIVE_INFINITY],
+    ['unsafe integer', Number.MAX_SAFE_INTEGER + 1],
+    ['string', '4096'],
+    ['null', null],
+    ['object', { value: 4096 }]
+  ])('normalizes %s to unlimited', (_label, input) => {
+    expect(normalizeMaxTokens(input)).toBeUndefined();
+  });
+
+  it('preserves a positive safe integer', () => {
+    expect(normalizeMaxTokens(4_096)).toBe(4_096);
+  });
+
+  it('defaults missing maxTokens to unlimited runtime behavior', () => {
+    expect(loadRuntimeSettings(configuration({})).maxTokens).toBeUndefined();
   });
 });
 
@@ -134,6 +160,24 @@ describe('buildSettingsSnapshot', () => {
       ])
     );
   });
+
+  it.each([-1, 1.5, Number.NaN, Number.POSITIVE_INFINITY, 'invalid', null])(
+    'keeps runtime valid when maxTokens is %s',
+    (maxTokens) => {
+      const snapshot = buildSettingsSnapshot(
+        configuration({
+          models: [{ id: 'coder', name: 'Coder', modelId: 'router/coder' }],
+          maxTokens
+        })
+      );
+
+      expect(snapshot.state).toBe('valid');
+      expect(snapshot.runtime?.maxTokens).toBeUndefined();
+      expect(snapshot.issues).not.toEqual(
+        expect.arrayContaining([expect.objectContaining({ code: 'INVALID_MAX_TOKENS' })])
+      );
+    }
+  );
 
   it('degrades one broken model without removing valid models', () => {
     const snapshot = buildSettingsSnapshot(

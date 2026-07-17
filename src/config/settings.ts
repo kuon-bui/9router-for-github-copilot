@@ -27,7 +27,7 @@ export interface RuntimeSettings {
 
 interface RuntimeSettingsIssue {
   scope: 'runtime';
-  code: 'INVALID_BASE_URL' | 'INVALID_REQUEST_TIMEOUT' | 'INVALID_MAX_TOKENS';
+  code: 'INVALID_BASE_URL' | 'INVALID_REQUEST_TIMEOUT';
   message: string;
   path: string;
 }
@@ -58,11 +58,19 @@ export function normalizeBaseUrl(input: string): string {
   return trimmed.endsWith('/v1') ? trimmed : `${trimmed}/v1`;
 }
 
+export function normalizeMaxTokens(input: unknown): number | undefined {
+  return typeof input === 'number' && Number.isSafeInteger(input) && input > 0
+    ? input
+    : undefined;
+}
+
 export function loadRuntimeSettings(
   configuration: Pick<vscode.WorkspaceConfiguration, 'get'>
 ): RuntimeSettings {
   const baseUrl = normalizeBaseUrl(configuration.get<string>('baseUrl') ?? DEFAULT_BASE_URL);
-  const maxTokens = configuration.get<number>('maxTokens') ?? DEFAULT_MAX_TOKENS;
+  const maxTokens = normalizeMaxTokens(
+    configuration.get<unknown>('maxTokens') ?? DEFAULT_MAX_TOKENS
+  );
   const requestTimeoutMs =
     configuration.get<number>('requestTimeoutMs') ?? DEFAULT_REQUEST_TIMEOUT_MS;
   const debugMode =
@@ -73,7 +81,7 @@ export function loadRuntimeSettings(
 
   return {
     baseUrl,
-    maxTokens,
+    ...(typeof maxTokens === 'number' ? { maxTokens } : {}),
     requestTimeoutMs,
     debugMode,
     visionProxyModelId
@@ -171,19 +179,6 @@ function validateRuntimeSettings(
       code: 'INVALID_REQUEST_TIMEOUT',
       message: 'The request timeout must be a positive number of milliseconds.',
       path: '9router-copilot.requestTimeoutMs'
-    });
-  }
-
-  if (
-    typeof runtime.maxTokens !== 'number' ||
-    !Number.isFinite(runtime.maxTokens) ||
-    runtime.maxTokens <= 0
-  ) {
-    issues.push({
-      scope: 'runtime',
-      code: 'INVALID_MAX_TOKENS',
-      message: 'The maxTokens setting must be a positive number.',
-      path: '9router-copilot.maxTokens'
     });
   }
 

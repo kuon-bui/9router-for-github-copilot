@@ -39,6 +39,16 @@ describe('release guardrails', () => {
     });
   });
 
+  it('defaults maxTokens to unlimited', () => {
+    const properties = manifest.contributes.configuration.properties as Record<string, unknown>;
+
+    expect(properties['9router-copilot.maxTokens']).toMatchObject({
+      type: 'integer',
+      minimum: 0,
+      default: 0
+    });
+  });
+
   it('does not contribute legacy fixed-model settings', () => {
     const properties = manifest.contributes.configuration.properties as Record<string, unknown>;
     const legacyKeys = [

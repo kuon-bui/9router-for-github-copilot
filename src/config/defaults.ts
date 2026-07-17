@@ -1,6 +1,6 @@
 export const DEFAULT_BASE_URL = 'http://127.0.0.1:3456/v1';
 export const DEFAULT_REQUEST_TIMEOUT_MS = 60_000;
-export const DEFAULT_MAX_TOKENS = 4_096;
+export const DEFAULT_MAX_TOKENS = 0;
 export const DEFAULT_DEBUG_MODE = 'minimal' as const;
 export const DEFAULT_MODEL_TOOL_MODE = 'off' as const;
 export const DEFAULT_MODEL_VISION_MODE = 'off' as const;

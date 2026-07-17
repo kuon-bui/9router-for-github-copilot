@@ -134,10 +134,10 @@
           "description": "Opaque 9router model id used to summarize image-bearing messages for models configured with visionMode proxy."
         },
         "9router-copilot.maxTokens": {
-          "type": "number",
-          "minimum": 1,
-          "default": 4096,
-          "description": "Requested max_tokens value sent to 9router."
+          "type": "integer",
+          "minimum": 0,
+          "default": 0,
+          "description": "Maximum response tokens requested from 9router. Use 0 to omit max_tokens and apply no extension-level limit."
         },
         "9router-copilot.requestTimeoutMs": {
           "type": "number",
