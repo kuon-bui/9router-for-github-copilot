@@ -256,7 +256,12 @@ describe('NineRouterChatProvider', () => {
           maxOutputTokens: 8192,
           capabilities: {}
         },
-        [{ role: 1, content: [{ mimeType: 'image/png' }] }] as never,
+        [
+          {
+            role: 1,
+            content: [{ mimeType: 'image/png', data: new Uint8Array([1]) }]
+          }
+        ] as never,
         {} as never,
         { report: () => undefined } as never,
         __createCancellationToken().value as never
