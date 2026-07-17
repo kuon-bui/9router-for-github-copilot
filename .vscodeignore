@@ -3,6 +3,7 @@
 .git/**
 .gitignore
 .worktrees/**
+.superpowers/**
 docs/**
 test/**
 node_modules/**

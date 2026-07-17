@@ -58,12 +58,12 @@ function adaptNativeVisionContent(content: HostChatRequestMessage['content']): R
       return { type: 'text', text: part };
     }
 
-    if (typeof part === 'object' && part !== null && 'value' in part && typeof part.value === 'string') {
-      return { type: 'text', text: part.value };
-    }
-
     if (isHostImageDataPart(part)) {
       return createRouterImagePart(part);
+    }
+
+    if (typeof part === 'object' && part !== null && 'value' in part && typeof part.value === 'string') {
+      return { type: 'text', text: part.value };
     }
 
     if (typeof part === 'object' && part !== null) {

@@ -112,7 +112,7 @@ Use `auto` only for combos that are expected to support tool calling through `9r
 
 The shared Vision proxy combo must already exist in `9router` and accept OpenAI-compatible `image_url` data URLs. Proxy requests run sequentially, one per image-bearing message; multiple images in one message are batched into that message's single Vision request.
 
-Proxy mode is fail-closed. A missing shared combo, 404, timeout, cancellation, malformed stream, or upstream error stops the request before the transformed conversation can reach the primary combo. Tools and Thinking Effort apply only to the primary request, not the Vision-stage requests. Diagnostics may include counts, timing, outcomes, and request ids, but image data, prompt content, and Vision proxy summary content never appear in diagnostics.
+Proxy mode is fail-closed. A missing shared combo, 404, timeout, cancellation during the Vision stage, malformed stream, or upstream error stops the request before the transformed conversation can reach the primary combo. Tools and Thinking Effort apply only to the primary request, not the Vision-stage requests. Diagnostics may include counts, timing, outcomes, and request ids, but image data, prompt content, and Vision proxy summary content never appear in diagnostics.
 
 Proxy mode is intended for text-only primary combos. Native vision should be configured only for a selected combo that is confirmed to handle image inputs directly; `9router` remains responsible for routing and fallback within every combo.
 

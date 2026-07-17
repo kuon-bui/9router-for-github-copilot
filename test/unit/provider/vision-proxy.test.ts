@@ -180,6 +180,36 @@ describe('VisionProxyService', () => {
     });
   });
 
+  it('rejects a truncated Vision stream after text deltas without leaking the summary', async () => {
+    const service = new VisionProxyService({
+      async *streamChatCompletion() {
+        yield { type: 'text-delta', text: 'partial-summary-secret' };
+      }
+    });
+
+    const promise = service.prepare({
+      selectedModel: proxyModel,
+      messages: [{ role: 1, content: [image('image/png', 1)] }],
+      visionProxyComboId: 'combo/vision',
+      baseUrl: 'https://router.example.com/v1',
+      apiKey: 'secret',
+      maxTokens: 128,
+      requestTimeoutMs: 5_000,
+      signal: new AbortController().signal
+    });
+
+    await expect(promise).rejects.toMatchObject({
+      code: 'MALFORMED_STREAM_ERROR',
+      details: { phase: 'vision-proxy' }
+    });
+    await expect(promise).rejects.not.toMatchObject({
+      details: expect.objectContaining({
+        summary: expect.anything()
+      })
+    });
+    await expect(promise).rejects.not.toThrow('partial-summary-secret');
+  });
+
   it('maps a missing Vision combo to the shared setting without raw response text', async () => {
     const service = new VisionProxyService({
       async *streamChatCompletion() {

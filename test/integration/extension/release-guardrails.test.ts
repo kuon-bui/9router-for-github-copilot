@@ -113,6 +113,12 @@ describe('release guardrails', () => {
     expect(vscodeIgnore).not.toContain('dist/src/**');
   });
 
+  it('keeps subagent workflow artifacts out of the packaged VSIX', async () => {
+    const vscodeIgnore = await readFile(resolve(process.cwd(), '.vscodeignore'), 'utf8');
+
+    expect(vscodeIgnore).toContain('.superpowers/**');
+  });
+
   it('keeps VS Code debug workspace assets available for local extension development', async () => {
     const launchPath = resolve(process.cwd(), '.vscode/launch.json');
     const tasksPath = resolve(process.cwd(), '.vscode/tasks.json');

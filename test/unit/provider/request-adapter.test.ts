@@ -428,4 +428,30 @@ describe('adaptMessagesToRouterRequest', () => {
       { type: 'image_url', image_url: { url: 'data:image/png;base64,YWJj' } }
     ]);
   });
+
+  it('treats hybrid native image parts as images before generic value text', () => {
+    const request = adaptMessagesToRouterRequest({
+      selectedModel: {
+        key: 'agent',
+        label: 'Agent Vision',
+        comboId: 'combo/agent-vision',
+        enabled: true,
+        toolMode: 'off',
+        visionMode: 'native',
+        thinkingMode: 'off'
+      },
+      messages: [{
+        role: 1,
+        content: [{
+          mimeType: 'image/png',
+          data: new Uint8Array([97, 98, 99]),
+          value: 'must-not-replace-image'
+        }]
+      }]
+    });
+
+    expect(request.messages[0]?.content).toEqual([
+      { type: 'image_url', image_url: { url: 'data:image/png;base64,YWJj' } }
+    ]);
+  });
 });

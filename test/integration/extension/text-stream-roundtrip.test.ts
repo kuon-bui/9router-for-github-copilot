@@ -290,13 +290,19 @@ describe('NineRouterChatProvider', () => {
       debugMode: 'metadata'
     });
 
-    const requests: RouterChatCompletionRequest[] = [];
+    const calls: Array<{
+      request: RouterChatCompletionRequest;
+      signal: AbortSignal;
+    }> = [];
     const visible: string[] = [];
     const provider = new NineRouterChatProvider(
       { secrets: { get: async () => 'token' } } as never,
       {
-        async *streamChatCompletion(input: { request: RouterChatCompletionRequest }) {
-          requests.push(input.request);
+        async *streamChatCompletion(input: {
+          request: RouterChatCompletionRequest;
+          signal: AbortSignal;
+        }) {
+          calls.push(input);
           if (input.request.model === 'combo/vision') {
             yield { type: 'text-delta', text: 'A diagram with A pointing to B.' };
             yield { type: 'response-complete', requestId: 'vision-req' };
@@ -328,7 +334,19 @@ describe('NineRouterChatProvider', () => {
           ]
         }
       ] as never,
-      { modelConfiguration: { reasoningEffort: 'max' } } as never,
+      {
+        modelConfiguration: { reasoningEffort: 'max' },
+        tools: [{
+          name: 'inspectDiagram',
+          description: 'Inspect a diagram element',
+          inputSchema: {
+            type: 'object',
+            properties: { element: { type: 'string' } },
+            required: ['element']
+          }
+        }],
+        toolMode: 2
+      } as never,
       {
         report: (part: vscode.LanguageModelResponsePart) => {
           if (part instanceof vscode.LanguageModelTextPart) visible.push(part.value);
@@ -337,17 +355,78 @@ describe('NineRouterChatProvider', () => {
       __createCancellationToken().value as never
     );
 
-    expect(requests).toHaveLength(2);
-    expect(requests[0]?.model).toBe('combo/vision');
-    expect(requests[0]).not.toHaveProperty('reasoning_effort');
-    expect(requests[0]).not.toHaveProperty('tools');
-    expect(requests[1]).toMatchObject({
+    expect(calls).toHaveLength(2);
+    expect(calls[0]?.request.model).toBe('combo/vision');
+    expect(calls[0]?.request).not.toHaveProperty('reasoning_effort');
+    expect(calls[0]?.request).not.toHaveProperty('tools');
+    expect(calls[0]?.request).not.toHaveProperty('tool_choice');
+    expect(calls[1]?.request).toMatchObject({
       model: 'combo/agent',
-      reasoning_effort: 'max'
+      reasoning_effort: 'max',
+      tools: [{
+        type: 'function',
+        function: {
+          name: 'inspectDiagram',
+          description: 'Inspect a diagram element',
+          parameters: {
+            type: 'object',
+            properties: { element: { type: 'string' } },
+            required: ['element']
+          }
+        }
+      }],
+      tool_choice: 'required'
     });
-    expect(JSON.stringify(requests[1]?.messages)).toContain('[Vision proxy summary]');
-    expect(JSON.stringify(requests[1]?.messages)).not.toContain('data:image/png');
+    expect(calls[0]?.signal).toBe(calls[1]?.signal);
+    expect(JSON.stringify(calls[1]?.request.messages)).toContain('[Vision proxy summary]');
+    expect(JSON.stringify(calls[1]?.request.messages)).not.toContain('data:image/png');
     expect(visible).toEqual(['Primary answer']);
+  });
+
+  it('fails closed before the primary call when the Vision stream is truncated', async () => {
+    __setConfigurationValues({
+      displayModels: ['agent'],
+      'modelMappings.agent': 'combo/agent',
+      'visionMode.agent': 'proxy',
+      visionProxyComboId: 'combo/vision',
+      baseUrl: 'https://router.example.com/v1',
+      maxTokens: 128,
+      requestTimeoutMs: 5000,
+      debugMode: 'minimal'
+    });
+    const modelsCalled: string[] = [];
+    const provider = new NineRouterChatProvider(
+      { secrets: { get: async () => 'token' } } as never,
+      {
+        async *streamChatCompletion(input: { request: RouterChatCompletionRequest }) {
+          modelsCalled.push(input.request.model);
+          yield { type: 'text-delta', text: 'partial-summary-secret' };
+        }
+      } as never
+    );
+
+    const promise = provider.provideLanguageModelChatResponse(
+      {
+        id: 'agent',
+        name: 'Agent',
+        vendor: '9router',
+        family: 'agent',
+        version: '1',
+        maxInputTokens: 128000,
+        maxOutputTokens: 8192,
+        capabilities: { imageInput: true }
+      },
+      [{ role: 1, content: [{ mimeType: 'image/png', data: new Uint8Array([1]) }] }] as never,
+      {} as never,
+      { report: () => undefined } as never,
+      __createCancellationToken().value as never
+    );
+
+    await expect(promise).rejects.toMatchObject({
+      code: 'MALFORMED_STREAM_ERROR',
+      details: { phase: 'vision-proxy' }
+    });
+    expect(modelsCalled).toEqual(['combo/vision']);
   });
 
   it('fails before any router call when the shared Vision combo is empty', async () => {

@@ -258,6 +258,7 @@ export class VisionProxyService {
   ): Promise<{ summary: string; requestId?: string }> {
     let summary = '';
     let requestId: string | undefined;
+    let responseCompleted = false;
 
     try {
       const stream = this.routerClient.streamChatCompletion({
@@ -273,8 +274,11 @@ export class VisionProxyService {
           summary += event.text;
         }
 
-        if (event.type === 'response-complete' && event.requestId) {
-          requestId = event.requestId;
+        if (event.type === 'response-complete') {
+          responseCompleted = true;
+          if (event.requestId) {
+            requestId = event.requestId;
+          }
         }
 
         if (event.type === 'router-error') {
@@ -290,6 +294,17 @@ export class VisionProxyService {
       }
     } catch (error) {
       throw mapVisionProxyError(error);
+    }
+
+    if (!responseCompleted) {
+      throw new NineRouterError(
+        'MALFORMED_STREAM_ERROR',
+        '9router Vision analysis stream ended before response completion',
+        {
+          ...(requestId ? { requestId } : {}),
+          details: { phase: 'vision-proxy' }
+        }
+      );
     }
 
     const trimmed = summary.trim();
