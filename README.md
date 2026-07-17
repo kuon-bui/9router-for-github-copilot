@@ -79,6 +79,12 @@ Example `settings.json`:
   "9router-copilot.thinkingMode.daily": "off",
   "9router-copilot.thinkingMode.agent": "high",
   "9router-copilot.thinkingMode.fallback": "off",
+  "9router-copilot.maxInputTokens.daily": 128000,
+  "9router-copilot.maxInputTokens.agent": 128000,
+  "9router-copilot.maxInputTokens.fallback": 128000,
+  "9router-copilot.maxOutputTokens.daily": 8192,
+  "9router-copilot.maxOutputTokens.agent": 8192,
+  "9router-copilot.maxOutputTokens.fallback": 8192,
   "9router-copilot.maxTokens": 4096,
   "9router-copilot.requestTimeoutMs": 60000,
   "9router-copilot.debugMode": "minimal"
@@ -92,6 +98,18 @@ Use `9router-copilot.modelMappings.<model>` to map a display model to a `9router
 The extension does not create or guess combo ids. Each non-empty value must already exist in the connected `9router` instance. Models with empty mappings stay out of the picker.
 
 Invalid or empty mappings are degraded per model. One broken model mapping should not disable every other configured model.
+
+### Context Window
+
+Use `9router-copilot.maxInputTokens.<model>` and
+`9router-copilot.maxOutputTokens.<model>` to publish each curated model's token
+limits to VS Code. Copilot Chat consumes this metadata together with the
+provider's token counter to render its native Context Window information.
+
+These per-model capability values are independent from
+`9router-copilot.maxTokens`. The global `maxTokens` setting remains the
+requested `max_tokens` value sent to `9router` and does not override the
+published Context Window metadata.
 
 ### Tool Mode
 

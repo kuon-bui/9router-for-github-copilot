@@ -29,6 +29,44 @@ describe('release guardrails', () => {
     }
   });
 
+  it('contributes per-model context window settings with stable defaults', () => {
+    const properties = manifest.contributes.configuration.properties as Record<
+      string,
+      { type?: string; minimum?: number; default?: unknown }
+    >;
+
+    for (const modelKey of ['daily', 'agent', 'fallback'] as const) {
+      expect(properties[`9router-copilot.maxInputTokens.${modelKey}`]).toMatchObject({
+        type: 'integer',
+        minimum: 1,
+        default: 128_000
+      });
+      expect(properties[`9router-copilot.maxOutputTokens.${modelKey}`]).toMatchObject({
+        type: 'integer',
+        minimum: 1,
+        default: 8_192
+      });
+    }
+  });
+
+  it('documents context window metadata separately from request max tokens', async () => {
+    const readme = await readFile(resolve(process.cwd(), 'README.md'), 'utf8');
+    const productionDesign = await readFile(
+      resolve(
+        process.cwd(),
+        'docs/superpowers/specs/2026-07-15-9router-copilot-chat-provider-production-design.md'
+      ),
+      'utf8'
+    );
+
+    for (const document of [readme, productionDesign]) {
+      expect(document).toContain('9router-copilot.maxInputTokens.daily');
+      expect(document).toContain('9router-copilot.maxOutputTokens.fallback');
+      expect(document).toContain('9router-copilot.maxTokens');
+      expect(document).toContain('independent');
+    }
+  });
+
   it('contributes one empty shared Vision proxy combo setting', () => {
     const setting =
       manifest.contributes.configuration.properties['9router-copilot.visionProxyComboId'];

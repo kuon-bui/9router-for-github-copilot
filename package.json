@@ -198,6 +198,42 @@
           "default": "off",
           "description": "Thinking level for Fallback. Non-off values are forwarded through the 9router model suffix contract."
         },
+        "9router-copilot.maxInputTokens.daily": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 128000,
+          "description": "Maximum input tokens published for the Daily model in Copilot Chat."
+        },
+        "9router-copilot.maxInputTokens.agent": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 128000,
+          "description": "Maximum input tokens published for the Agent model in Copilot Chat."
+        },
+        "9router-copilot.maxInputTokens.fallback": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 128000,
+          "description": "Maximum input tokens published for the Fallback model in Copilot Chat."
+        },
+        "9router-copilot.maxOutputTokens.daily": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 8192,
+          "description": "Maximum output tokens published for the Daily model in Copilot Chat."
+        },
+        "9router-copilot.maxOutputTokens.agent": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 8192,
+          "description": "Maximum output tokens published for the Agent model in Copilot Chat."
+        },
+        "9router-copilot.maxOutputTokens.fallback": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 8192,
+          "description": "Maximum output tokens published for the Fallback model in Copilot Chat."
+        },
         "9router-copilot.maxTokens": {
           "type": "number",
           "minimum": 1,

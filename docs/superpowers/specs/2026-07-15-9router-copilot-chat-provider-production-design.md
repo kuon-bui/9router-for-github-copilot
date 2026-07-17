@@ -204,9 +204,27 @@ Recommended configuration keys:
 - `9router-copilot.thinkingMode.daily`
 - `9router-copilot.thinkingMode.agent`
 - `9router-copilot.thinkingMode.fallback`
+- `9router-copilot.maxInputTokens.daily`
+- `9router-copilot.maxInputTokens.agent`
+- `9router-copilot.maxInputTokens.fallback`
+- `9router-copilot.maxOutputTokens.daily`
+- `9router-copilot.maxOutputTokens.agent`
+- `9router-copilot.maxOutputTokens.fallback`
 - `9router-copilot.maxTokens`
 - `9router-copilot.requestTimeoutMs`
 - `9router-copilot.debugMode`
+
+### Native context window metadata
+
+Every valid published model exposes its validated per-model
+`maxInputTokens` and `maxOutputTokens` values through
+`LanguageModelChatInformation`. VS Code combines this metadata with the
+provider's token counting implementation to render native Context Window
+information in Copilot Chat.
+
+The per-model metadata is independent from `9router-copilot.maxTokens`. The
+global setting continues to control the requested `max_tokens` field sent to
+`9router`; context-window publication does not change request limits.
 
 ### Native thinking effort picker
 
