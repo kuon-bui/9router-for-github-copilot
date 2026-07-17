@@ -23,8 +23,8 @@ describe('release guardrails', () => {
           toolMode: 'auto',
           visionMode: 'off',
           thinkingMode: 'off',
-          maxInputTokens: 128_000,
-          maxOutputTokens: 8_192
+          maxInputTokens: 264_000,
+          maxOutputTokens: 264_000
         }
       ],
       items: {

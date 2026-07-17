@@ -5,8 +5,8 @@ export const DEFAULT_DEBUG_MODE = 'minimal' as const;
 export const DEFAULT_MODEL_TOOL_MODE = 'off' as const;
 export const DEFAULT_MODEL_VISION_MODE = 'off' as const;
 export const DEFAULT_MODEL_THINKING_MODE = 'off' as const;
-export const DEFAULT_MODEL_MAX_INPUT_TOKENS = 128_000;
-export const DEFAULT_MODEL_MAX_OUTPUT_TOKENS = 8_192;
+export const DEFAULT_MODEL_MAX_INPUT_TOKENS = 264_000;
+export const DEFAULT_MODEL_MAX_OUTPUT_TOKENS = 264_000;
 export const DEFAULT_VISION_PROXY_MODEL_ID = '';
 
 export const DEFAULT_MODELS = [

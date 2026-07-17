@@ -3,7 +3,7 @@
   "displayName": "9router Copilot Chat Provider",
   "description": "Expose 9router as a custom provider inside GitHub Copilot Chat.",
   "publisher": "local",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "license": "UNLICENSED",
   "engines": {
     "vscode": "^1.125.0"
@@ -13,10 +13,7 @@
   ],
   "main": "./dist/src/extension.js",
   "activationEvents": [
-    "onStartupFinished",
-    "onCommand:9routerCopilot.setApiKey",
-    "onCommand:9routerCopilot.clearApiKey",
-    "onCommand:9routerCopilot.showDiagnostics"
+    "onStartupFinished"
   ],
   "contributes": {
     "commands": [
@@ -44,7 +41,7 @@
       "properties": {
         "9router-copilot.baseUrl": {
           "type": "string",
-          "default": "http://127.0.0.1:3456/v1",
+          "default": "http://127.0.0.1:20128/v1",
           "description": "Base URL for the 9router OpenAI-compatible API."
         },
         "9router-copilot.models": {
@@ -57,8 +54,8 @@
               "toolMode": "auto",
               "visionMode": "off",
               "thinkingMode": "off",
-              "maxInputTokens": 128000,
-              "maxOutputTokens": 8192
+              "maxInputTokens": 264000,
+              "maxOutputTokens": 264000
             }
           ],
           "items": {
@@ -117,12 +114,12 @@
               "maxInputTokens": {
                 "type": "integer",
                 "minimum": 1,
-                "default": 128000
+                "default": 264000
               },
               "maxOutputTokens": {
                 "type": "integer",
                 "minimum": 1,
-                "default": 8192
+                "default": 264000
               }
             }
           },
