@@ -50,14 +50,14 @@ describe('createRouterClient', () => {
     });
 
     const consume = async (): Promise<void> => {
-      for await (const _event of client.streamChatCompletion({
+      for await (const event of client.streamChatCompletion({
         baseUrl: 'https://router.example.com/v1',
         apiKey: 'secret-token',
         request: { model: 'missing-combo', messages: [], stream: true },
         timeoutMs: 1000,
         signal: new AbortController().signal
       })) {
-        // The error occurs before any event is emitted.
+        void event;
       }
     };
 
@@ -78,14 +78,14 @@ describe('createRouterClient', () => {
     });
 
     const consume = async (): Promise<void> => {
-      for await (const _event of client.streamChatCompletion({
+      for await (const event of client.streamChatCompletion({
         baseUrl: 'https://router.example.com/v1',
         apiKey: 'secret-token',
         request: { model: '123', messages: [], stream: true },
         timeoutMs: 1000,
         signal: new AbortController().signal
       })) {
-        // The error occurs before any event is emitted.
+        void event;
       }
     };
 
