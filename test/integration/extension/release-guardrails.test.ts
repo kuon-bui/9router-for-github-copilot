@@ -45,8 +45,12 @@ describe('release guardrails', () => {
     expect(readme).toContain('9router-copilot.thinkingMode.agent');
     expect(readme).toContain('default and fallback');
     expect(readme).toContain('base combo id');
+    expect(readme).toContain('reasoning_effort');
+    expect(readme).toContain('keeps that id unchanged');
     expect(productionDesign).toContain('configurationSchema');
     expect(productionDesign).toContain('modelConfiguration.reasoningEffort');
+    expect(productionDesign).toContain('resolved combo id unchanged in `model`');
+    expect(productionDesign).toContain('reasoning_effort');
     expect(productionDesign).toContain('provider-specific reasoning translation');
     expect(productionDesign).toContain('Reasoning deltas remain hidden');
   });

@@ -45,7 +45,7 @@ describe('createRouterClient', () => {
         ok: false,
         status: 404,
         headers: new Headers({ 'x-request-id': 'req-missing-combo' }),
-        text: async () => '{"error":{"message":"Combo not found"}}'
+        text: async () => '{"error":{"message":"Combo 123 not found"}}'
       }) as never
     });
 
@@ -74,6 +74,34 @@ describe('createRouterClient', () => {
         status: 404,
         headers: new Headers(),
         text: async () => '{"error":{"message":"No active credentials for provider: openai"}}'
+      }) as never
+    });
+
+    const consume = async (): Promise<void> => {
+      for await (const event of client.streamChatCompletion({
+        baseUrl: 'https://router.example.com/v1',
+        apiKey: 'secret-token',
+        request: { model: '123', messages: [], stream: true },
+        timeoutMs: 1000,
+        signal: new AbortController().signal
+      })) {
+        void event;
+      }
+    };
+
+    await expect(consume()).rejects.toMatchObject({
+      code: 'TRANSPORT_ERROR',
+      message: '9router request failed with status 404'
+    });
+  });
+
+  it('does not treat an invalid downstream model response as a missing combo', async () => {
+    const client = createRouterClient({
+      fetch: vi.fn().mockResolvedValue({
+        ok: false,
+        status: 404,
+        headers: new Headers(),
+        text: async () => '{"error":{"message":"Invalid model response from provider"}}'
       }) as never
     });
 

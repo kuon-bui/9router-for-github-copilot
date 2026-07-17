@@ -113,12 +113,41 @@ export function createRouterClient(deps: { fetch: typeof globalThis.fetch }): Ro
   };
 }
 
+function extractRouterErrorMessage(responseText: string): string {
+  try {
+    const payload: unknown = JSON.parse(responseText);
+    if (typeof payload !== 'object' || payload === null || !('error' in payload)) {
+      return responseText;
+    }
+
+    const error = payload.error;
+    if (typeof error === 'string') {
+      return error;
+    }
+
+    if (
+      typeof error === 'object' &&
+      error !== null &&
+      'message' in error &&
+      typeof error.message === 'string'
+    ) {
+      return error.message;
+    }
+  } catch {
+    return responseText;
+  }
+
+  return responseText;
+}
+
 function isExplicitMissingModelError(responseText: string): boolean {
-  const normalized = responseText.toLowerCase();
+  const normalized = extractRouterErrorMessage(responseText).trim().toLowerCase();
   return (
-    /(?:model|combo)\s+(?:was\s+)?not\s+found/.test(normalized) ||
-    /unknown\s+(?:model|combo)/.test(normalized) ||
-    /invalid\s+(?:model|combo)/.test(normalized)
+    /\b(?:model|combo)\s+(?:(?:"[^"]+"|'[^']+'|[^\s:]+)\s+)?(?:was\s+)?not\s+found\b/.test(
+      normalized
+    ) ||
+    /\bunknown\s+(?:model|combo)(?=\s|:|$)/.test(normalized) ||
+    /\binvalid\s+(?:model|combo)\s+(?:id|name|format)(?=\s|:|$)/.test(normalized)
   );
 }
 
