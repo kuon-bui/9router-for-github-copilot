@@ -1,19 +1,32 @@
 import { describe, expect, it } from 'vitest';
 import * as vscode from 'vscode';
 import { adaptMessagesToRouterRequest } from '../../../src/provider/request-adapter';
+import type { DisplayModelSetting } from '../../../src/types/product-model';
+
+function selectedModel(overrides: Partial<DisplayModelSetting> = {}): DisplayModelSetting {
+  return {
+    key: 'agent',
+    label: 'Agent',
+    comboId: '123',
+    enabled: true,
+    toolMode: 'auto',
+    visionMode: 'off',
+    thinkingMode: 'off',
+    maxInputTokens: 128_000,
+    maxOutputTokens: 8_192,
+    ...overrides
+  };
+}
 
 describe('adaptMessagesToRouterRequest', () => {
   it('maps the selected display model to the configured combo id', () => {
     const request = adaptMessagesToRouterRequest({
-      selectedModel: {
+      selectedModel: selectedModel({
         key: 'daily',
         label: 'Daily',
         comboId: 'combo/daily',
-        enabled: true,
-        toolMode: 'off',
-        visionMode: 'off',
-        thinkingMode: 'off'
-      },
+        toolMode: 'off'
+      }),
       messages: [{ role: 1, content: 'Say hello' }],
       maxTokens: 256
     });
@@ -29,15 +42,7 @@ describe('adaptMessagesToRouterRequest', () => {
 
   it('keeps the combo id bare and forwards thinking as reasoning_effort', () => {
     const request = adaptMessagesToRouterRequest({
-      selectedModel: {
-        key: 'agent',
-        label: 'Agent',
-        comboId: '123',
-        enabled: true,
-        toolMode: 'auto',
-        visionMode: 'off',
-        thinkingMode: 'high'
-      },
+      selectedModel: selectedModel({ thinkingMode: 'high' }),
       messages: [{ role: 1, content: 'Solve this carefully' }]
     });
 
@@ -49,15 +54,7 @@ describe('adaptMessagesToRouterRequest', () => {
 
   it('preserves matching assistant tool calls and tool results', () => {
     const request = adaptMessagesToRouterRequest({
-      selectedModel: {
-        key: 'agent',
-        label: 'Agent',
-        comboId: '123',
-        enabled: true,
-        toolMode: 'auto',
-        visionMode: 'off',
-        thinkingMode: 'off'
-      },
+      selectedModel: selectedModel(),
       messages: [
         {
           role: 2,
@@ -103,15 +100,7 @@ describe('adaptMessagesToRouterRequest', () => {
 
   it('preserves multiple tool calls and results in order', () => {
     const request = adaptMessagesToRouterRequest({
-      selectedModel: {
-        key: 'agent',
-        label: 'Agent',
-        comboId: '123',
-        enabled: true,
-        toolMode: 'auto',
-        visionMode: 'off',
-        thinkingMode: 'off'
-      },
+      selectedModel: selectedModel(),
       messages: [
         {
           role: 2,
@@ -176,15 +165,7 @@ describe('adaptMessagesToRouterRequest', () => {
 
   it('degrades undocumented numeric roles without tool results to user messages', () => {
     const request = adaptMessagesToRouterRequest({
-      selectedModel: {
-        key: 'agent',
-        label: 'Agent',
-        comboId: '123',
-        enabled: true,
-        toolMode: 'auto',
-        visionMode: 'off',
-        thinkingMode: 'off'
-      },
+      selectedModel: selectedModel(),
       messages: [
         {
           role: 3,
@@ -203,15 +184,7 @@ describe('adaptMessagesToRouterRequest', () => {
 
   it('degrades string tool roles without tool results to user messages', () => {
     const request = adaptMessagesToRouterRequest({
-      selectedModel: {
-        key: 'agent',
-        label: 'Agent',
-        comboId: '123',
-        enabled: true,
-        toolMode: 'auto',
-        visionMode: 'off',
-        thinkingMode: 'off'
-      },
+      selectedModel: selectedModel(),
       messages: [
         {
           role: 'tool',
@@ -230,15 +203,7 @@ describe('adaptMessagesToRouterRequest', () => {
 
   it('does not promote tool result parts with empty call ids', () => {
     const request = adaptMessagesToRouterRequest({
-      selectedModel: {
-        key: 'agent',
-        label: 'Agent',
-        comboId: '123',
-        enabled: true,
-        toolMode: 'auto',
-        visionMode: 'off',
-        thinkingMode: 'off'
-      },
+      selectedModel: selectedModel(),
       messages: [
         {
           role: 1,
@@ -259,15 +224,7 @@ describe('adaptMessagesToRouterRequest', () => {
 
   it('degrades orphaned tool results to user content', () => {
     const request = adaptMessagesToRouterRequest({
-      selectedModel: {
-        key: 'agent',
-        label: 'Agent',
-        comboId: '123',
-        enabled: true,
-        toolMode: 'auto',
-        visionMode: 'off',
-        thinkingMode: 'off'
-      },
+      selectedModel: selectedModel(),
       messages: [
         {
           role: 1,
@@ -290,15 +247,7 @@ describe('adaptMessagesToRouterRequest', () => {
 
   it('does not match tool results across an intervening ordinary message', () => {
     const request = adaptMessagesToRouterRequest({
-      selectedModel: {
-        key: 'agent',
-        label: 'Agent',
-        comboId: '123',
-        enabled: true,
-        toolMode: 'auto',
-        visionMode: 'off',
-        thinkingMode: 'off'
-      },
+      selectedModel: selectedModel(),
       messages: [
         {
           role: 2,
@@ -331,15 +280,7 @@ describe('adaptMessagesToRouterRequest', () => {
 
   it('places ordinary result-message text after matching tool responses', () => {
     const request = adaptMessagesToRouterRequest({
-      selectedModel: {
-        key: 'agent',
-        label: 'Agent',
-        comboId: '123',
-        enabled: true,
-        toolMode: 'auto',
-        visionMode: 'off',
-        thinkingMode: 'off'
-      },
+      selectedModel: selectedModel(),
       messages: [
         {
           role: 2,
@@ -376,15 +317,7 @@ describe('adaptMessagesToRouterRequest', () => {
 
   it('adds tools and required tool choice only when the selected model exposes tools', () => {
     const request = adaptMessagesToRouterRequest({
-      selectedModel: {
-        key: 'agent',
-        label: 'Agent',
-        comboId: 'combo/agent',
-        enabled: true,
-        toolMode: 'auto',
-        visionMode: 'off',
-        thinkingMode: 'off'
-      },
+      selectedModel: selectedModel({ comboId: 'combo/agent' }),
       messages: [{ role: 1, content: 'Use a tool' }],
       tools: [
         {
@@ -411,15 +344,12 @@ describe('adaptMessagesToRouterRequest', () => {
     };
 
     const request = adaptMessagesToRouterRequest({
-      selectedModel: {
-        key: 'agent',
+      selectedModel: selectedModel({
         label: 'Agent Vision',
         comboId: 'combo/agent-vision',
-        enabled: true,
         toolMode: 'off',
-        visionMode: 'native',
-        thinkingMode: 'off'
-      },
+        visionMode: 'native'
+      }),
       messages: [{ role: 1, content: ['What is in this image?', imagePart] }]
     });
 
@@ -431,23 +361,24 @@ describe('adaptMessagesToRouterRequest', () => {
 
   it('treats hybrid native image parts as images before generic value text', () => {
     const request = adaptMessagesToRouterRequest({
-      selectedModel: {
-        key: 'agent',
+      selectedModel: selectedModel({
         label: 'Agent Vision',
         comboId: 'combo/agent-vision',
-        enabled: true,
         toolMode: 'off',
-        visionMode: 'native',
-        thinkingMode: 'off'
-      },
-      messages: [{
-        role: 1,
-        content: [{
-          mimeType: 'image/png',
-          data: new Uint8Array([97, 98, 99]),
-          value: 'must-not-replace-image'
-        }]
-      }]
+        visionMode: 'native'
+      }),
+      messages: [
+        {
+          role: 1,
+          content: [
+            {
+              mimeType: 'image/png',
+              data: new Uint8Array([97, 98, 99]),
+              value: 'must-not-replace-image'
+            }
+          ]
+        }
+      ]
     });
 
     expect(request.messages[0]?.content).toEqual([

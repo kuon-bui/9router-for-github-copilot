@@ -4,20 +4,26 @@ import {
   adaptToolsToRouterDefinitions,
   shouldExposeTools
 } from '../../../src/provider/tool-adapter';
+import type { DisplayModelSetting } from '../../../src/types/product-model';
+
+function selectedModel(overrides: Partial<DisplayModelSetting> = {}): DisplayModelSetting {
+  return {
+    key: 'agent',
+    label: 'Agent',
+    comboId: 'combo/agent',
+    enabled: true,
+    toolMode: 'auto',
+    visionMode: 'off',
+    thinkingMode: 'off',
+    maxInputTokens: 128_000,
+    maxOutputTokens: 8_192,
+    ...overrides
+  };
+}
 
 describe('shouldExposeTools', () => {
   it('enables tools only when the display model is explicitly configured for them', () => {
-    expect(
-      shouldExposeTools({
-        key: 'agent',
-        label: 'Agent',
-        comboId: 'combo/agent',
-        enabled: true,
-        toolMode: 'auto',
-        visionMode: 'off',
-        thinkingMode: 'off'
-      })
-    ).toBe(true);
+    expect(shouldExposeTools(selectedModel())).toBe(true);
   });
 });
 
@@ -80,15 +86,7 @@ describe('adaptToolsToRouterDefinitions', () => {
 describe('adaptToolOptionsForRouter', () => {
   it('drops malformed tools while preserving valid tools', () => {
     const result = adaptToolOptionsForRouter({
-      selectedModel: {
-        key: 'agent',
-        label: 'Agent',
-        comboId: 'combo/agent',
-        enabled: true,
-        toolMode: 'auto',
-        visionMode: 'off',
-        thinkingMode: 'off'
-      },
+      selectedModel: selectedModel(),
       tools: [
         {
           name: 'lookupUser',
@@ -113,15 +111,12 @@ describe('adaptToolOptionsForRouter', () => {
 
   it('does not expose tools when the selected display model has toolMode off', () => {
     const result = adaptToolOptionsForRouter({
-      selectedModel: {
+      selectedModel: selectedModel({
         key: 'daily',
         label: 'Daily',
         comboId: 'combo/daily',
-        enabled: true,
-        toolMode: 'off',
-        visionMode: 'off',
-        thinkingMode: 'off'
-      },
+        toolMode: 'off'
+      }),
       tools: [
         {
           name: 'lookupUser',

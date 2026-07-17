@@ -79,6 +79,56 @@ describe('NineRouterChatProvider snapshot refresh', () => {
     expect(refreshedModels.map((model) => model.id)).toEqual(['fallback']);
   });
 
+  it('refreshes published context window metadata from per-model settings', async () => {
+    const createSnapshot = (maxInputTokens: number, maxOutputTokens: number) =>
+      buildSettingsSnapshot({
+        get: (key: string) => {
+          const values: Record<string, unknown> = {
+            displayModels: ['daily'],
+            'modelMappings.daily': 'combo/daily',
+            'maxInputTokens.daily': maxInputTokens,
+            'maxOutputTokens.daily': maxOutputTokens
+          };
+
+          return values[key];
+        }
+      } as never);
+
+    const provider = new NineRouterChatProvider(
+      {
+        secrets: {
+          get: async () => 'token'
+        }
+      } as never,
+      {
+        async *streamChatCompletion() {
+          yield { type: 'response-complete' };
+        }
+      } as never,
+      createSnapshot(32_000, 2_048)
+    );
+
+    const initialModels = await provider.provideLanguageModelChatInformation(
+      {} as never,
+      {} as never
+    );
+    expect(initialModels[0]).toMatchObject({
+      maxInputTokens: 32_000,
+      maxOutputTokens: 2_048
+    });
+
+    provider.refreshFromSnapshot(createSnapshot(64_000, 4_096));
+
+    const refreshedModels = await provider.provideLanguageModelChatInformation(
+      {} as never,
+      {} as never
+    );
+    expect(refreshedModels[0]).toMatchObject({
+      maxInputTokens: 64_000,
+      maxOutputTokens: 4_096
+    });
+  });
+
   it('blocks requests when the current snapshot has invalid runtime settings', async () => {
     const provider = new NineRouterChatProvider(
       {

@@ -11,7 +11,9 @@ describe('resolvePublishedModels', () => {
         enabled: true,
         toolMode: 'off',
         visionMode: 'off',
-        thinkingMode: 'off'
+        thinkingMode: 'off',
+        maxInputTokens: 128_000,
+        maxOutputTokens: 8_192
       },
       {
         key: 'agent',
@@ -20,7 +22,9 @@ describe('resolvePublishedModels', () => {
         enabled: true,
         toolMode: 'off',
         visionMode: 'off',
-        thinkingMode: 'off'
+        thinkingMode: 'off',
+        maxInputTokens: 128_000,
+        maxOutputTokens: 8_192
       }
     ]);
 
@@ -38,7 +42,9 @@ describe('resolvePublishedModels', () => {
         enabled: true,
         toolMode: 'off',
         visionMode: 'off',
-        thinkingMode: 'off'
+        thinkingMode: 'off',
+        maxInputTokens: 128_000,
+        maxOutputTokens: 8_192
       },
       {
         key: 'agent',
@@ -47,7 +53,9 @@ describe('resolvePublishedModels', () => {
         enabled: true,
         toolMode: 'auto',
         visionMode: 'proxy',
-        thinkingMode: 'max'
+        thinkingMode: 'max',
+        maxInputTokens: 128_000,
+        maxOutputTokens: 8_192
       }
     ]);
 
@@ -64,7 +72,9 @@ describe('resolvePublishedModels', () => {
       enabled: true,
       toolMode: 'auto',
       visionMode: 'proxy',
-      thinkingMode: 'off'
+      thinkingMode: 'off',
+      maxInputTokens: 128_000,
+      maxOutputTokens: 8_192
     } as const;
 
     expect(createPublishedModel(setting).capabilities.imageInput).toBeUndefined();
@@ -73,5 +83,24 @@ describe('resolvePublishedModels', () => {
         visionProxyConfigured: true
       }).capabilities.imageInput
     ).toBe(true);
+  });
+
+  it('publishes configured input and output token limits', () => {
+    const model = createPublishedModel({
+      key: 'daily',
+      label: 'Daily',
+      comboId: 'combo/daily',
+      enabled: true,
+      toolMode: 'off',
+      visionMode: 'off',
+      thinkingMode: 'off',
+      maxInputTokens: 64_000,
+      maxOutputTokens: 4_096
+    });
+
+    expect(model).toMatchObject({
+      maxInputTokens: 64_000,
+      maxOutputTokens: 4_096
+    });
   });
 });

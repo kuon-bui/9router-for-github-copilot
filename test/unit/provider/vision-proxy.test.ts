@@ -13,7 +13,9 @@ const proxyModel = {
   enabled: true,
   toolMode: 'auto',
   visionMode: 'proxy',
-  thinkingMode: 'max'
+  thinkingMode: 'max',
+  maxInputTokens: 128_000,
+  maxOutputTokens: 8_192
 } as const;
 
 const image = (mimeType: string, byte: number): { mimeType: string; data: Uint8Array } => ({

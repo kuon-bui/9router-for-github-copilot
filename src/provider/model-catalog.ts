@@ -23,8 +23,8 @@ export function createPublishedModel(
     vendor: '9router',
     family: setting.key,
     version: '1',
-    maxInputTokens: 128_000,
-    maxOutputTokens: 8_192,
+    maxInputTokens: setting.maxInputTokens,
+    maxOutputTokens: setting.maxOutputTokens,
     capabilities,
     configurationSchema: createThinkingEffortConfigurationSchema(setting.thinkingMode)
   };
