@@ -24,6 +24,11 @@ describe('runtime settings', () => {
 
     expect(runtime.visionProxyModelId).toBe('router/vision');
   });
+
+  it('defaults request timeout to unlimited and preserves an explicit zero', () => {
+    expect(loadRuntimeSettings(configuration({})).requestTimeoutMs).toBe(0);
+    expect(loadRuntimeSettings(configuration({ requestTimeoutMs: 0 })).requestTimeoutMs).toBe(0);
+  });
 });
 
 describe('max token normalization', () => {
@@ -146,7 +151,7 @@ describe('buildSettingsSnapshot', () => {
       configuration({
         models: [{ id: 'coder', name: 'Coder', modelId: 'router/coder' }],
         baseUrl: 'not-a-url',
-        requestTimeoutMs: 0
+        requestTimeoutMs: -1
       })
     );
 
@@ -158,6 +163,21 @@ describe('buildSettingsSnapshot', () => {
         expect.objectContaining({ code: 'INVALID_BASE_URL', scope: 'runtime' }),
         expect.objectContaining({ code: 'INVALID_REQUEST_TIMEOUT', scope: 'runtime' })
       ])
+    );
+  });
+
+  it('keeps runtime valid when requestTimeoutMs is zero', () => {
+    const snapshot = buildSettingsSnapshot(
+      configuration({
+        models: [{ id: 'coder', name: 'Coder', modelId: 'router/coder' }],
+        requestTimeoutMs: 0
+      })
+    );
+
+    expect(snapshot.state).toBe('valid');
+    expect(snapshot.runtime?.requestTimeoutMs).toBe(0);
+    expect(snapshot.issues).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ code: 'INVALID_REQUEST_TIMEOUT' })])
     );
   });
 

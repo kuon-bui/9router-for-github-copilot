@@ -138,9 +138,9 @@
         },
         "9router-copilot.requestTimeoutMs": {
           "type": "number",
-          "minimum": 1000,
-          "default": 60000,
-          "description": "Timeout for requests sent to 9router."
+          "minimum": 0,
+          "default": 0,
+          "description": "Timeout in milliseconds for each request sent to 9router. Use 0 to disable the extension-level timeout."
         },
         "9router-copilot.debugMode": {
           "type": "string",

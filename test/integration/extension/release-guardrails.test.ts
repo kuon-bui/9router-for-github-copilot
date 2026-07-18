@@ -49,6 +49,16 @@ describe('release guardrails', () => {
     });
   });
 
+  it('defaults requestTimeoutMs to unlimited', () => {
+    const properties = manifest.contributes.configuration.properties as Record<string, unknown>;
+
+    expect(properties['9router-copilot.requestTimeoutMs']).toMatchObject({
+      type: 'number',
+      minimum: 0,
+      default: 0
+    });
+  });
+
   it('does not contribute legacy fixed-model settings', () => {
     const properties = manifest.contributes.configuration.properties as Record<string, unknown>;
     const legacyKeys = [
@@ -114,6 +124,24 @@ describe('release guardrails', () => {
       expect(document).toContain('positive safe integer');
       expect(document).toContain('omits `max_tokens`');
       expect(document).toContain('upstream');
+    }
+  });
+
+  it('documents unlimited request timeout semantics', async () => {
+    const readme = await readFile(resolve(process.cwd(), 'README.md'), 'utf8');
+    const productionDesign = await readFile(
+      resolve(
+        process.cwd(),
+        'docs/superpowers/specs/2026-07-15-9router-copilot-chat-provider-production-design.md'
+      ),
+      'utf8'
+    );
+
+    for (const document of [readme, productionDesign]) {
+      expect(document).toContain('requestTimeoutMs');
+      expect(document).toContain('defaults to `0`');
+      expect(document).toContain('extension-level');
+      expect(document).toContain('cancellation');
     }
   });
 

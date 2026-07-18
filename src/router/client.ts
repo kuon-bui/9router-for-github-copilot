@@ -31,15 +31,20 @@ function createCompositeAbortSignal(signal: AbortSignal, timeoutMs: number): {
     signal.addEventListener('abort', forwardAbort, { once: true });
   }
 
-  const timeoutHandle = setTimeout(() => {
-    timedOut = true;
-    controller.abort(new Error('Timed out'));
-  }, timeoutMs);
+  const timeoutHandle =
+    timeoutMs > 0
+      ? setTimeout(() => {
+          timedOut = true;
+          controller.abort(new Error('Timed out'));
+        }, timeoutMs)
+      : undefined;
 
   return {
     signal: controller.signal,
     cleanup: () => {
-      clearTimeout(timeoutHandle);
+      if (timeoutHandle !== undefined) {
+        clearTimeout(timeoutHandle);
+      }
       signal.removeEventListener('abort', forwardAbort);
     },
     didTimeout: () => timedOut
@@ -153,8 +158,7 @@ function isExplicitMissingModelError(responseText: string): boolean {
 
 function classifyStatusError(status: number, requestId: string | undefined, responseText: string): NineRouterError {
   const details = {
-    status,
-    responseText
+    status
   };
 
   if (status === 401 || status === 403) {
@@ -176,7 +180,7 @@ function classifyStatusError(status: number, requestId: string | undefined, resp
   if (status >= 500) {
     return new NineRouterError(
       'UPSTREAM_UNAVAILABLE',
-      '9router upstream execution is unavailable',
+      buildUpstreamUnavailableMessage(status, requestId),
       buildErrorOptions(requestId, details)
     );
   }
@@ -186,6 +190,11 @@ function classifyStatusError(status: number, requestId: string | undefined, resp
     `9router request failed with status ${status}`,
     buildErrorOptions(requestId, details)
   );
+}
+
+function buildUpstreamUnavailableMessage(status: number, requestId: string | undefined): string {
+  const requestIdSuffix = requestId ? ` Request ID: ${requestId}.` : '';
+  return `9router could not complete upstream execution (HTTP ${status}). Check the mapped model's upstream credentials, quota, and provider availability.${requestIdSuffix}`;
 }
 
 function buildErrorOptions(

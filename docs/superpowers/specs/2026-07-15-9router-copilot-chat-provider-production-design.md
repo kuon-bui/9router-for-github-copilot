@@ -191,6 +191,12 @@ Recommended configuration keys:
 - `9router-copilot.requestTimeoutMs`
 - `9router-copilot.debugMode`
 
+`9router-copilot.requestTimeoutMs` defaults to `0`. Zero disables the
+extension-level timer; a positive finite value limits each primary or Vision
+proxy request independently. Host cancellation remains active when the timer is
+disabled, and `9router` or network infrastructure may still enforce its own
+timeout.
+
 ### Native context window metadata
 
 Every valid published model exposes its validated per-model
@@ -406,7 +412,7 @@ Secrets must always be redacted from every logging path.
 - Keep activation lightweight.
 - Avoid blocking picker availability on remote model discovery for the first production release.
 - Prefer streaming-first delivery over buffered response handling.
-- Bound request timeout defaults to avoid hanging the Copilot UX.
+- Keep request cancellation active even when the optional extension-level timeout is disabled.
 - Isolate token estimation from the critical request path when possible.
 
 ## Testing Strategy

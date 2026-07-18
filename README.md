@@ -49,7 +49,7 @@ Configuration is local per user under the `9router-copilot` namespace. Array ord
   ],
   "9router-copilot.visionProxyModelId": "",
   "9router-copilot.maxTokens": 0,
-  "9router-copilot.requestTimeoutMs": 60000,
+  "9router-copilot.requestTimeoutMs": 0,
   "9router-copilot.debugMode": "minimal"
 }
 ```
@@ -71,6 +71,8 @@ This release replaces the old fixed-model settings. They are not read or migrate
 Unknown fields, duplicate ids, invalid values, and empty mappings are rejected per model. One broken entry does not hide unrelated valid entries. The default configuration contains one unpublished `agent` entry until its `modelId` is set.
 
 `9router-copilot.maxTokens` is independent of per-model Context Window metadata. Its default is `0`. A positive safe integer is sent as `max_tokens`; `0` or a malformed value omits `max_tokens`, applying no extension-level response limit. `9router` or an upstream provider may still enforce its own limit. Streaming requests continue to set `stream_options.include_usage`.
+
+`9router-copilot.requestTimeoutMs` also defaults to `0`. A value of `0` disables the extension-level request timeout, while a positive value limits each primary or Vision proxy request independently. User cancellation remains active in both cases, and network infrastructure or 9router may still enforce its own timeout.
 
 ### Tools
 
@@ -103,6 +105,7 @@ Common fixes:
 - Missing API key: run `9router: Set API Key`.
 - Invalid base URL: use an `http` or `https` URL that ends at, or can normalize to, `/v1`.
 - Missing model: update the affected object's `modelId` to an existing 9router model.
+- Upstream HTTP 5xx: check the mapped model's provider credentials, quota, and availability in 9router; use the reported request ID to correlate backend logs when one is available.
 - Image input blocked: set that object's `visionMode` to `native` or `proxy` only when supported.
 - Missing Vision proxy: configure `9router-copilot.visionProxyModelId`; proxy mode remains fail-closed until then.
 - Invalid thinking mode: use `off`, `minimal`, `low`, `medium`, `high`, `xhigh`, or `max`.

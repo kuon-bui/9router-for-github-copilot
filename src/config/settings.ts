@@ -173,11 +173,11 @@ function validateRuntimeSettings(
     });
   }
 
-  if (!Number.isFinite(runtime.requestTimeoutMs) || runtime.requestTimeoutMs <= 0) {
+  if (!Number.isFinite(runtime.requestTimeoutMs) || runtime.requestTimeoutMs < 0) {
     issues.push({
       scope: 'runtime',
       code: 'INVALID_REQUEST_TIMEOUT',
-      message: 'The request timeout must be a positive number of milliseconds.',
+      message: 'The request timeout must be zero or a positive number of milliseconds.',
       path: '9router-copilot.requestTimeoutMs'
     });
   }

@@ -39,6 +39,40 @@ describe('createRouterClient', () => {
     expect(events).toEqual([{ type: 'response-complete' }]);
   });
 
+  it('does not create an extension timeout when timeoutMs is zero', async () => {
+    const fetchMock = vi.fn().mockImplementation(async (_url: string, init: { signal?: AbortSignal }) => {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      if (init.signal?.aborted) {
+        throw new Error('request was aborted');
+      }
+
+      return {
+        ok: true,
+        body: new ReadableStream<Uint8Array>({
+          start(controller) {
+            controller.enqueue(new TextEncoder().encode('data: [DONE]\n\n'));
+            controller.close();
+          }
+        }),
+        headers: new Headers()
+      };
+    });
+    const client = createRouterClient({ fetch: fetchMock as never });
+
+    const events: unknown[] = [];
+    for await (const event of client.streamChatCompletion({
+      baseUrl: 'https://router.example.com/v1',
+      apiKey: 'secret-token',
+      request: { model: 'combo/daily', messages: [], stream: true },
+      timeoutMs: 0,
+      signal: new AbortController().signal
+    })) {
+      events.push(event);
+    }
+
+    expect(events).toEqual([{ type: 'response-complete' }]);
+  });
+
   it('classifies an explicit missing model 404 as a model mapping error', async () => {
     const client = createRouterClient({
       fetch: vi.fn().mockResolvedValue({
@@ -120,6 +154,42 @@ describe('createRouterClient', () => {
     await expect(consume()).rejects.toMatchObject({
       code: 'TRANSPORT_ERROR',
       message: '9router request failed with status 404'
+    });
+  });
+
+  it('makes an upstream 5xx actionable without exposing the raw response body', async () => {
+    const client = createRouterClient({
+      fetch: vi.fn().mockResolvedValue({
+        ok: false,
+        status: 503,
+        headers: new Headers({ 'x-request-id': 'req-upstream-503' }),
+        text: async () => '{"error":{"message":"private provider failure details"}}'
+      }) as never
+    });
+
+    const consume = async (): Promise<void> => {
+      for await (const event of client.streamChatCompletion({
+        baseUrl: 'https://router.example.com/v1',
+        apiKey: 'secret-token',
+        request: { model: 'combo/daily', messages: [], stream: true },
+        timeoutMs: 1000,
+        signal: new AbortController().signal
+      })) {
+        void event;
+      }
+    };
+
+    await expect(consume()).rejects.toMatchObject({
+      code: 'UPSTREAM_UNAVAILABLE',
+      requestId: 'req-upstream-503',
+      message:
+        "9router could not complete upstream execution (HTTP 503). Check the mapped model's upstream credentials, quota, and provider availability. Request ID: req-upstream-503.",
+      details: {
+        status: 503
+      }
+    });
+    await expect(consume()).rejects.not.toMatchObject({
+      details: expect.objectContaining({ responseText: expect.anything() })
     });
   });
 });

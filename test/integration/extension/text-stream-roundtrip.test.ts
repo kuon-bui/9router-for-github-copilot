@@ -768,4 +768,58 @@ describe('NineRouterChatProvider', () => {
       details: expect.objectContaining({ responseText: expect.anything() })
     });
   });
+
+  it('logs safe failure status in minimal mode without model metadata or raw response text', async () => {
+    const provider = new NineRouterChatProvider(
+      {
+        secrets: {
+          get: async () => 'token'
+        }
+      } as never,
+      {
+        async *streamChatCompletion() {
+          throw new NineRouterError(
+            'UPSTREAM_UNAVAILABLE',
+            '9router could not complete upstream execution (HTTP 503).',
+            {
+              requestId: 'req-private-id',
+              details: {
+                status: 503,
+                responseText: 'private provider failure details'
+              }
+            }
+          );
+        }
+      } as never
+    );
+
+    await expect(
+      provider.provideLanguageModelChatResponse(
+        {
+          id: 'daily',
+          name: 'Daily',
+          vendor: '9router',
+          family: 'daily',
+          version: '1',
+          maxInputTokens: 128000,
+          maxOutputTokens: 8192,
+          capabilities: {}
+        },
+        [{ role: 1, content: 'Say hello' }] as never,
+        {} as never,
+        { report: () => undefined } as never,
+        __createCancellationToken().value as never
+      )
+    ).rejects.toMatchObject({
+      code: 'UPSTREAM_UNAVAILABLE'
+    });
+
+    const output = __getOutputLines().join('\n');
+    expect(output).toContain('9router request failed');
+    expect(output).toContain('"errorCode":"UPSTREAM_UNAVAILABLE"');
+    expect(output).toContain('"status":503');
+    expect(output).not.toContain('combo/daily');
+    expect(output).not.toContain('req-private-id');
+    expect(output).not.toContain('private provider failure details');
+  });
 });

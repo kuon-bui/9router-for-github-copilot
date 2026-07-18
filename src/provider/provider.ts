@@ -115,7 +115,8 @@ export class NineRouterChatProvider
       thinkingMode: effectiveThinking.thinkingMode
     };
     const requestCancellation = createAbortSignalFromToken(token);
-    const visionStartedAt = Date.now();
+    const requestStartedAt = Date.now();
+    const visionStartedAt = requestStartedAt;
 
     try {
       const visionResult = await this.visionProxyService.prepare({
@@ -216,7 +217,19 @@ export class NineRouterChatProvider
         emitter.emit(event);
       }
     } catch (error) {
-      throw mapProviderError(error, selectedModel);
+      const mappedError = mapProviderError(error, selectedModel);
+      logDebugEvent(
+        this.snapshot.runtime.debugMode,
+        '9router request failed',
+        buildFailureMetadata(
+          this.snapshot.runtime.debugMode,
+          mappedError,
+          selectedModel,
+          Date.now() - requestStartedAt
+        ),
+        'minimal'
+      );
+      throw mappedError;
     } finally {
       requestCancellation.cleanup();
     }
@@ -266,6 +279,32 @@ function mapProviderError(error: unknown, selectedModel: ConfiguredModel): NineR
       }
     }
   );
+}
+
+function buildFailureMetadata(
+  debugMode: 'minimal' | 'metadata' | 'verbose',
+  error: NineRouterError,
+  selectedModel: ConfiguredModel,
+  durationMs: number
+): Record<string, unknown> {
+  const metadata: Record<string, unknown> = {
+    errorCode: error.code,
+    durationMs
+  };
+
+  if (typeof error.details?.status === 'number') {
+    metadata.status = error.details.status;
+  }
+
+  if (debugMode !== 'minimal') {
+    metadata.displayModel = selectedModel.id;
+    metadata.modelId = selectedModel.modelId;
+    if (error.requestId) {
+      metadata.requestId = error.requestId;
+    }
+  }
+
+  return metadata;
 }
 
 function flattenRequestContent(content: string | readonly unknown[]): string {
