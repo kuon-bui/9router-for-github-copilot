@@ -39,6 +39,14 @@ class LanguageModelTextPart {
   }
 }
 
+class LanguageModelThinkingPart {
+  public readonly value: string | string[];
+
+  public constructor(value: string | string[]) {
+    this.value = value;
+  }
+}
+
 class LanguageModelToolCallPart {
   public readonly callId: string;
   public readonly name: string;
@@ -192,6 +200,7 @@ export {
   Disposable,
   EventEmitter,
   LanguageModelTextPart,
+  LanguageModelThinkingPart,
   LanguageModelDataPart,
   LanguageModelToolCallPart,
   LanguageModelToolResultPart

@@ -3,8 +3,10 @@ import {
   countImageParts,
   createRouterImagePart,
   hasImageParts,
-  isHostImageDataPart
+  isHostImageDataPart,
+  isHostNonImageDataPart
 } from './image-input-adapter';
+import { isLanguageModelThinkingPart } from './reasoning-part-compat';
 import type { RouterClient } from '../router/client';
 import type { ConfiguredModel } from '../types/product-model';
 import type {
@@ -66,6 +68,8 @@ export function buildVisionProxyRequest(
       userContent.push({ type: 'text', text: part });
     } else if (isHostImageDataPart(part)) {
       userContent.push(createRouterImagePart(part));
+    } else if (isLanguageModelThinkingPart(part) || isHostNonImageDataPart(part)) {
+      continue;
     } else if (
       typeof part === 'object' &&
       part !== null &&
@@ -151,7 +155,12 @@ function replaceImagesWithSummary(
   const retained =
     typeof message.content === 'string'
       ? [{ value: message.content }]
-      : message.content.filter((part) => !isHostImageDataPart(part));
+      : message.content.filter(
+          (part) =>
+            !isHostImageDataPart(part) &&
+            !isLanguageModelThinkingPart(part) &&
+            !isHostNonImageDataPart(part)
+        );
 
   return {
     ...message,

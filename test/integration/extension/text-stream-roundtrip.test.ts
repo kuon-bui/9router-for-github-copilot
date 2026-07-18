@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import * as vscode from 'vscode';
 import { NineRouterChatProvider } from '../../../src/provider/provider';
+import { isLanguageModelThinkingPart } from '../../../src/provider/reasoning-part-compat';
 import { NineRouterError } from '../../../src/router/errors';
 import type { RouterChatCompletionRequest } from '../../../src/types/router-contract';
 import {
@@ -63,6 +64,131 @@ describe('NineRouterChatProvider', () => {
     );
 
     expect(progressCalls.join('')).toBe('Hello world');
+    const diagnosticLine = __getOutputLines().find((line) =>
+      line.startsWith('Reasoning stream diagnostic')
+    );
+    expect(diagnosticLine).toContain('"outcome":"completed"');
+    expect(diagnosticLine).toContain('"receivedDeltas":0');
+  });
+
+  it('streams reasoning through native thinking parts without logging its content', async () => {
+    __setConfigurationValues({
+      models: [
+        {
+          id: 'daily',
+          name: 'Daily',
+          modelId: 'combo/daily',
+          thinkingMode: 'high'
+        }
+      ],
+      baseUrl: 'https://router.example.com/v1',
+      maxTokens: 128,
+      requestTimeoutMs: 5000,
+      debugMode: 'metadata'
+    });
+
+    const streamedParts: string[] = [];
+    const provider = new NineRouterChatProvider(
+      {
+        secrets: {
+          get: async () => 'token'
+        }
+      } as never,
+      {
+        async *streamChatCompletion() {
+          yield { type: 'reasoning-delta', text: 'sensitive reasoning detail' };
+          yield { type: 'text-delta', text: 'Visible answer' };
+          yield { type: 'response-complete' };
+        }
+      } as never
+    );
+
+    await provider.provideLanguageModelChatResponse(
+      {
+        id: 'daily',
+        name: 'Daily',
+        vendor: '9router',
+        family: 'daily',
+        version: '1',
+        maxInputTokens: 128000,
+        maxOutputTokens: 8192,
+        capabilities: {}
+      },
+      [{ role: 1, content: 'Think carefully' }] as never,
+      {} as never,
+      {
+        report: (part: vscode.LanguageModelResponsePart) => {
+          if (isLanguageModelThinkingPart(part)) {
+            const value = (part as unknown as { value: string | string[] }).value;
+            for (const item of Array.isArray(value) ? value : [value]) {
+              streamedParts.push(`thinking:${item}`);
+            }
+          } else if (part instanceof vscode.LanguageModelTextPart) {
+            streamedParts.push(`text:${part.value}`);
+          }
+        }
+      } as vscode.Progress<vscode.LanguageModelResponsePart>,
+      __createCancellationToken().value as never
+    );
+
+    expect(streamedParts).toEqual([
+      'thinking:sensitive reasoning detail',
+      'text:Visible answer'
+    ]);
+
+    const diagnosticLine = __getOutputLines().find((line) =>
+      line.startsWith('Reasoning stream diagnostic')
+    );
+    expect(diagnosticLine).toContain('"outcome":"completed"');
+    expect(diagnosticLine).toContain('"receivedDeltas":1');
+    expect(diagnosticLine).toContain('"receivedCharacters":26');
+    expect(diagnosticLine).toContain('"emittedDeltas":1');
+    expect(diagnosticLine).toContain('"droppedDeltas":0');
+    expect(diagnosticLine).toContain('"hostThinkingPartAvailable":true');
+    expect(diagnosticLine).not.toContain('sensitive reasoning detail');
+  });
+
+  it('keeps safe reasoning counters when a primary stream is cancelled', async () => {
+    const provider = new NineRouterChatProvider(
+      {
+        secrets: {
+          get: async () => 'token'
+        }
+      } as never,
+      {
+        async *streamChatCompletion() {
+          yield { type: 'reasoning-delta', text: 'sensitive partial reasoning' };
+          throw new NineRouterError('CANCELLATION_ERROR', '9router request was cancelled');
+        }
+      } as never
+    );
+
+    await expect(
+      provider.provideLanguageModelChatResponse(
+        {
+          id: 'daily',
+          name: 'Daily',
+          vendor: '9router',
+          family: 'daily',
+          version: '1',
+          maxInputTokens: 128000,
+          maxOutputTokens: 8192,
+          capabilities: {}
+        },
+        [{ role: 1, content: 'Think carefully' }] as never,
+        {} as never,
+        { report: () => undefined } as never,
+        __createCancellationToken().value as never
+      )
+    ).rejects.toMatchObject({ code: 'CANCELLATION_ERROR' });
+
+    const diagnosticLine = __getOutputLines().find((line) =>
+      line.startsWith('Reasoning stream diagnostic')
+    );
+    expect(diagnosticLine).toContain('"outcome":"cancelled"');
+    expect(diagnosticLine).toContain('"receivedDeltas":1');
+    expect(diagnosticLine).toContain('"receivedCharacters":27');
+    expect(diagnosticLine).not.toContain('sensitive partial reasoning');
   });
 
   it('lets the Copilot picker override the selected model thinking default', async () => {

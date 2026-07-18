@@ -5,6 +5,7 @@ import { logDebugEvent } from '../debug/output-channel';
 import { NineRouterError } from '../router/errors';
 import { adaptToolOptionsForRouter } from './tool-adapter';
 import { adaptMessagesToRouterRequest } from './request-adapter';
+import { isLanguageModelThinkingPartAvailable } from './reasoning-part-compat';
 import { createRouterEventEmitter } from './stream-adapter';
 import { createAbortSignalFromToken } from './cancellation';
 import { resolveEffectiveThinkingMode } from './thinking-effort';
@@ -15,6 +16,9 @@ import type { ConfiguredModel, PublishedModel } from '../types/product-model';
 import type { ModelConfigurationResponseOptions } from '../types/vscode-chat-compat';
 import type { HostToolDefinition } from './tool-adapter';
 import type { HostChatRequestMessage } from './vision-proxy';
+import type { RouterEventEmitter } from './stream-adapter';
+
+type ReasoningStreamOutcome = 'completed' | 'cancelled' | 'failed';
 
 function getRequestTools(options: unknown): readonly HostToolDefinition[] | undefined {
   if (typeof options !== 'object' || options === null || !('tools' in options)) {
@@ -117,6 +121,8 @@ export class NineRouterChatProvider
     const requestCancellation = createAbortSignalFromToken(token);
     const requestStartedAt = Date.now();
     const visionStartedAt = requestStartedAt;
+    let reasoningEmitter: RouterEventEmitter | undefined;
+    let reasoningStreamOutcome: ReasoningStreamOutcome | undefined;
 
     try {
       const visionResult = await this.visionProxyService.prepare({
@@ -204,7 +210,8 @@ export class NineRouterChatProvider
         throw new NineRouterError('CANCELLATION_ERROR', '9router request was cancelled');
       }
 
-      const emitter = createRouterEventEmitter(progress);
+      reasoningEmitter = createRouterEventEmitter(progress);
+      reasoningStreamOutcome = 'failed';
       const stream = this.routerClient.streamChatCompletion({
         baseUrl: this.snapshot.runtime.baseUrl,
         apiKey,
@@ -214,10 +221,15 @@ export class NineRouterChatProvider
       });
 
       for await (const event of stream) {
-        emitter.emit(event);
+        reasoningEmitter.emit(event);
       }
+      reasoningStreamOutcome = 'completed';
     } catch (error) {
       const mappedError = mapProviderError(error, selectedModel);
+      if (reasoningEmitter) {
+        reasoningStreamOutcome =
+          mappedError.code === 'CANCELLATION_ERROR' ? 'cancelled' : 'failed';
+      }
       logDebugEvent(
         this.snapshot.runtime.debugMode,
         '9router request failed',
@@ -231,6 +243,24 @@ export class NineRouterChatProvider
       );
       throw mappedError;
     } finally {
+      if (reasoningEmitter && reasoningStreamOutcome) {
+        const reasoningSummary = reasoningEmitter.getReasoningSummary();
+        logDebugEvent(
+          this.snapshot.runtime.debugMode,
+          'Reasoning stream diagnostic',
+          {
+            displayModel: selectedModel.id,
+            effectiveThinkingMode: effectiveThinking.thinkingMode,
+            outcome: reasoningStreamOutcome,
+            receivedDeltas: reasoningSummary.receivedDeltas,
+            receivedCharacters: reasoningSummary.receivedCharacters,
+            emittedDeltas: reasoningSummary.emittedDeltas,
+            droppedDeltas: reasoningSummary.droppedDeltas,
+            hostThinkingPartAvailable: isLanguageModelThinkingPartAvailable()
+          },
+          'minimal'
+        );
+      }
       requestCancellation.cleanup();
     }
   }

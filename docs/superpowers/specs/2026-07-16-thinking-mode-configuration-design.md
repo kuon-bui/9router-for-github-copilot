@@ -155,6 +155,12 @@ Update the README with:
 
 ## Non-Goals
 
+> **Superseding note (2026-07-18):**
+> `2026-07-18-reasoning-detail-streaming-design.md` supersedes only the first
+> non-goal below. Router-provided reasoning may now be rendered through the
+> runtime-gated native thinking-part surface; every other non-goal and all
+> request-mapping decisions in this document remain in force.
+
 - Rendering reasoning or chain-of-thought deltas in Copilot Chat
 - Exposing provider-specific reasoning token budgets
 - Detecting thinking capabilities for individual combo members

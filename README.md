@@ -1,12 +1,12 @@
 # 9router Copilot Chat Provider
 
-Expose `9router` as a custom provider inside GitHub Copilot Chat while preserving the native VS Code model picker, tools, Thinking Effort, Vision input, streaming, and Context Window experience.
+Expose `9router` as a custom provider inside GitHub Copilot Chat while preserving the native VS Code model picker, tools, Thinking Effort, reasoning detail, Vision input, streaming, and Context Window experience.
 
 The extension is a thin adapter. Users publish an ordered set of user-defined curated models, while `9router` remains responsible for routing, fallback, quotas, and upstream execution.
 
 ## Status
 
-- Package version: `0.1.0`
+- Package version: `0.2.1`
 - License policy: `UNLICENSED`
 - Runtime target: VS Code `^1.125.0`
 - Backend contract: OpenAI-compatible `9router` `/v1/chat/completions`
@@ -90,6 +90,14 @@ The proxy model must accept OpenAI-compatible `image_url` data URLs. Proxy mode 
 
 Each configured model gets the native Copilot Chat Thinking Effort picker. `None` omits a reasoning override; `Minimal`, `Low`, `Medium`, `High`, `XHigh`, and `Max` send the selected value through `reasoning_effort` while keeping `modelId` unchanged. The model object's `thinkingMode` is the fallback when the host supplies no valid selection. `9router` owns provider-specific reasoning translation.
 
+### Reasoning Detail
+
+When the primary `9router` response streams a non-empty OpenAI-compatible reasoning string, the extension automatically sends each delta to Copilot Chat as a native thinking part. The canonical field is `reasoning_content`; the SSE boundary also accepts the common string aliases `cot_summary`, `reasoning_text`, `reasoning`, and `thinking`, using the first populated field so one frame is never duplicated. There is no additional display setting: `thinkingMode` and the Thinking Effort picker control what the request asks for, while the routed model decides whether reasoning is returned.
+
+Native thinking parts are currently a proposed VS Code API. The extension checks for support at runtime. On a host without that API, reasoning is dropped safely while the visible answer, tools, and usage continue to stream normally; reasoning is never converted into final-answer text. Copilot Chat owns the collapsible layout and labels, so their exact appearance can vary by host version.
+
+Reasoning text is not replayed into later `9router` requests and is never written to extension diagnostics. Every started primary stream writes one safe `Reasoning stream diagnostic` line, even after cancellation or failure. `receivedDeltas: 0` means the response supplied no recognized reasoning string; a positive `droppedDeltas` count means the extension received reasoning but could not report it to the host. The line contains aggregate counts, terminal outcome, effective thinking mode, and native thinking-part availability only.
+
 ### Debug Mode
 
 - `minimal`: Safe default.
@@ -110,6 +118,7 @@ Common fixes:
 - Missing Vision proxy: configure `9router-copilot.visionProxyModelId`; proxy mode remains fail-closed until then.
 - Invalid thinking mode: use `off`, `minimal`, `low`, `medium`, `high`, `xhigh`, or `max`.
 - Suffixed model id: remove the `(level)` suffix and set `thinkingMode` separately.
+- Missing reasoning detail: run one request, then inspect `Reasoning stream diagnostic` in Output → `9router Copilot`. If `receivedDeltas` is `0`, verify that the selected `9router` combo and its upstream model actually stream reasoning; Thinking Effort requests reasoning but cannot guarantee a reasoning payload.
 
 ## Debug in VS Code
 

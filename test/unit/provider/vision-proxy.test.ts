@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import * as vscode from 'vscode';
 import { NineRouterError } from '../../../src/router/errors';
+import { createLanguageModelThinkingResponsePart } from '../../../src/provider/reasoning-part-compat';
 import type { RouterChatCompletionRequest } from '../../../src/types/router-contract';
 import {
   buildVisionProxyRequest,
@@ -24,6 +26,31 @@ const image = (mimeType: string, byte: number): { mimeType: string; data: Uint8A
 });
 
 describe('VisionProxyService', () => {
+  it('does not forward thinking or usage metadata to the Vision proxy', () => {
+    const thinkingPart = createLanguageModelThinkingResponsePart('private reasoning');
+    if (!thinkingPart) {
+      throw new Error('Expected the VS Code test API to expose LanguageModelThinkingPart');
+    }
+
+    const request = buildVisionProxyRequest(
+      {
+        role: 2,
+        content: [
+          thinkingPart,
+          new vscode.LanguageModelDataPart(new Uint8Array([1]), 'usage'),
+          new vscode.LanguageModelTextPart('Visible context'),
+          image('image/png', 2)
+        ]
+      },
+      'combo/vision'
+    );
+
+    expect(JSON.stringify(request.messages)).toContain('Visible context');
+    expect(JSON.stringify(request.messages)).toContain('data:image/png;base64');
+    expect(JSON.stringify(request.messages)).not.toContain('private reasoning');
+    expect(JSON.stringify(request.messages)).not.toContain('usage');
+  });
+
   it('summarizes each image-bearing message sequentially', async () => {
     const requests: RouterChatCompletionRequest[] = [];
     let active = 0;

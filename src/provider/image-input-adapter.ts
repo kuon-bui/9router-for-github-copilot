@@ -6,16 +6,23 @@ export interface HostImageDataPart {
   data: Uint8Array;
 }
 
-export function isHostImageDataPart(part: unknown): part is HostImageDataPart {
+function isHostDataPart(part: unknown): part is HostImageDataPart {
   return (
     typeof part === 'object' &&
     part !== null &&
     'mimeType' in part &&
     typeof part.mimeType === 'string' &&
-    part.mimeType.startsWith('image/') &&
     'data' in part &&
     part.data instanceof Uint8Array
   );
+}
+
+export function isHostImageDataPart(part: unknown): part is HostImageDataPart {
+  return isHostDataPart(part) && part.mimeType.startsWith('image/');
+}
+
+export function isHostNonImageDataPart(part: unknown): part is HostImageDataPart {
+  return isHostDataPart(part) && !part.mimeType.startsWith('image/');
 }
 
 export function createRouterImagePart(part: HostImageDataPart): RouterContentPart {

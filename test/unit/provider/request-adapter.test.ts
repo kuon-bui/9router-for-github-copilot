@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import * as vscode from 'vscode';
 import { adaptMessagesToRouterRequest } from '../../../src/provider/request-adapter';
+import { createLanguageModelThinkingResponsePart } from '../../../src/provider/reasoning-part-compat';
 import type { ConfiguredModel } from '../../../src/types/product-model';
 
 function selectedModel(overrides: Partial<ConfiguredModel> = {}): ConfiguredModel {
@@ -53,6 +54,118 @@ describe('adaptMessagesToRouterRequest', () => {
       model: '123',
       reasoning_effort: 'high'
     });
+  });
+
+  it('does not merge thinking parts into ordinary assistant history content', () => {
+    const thinkingPart = createLanguageModelThinkingResponsePart('private reasoning');
+    if (!thinkingPart) {
+      throw new Error('Expected the VS Code test API to expose LanguageModelThinkingPart');
+    }
+
+    const request = adaptMessagesToRouterRequest({
+      selectedModel: selectedModel(),
+      messages: [
+        {
+          role: 2,
+          content: [thinkingPart, new vscode.LanguageModelTextPart('Visible answer')]
+        }
+      ]
+    });
+
+    expect(request.messages).toEqual([
+      {
+        role: 'assistant',
+        content: 'Visible answer'
+      }
+    ]);
+  });
+
+  it('does not merge thinking parts into native-vision assistant history content', () => {
+    const thinkingPart = createLanguageModelThinkingResponsePart('private reasoning');
+    if (!thinkingPart) {
+      throw new Error('Expected the VS Code test API to expose LanguageModelThinkingPart');
+    }
+
+    const request = adaptMessagesToRouterRequest({
+      selectedModel: selectedModel({ visionMode: 'native' }),
+      messages: [
+        {
+          role: 2,
+          content: [thinkingPart, new vscode.LanguageModelTextPart('Visible answer')]
+        }
+      ]
+    });
+
+    expect(request.messages).toEqual([
+      {
+        role: 'assistant',
+        content: [{ type: 'text', text: 'Visible answer' }]
+      }
+    ]);
+  });
+
+  it('omits an ordinary assistant history turn containing only thinking', () => {
+    const thinkingPart = createLanguageModelThinkingResponsePart('private reasoning');
+    if (!thinkingPart) {
+      throw new Error('Expected the VS Code test API to expose LanguageModelThinkingPart');
+    }
+
+    const request = adaptMessagesToRouterRequest({
+      selectedModel: selectedModel(),
+      messages: [{ role: 2, content: [thinkingPart] }]
+    });
+
+    expect(request.messages).toEqual([]);
+  });
+
+  it('omits a native-vision assistant history turn containing only thinking', () => {
+    const thinkingPart = createLanguageModelThinkingResponsePart('private reasoning');
+    if (!thinkingPart) {
+      throw new Error('Expected the VS Code test API to expose LanguageModelThinkingPart');
+    }
+
+    const request = adaptMessagesToRouterRequest({
+      selectedModel: selectedModel({ visionMode: 'native' }),
+      messages: [{ role: 2, content: [thinkingPart] }]
+    });
+
+    expect(request.messages).toEqual([]);
+  });
+
+  it('omits an assistant turn containing only thinking and usage metadata', () => {
+    const thinkingPart = createLanguageModelThinkingResponsePart('private reasoning');
+    if (!thinkingPart) {
+      throw new Error('Expected the VS Code test API to expose LanguageModelThinkingPart');
+    }
+
+    const usagePart = new vscode.LanguageModelDataPart(
+      new TextEncoder().encode('{"total_tokens":42}'),
+      'usage'
+    );
+    const request = adaptMessagesToRouterRequest({
+      selectedModel: selectedModel(),
+      messages: [{ role: 2, content: [thinkingPart, usagePart] }]
+    });
+
+    expect(request.messages).toEqual([]);
+  });
+
+  it('omits a native-vision assistant turn containing only thinking and usage metadata', () => {
+    const thinkingPart = createLanguageModelThinkingResponsePart('private reasoning');
+    if (!thinkingPart) {
+      throw new Error('Expected the VS Code test API to expose LanguageModelThinkingPart');
+    }
+
+    const usagePart = new vscode.LanguageModelDataPart(
+      new TextEncoder().encode('{"total_tokens":42}'),
+      'usage'
+    );
+    const request = adaptMessagesToRouterRequest({
+      selectedModel: selectedModel({ visionMode: 'native' }),
+      messages: [{ role: 2, content: [thinkingPart, usagePart] }]
+    });
+
+    expect(request.messages).toEqual([]);
   });
 
   it('preserves matching assistant tool calls and tool results', () => {

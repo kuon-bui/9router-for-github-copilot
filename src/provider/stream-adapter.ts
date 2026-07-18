@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import type { RouterStreamEvent } from '../types/router-contract';
+import { createLanguageModelThinkingResponsePart } from './reasoning-part-compat';
 
 interface ToolAccumulator {
   id?: string;
@@ -9,15 +10,54 @@ interface ToolAccumulator {
 
 export interface RouterEventEmitter {
   emit(event: RouterStreamEvent): void;
+  getReasoningSummary(): ReasoningStreamSummary;
+}
+
+export interface ReasoningStreamSummary {
+  receivedDeltas: number;
+  receivedCharacters: number;
+  emittedDeltas: number;
+  droppedDeltas: number;
+}
+
+interface RouterEventEmitterOptions {
+  createThinkingPart?: (value: string) => vscode.LanguageModelResponsePart | undefined;
 }
 
 export function createRouterEventEmitter(
-  progress: vscode.Progress<vscode.LanguageModelResponsePart>
+  progress: vscode.Progress<vscode.LanguageModelResponsePart>,
+  options: RouterEventEmitterOptions = {}
 ): RouterEventEmitter {
   const toolCalls = new Map<string, ToolAccumulator>();
+  const createThinkingPart =
+    options.createThinkingPart ?? createLanguageModelThinkingResponsePart;
+  const reasoningSummary: ReasoningStreamSummary = {
+    receivedDeltas: 0,
+    receivedCharacters: 0,
+    emittedDeltas: 0,
+    droppedDeltas: 0
+  };
 
   return {
     emit(event) {
+      if (event.type === 'reasoning-delta') {
+        reasoningSummary.receivedDeltas += 1;
+        reasoningSummary.receivedCharacters += event.text.length;
+
+        const part = createThinkingPart(event.text);
+        if (part) {
+          try {
+            progress.report(part);
+            reasoningSummary.emittedDeltas += 1;
+          } catch {
+            reasoningSummary.droppedDeltas += 1;
+          }
+        } else {
+          reasoningSummary.droppedDeltas += 1;
+        }
+        return;
+      }
+
       if (event.type === 'text-delta') {
         progress.report(new vscode.LanguageModelTextPart(event.text));
         return;
@@ -66,6 +106,9 @@ export function createRouterEventEmitter(
           return;
         }
       }
+    },
+    getReasoningSummary() {
+      return { ...reasoningSummary };
     }
   };
 }

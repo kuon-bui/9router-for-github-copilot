@@ -43,6 +43,7 @@ export interface RouterChatCompletionRequest {
 }
 
 export type RouterStreamEvent =
+  | { type: 'reasoning-delta'; text: string }
   | { type: 'text-delta'; text: string }
   | {
       type: 'usage';

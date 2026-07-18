@@ -145,6 +145,48 @@ describe('release guardrails', () => {
     }
   });
 
+  it('documents runtime-gated reasoning detail without adding a display setting', async () => {
+    const readme = await readFile(resolve(process.cwd(), 'README.md'), 'utf8');
+    const productionDesign = await readFile(
+      resolve(
+        process.cwd(),
+        'docs/superpowers/specs/2026-07-15-9router-copilot-chat-provider-production-design.md'
+      ),
+      'utf8'
+    );
+    const reasoningDesign = await readFile(
+      resolve(
+        process.cwd(),
+        'docs/superpowers/specs/2026-07-18-reasoning-detail-streaming-design.md'
+      ),
+      'utf8'
+    );
+    const thinkingModeDesign = await readFile(
+      resolve(
+        process.cwd(),
+        'docs/superpowers/specs/2026-07-16-thinking-mode-configuration-design.md'
+      ),
+      'utf8'
+    );
+
+    for (const document of [readme, productionDesign, reasoningDesign]) {
+      expect(document).toContain('reasoning_content');
+    }
+
+    expect(readme).toContain('proposed VS Code API');
+    expect(productionDesign).toContain('LanguageModelThinkingPart');
+    expect(reasoningDesign).toContain('LanguageModelThinkingPart');
+    expect(reasoningDesign).toContain('Reasoning stream diagnostic');
+    expect(reasoningDesign).toContain('cot_summary');
+
+    const properties = manifest.contributes.configuration.properties as Record<string, unknown>;
+    expect(properties).not.toHaveProperty('9router-copilot.reasoningDisplay');
+    expect(manifest).not.toHaveProperty('enabledApiProposals');
+    expect(reasoningDesign).toContain('safe drop');
+    expect(reasoningDesign).toContain('Do not replay thinking parts');
+    expect(thinkingModeDesign).toContain('supersedes only the first');
+  });
+
   it('keeps the VSIX package command explicit about local repository metadata', () => {
     const packageCommand = manifest.scripts.package;
     const hasRepositoryMetadata = 'repository' in manifest;

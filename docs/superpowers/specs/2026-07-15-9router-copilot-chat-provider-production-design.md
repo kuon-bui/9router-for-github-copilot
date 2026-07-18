@@ -33,6 +33,7 @@ Documented `9router` behavior that influences this design:
 - Support local per-user configuration of which display models appear in the picker.
 - Allow each local display model to map to an opaque `9router` `modelId`.
 - Keep the extension thin, streaming-first, and operationally simple.
+- Render router-provided reasoning through the native Copilot Chat thinking surface when the host supports it.
 - Provide a production path for tools, vision compatibility, diagnostics, and compatibility hardening.
 
 ## Non-Goals
@@ -167,6 +168,9 @@ When the user sends a prompt in Copilot Chat:
 
 The extension should:
 
+- normalize the canonical non-empty `delta.reasoning_content` string, plus documented string aliases at the SSE compatibility boundary, into one dedicated reasoning event before sibling visible text
+- forward reasoning immediately as a native thinking part when the running host supports it
+- drop reasoning safely, without converting it to visible text, when the host lacks the proposed thinking-part API
 - forward text deltas immediately to the host
 - preserve cancellation behavior
 - forward tool-related response parts when supported
@@ -227,7 +231,19 @@ Every valid published model exposes a `configurationSchema` navigation property 
 
 The validated model object's `thinkingMode` value supplies that model's schema default and request fallback. A valid `modelConfiguration.reasoningEffort` value overrides the local default for the current request; `none` maps to internal `off`, while the remaining values map directly.
 
-The extension keeps the configured `modelId` unchanged in `model`. For a non-`off` effective level, it sets the OpenAI-compatible `reasoning_effort` request field. `9router` owns provider-specific reasoning translation and compatibility policy. Reasoning deltas remain hidden.
+The extension keeps the configured `modelId` unchanged in `model`. For a non-`off` effective level, it sets the OpenAI-compatible `reasoning_effort` request field. `9router` owns provider-specific reasoning translation and compatibility policy. The request preference does not guarantee that the routed model will return reasoning deltas.
+
+### Native reasoning detail
+
+The primary response parser recognizes a non-empty OpenAI-compatible reasoning string and normalizes it as a `reasoning-delta`. The canonical field is `choices[0].delta.reasoning_content`; compatibility aliases are `cot_summary`, `reasoning_text`, `reasoning`, and `thinking`. The first populated string in the documented precedence order produces at most one event per frame. When a frame contains reasoning and visible content, reasoning is emitted first. Empty, malformed, or non-string reasoning values are ignored without failing otherwise valid response data. Both LF and CRLF SSE boundaries are supported across transport chunks.
+
+`LanguageModelThinkingPart` is a proposed VS Code API. A focused provider compatibility module probes for its constructor at runtime and confines the structural cast to that boundary. When available, every reasoning delta is reported immediately as a native thinking part. When unavailable, the extension drops only the reasoning delta and continues streaming visible text, usage, and tool calls. It never falls back to `LanguageModelTextPart`, adds no `enabledApiProposals` manifest entry, and adds no reasoning-display setting.
+
+Copilot Chat owns the collapsible presentation, grouping, and labels. The extension cannot guarantee a pixel-identical layout or generate host orchestration labels. Internal Vision proxy reasoning is not a primary user-facing response and is not rendered.
+
+Every started primary stream emits a safe minimal-threshold `Reasoning stream diagnostic` event, including streams with zero reasoning and streams terminated by cancellation or failure. The event contains only the effective thinking mode, terminal outcome, aggregate delta/character/emission/drop counts, curated display model id, and runtime thinking-part availability. It never contains reasoning text, prompts, raw SSE frames, or serialized parts.
+
+Thinking parts returned in prior host assistant messages are omitted from ordinary router message content and from image-bearing messages sent to the Vision proxy. Non-image response data such as usage metadata is omitted with them. If that leaves an ordinary assistant turn with no visible content, the empty turn is omitted as well. Replaying reasoning through a request-side `reasoning_content` field is out of scope unless `9router` later defines a canonical, provider-neutral history contract that requires it.
 
 ### Recommended behavior
 
@@ -387,7 +403,7 @@ Recommended debug levels:
   - token or latency summaries when available
 
 - `verbose`
-  - full request and response dumps
+  - deeper request and response diagnostics after redaction
   - only with redaction controls
   - only as an explicit debugging mode
 
@@ -397,7 +413,7 @@ Recommended observability surfaces:
 - structured debug events
 - optional dump files in extension storage
 
-Secrets must always be redacted from every logging path.
+Secrets must always be redacted from every logging path. Reasoning content is never diagnostic payload data, even at `verbose`. After a primary reasoning stream, diagnostics may record only the curated display model, received/emitted/dropped delta counts, received character count, and runtime thinking-part support state.
 
 ## Security Model
 
@@ -405,6 +421,7 @@ Secrets must always be redacted from every logging path.
 - Never place credentials in `settings.json`.
 - Keep verbose request dumps disabled by default.
 - Redact secrets and sensitive headers before persistence.
+- Never log, dump, or persist raw reasoning deltas.
 - Assume prompt content can be sensitive and avoid storing it outside explicit debug workflows.
 
 ## Performance Considerations
@@ -423,6 +440,8 @@ Secrets must always be redacted from every logging path.
 - combo mapping validation
 - request conversion
 - streaming parser behavior
+- reasoning-part runtime compatibility and safe drop behavior
+- omission of thinking parts from replayed assistant text
 - error classification
 - redaction logic
 
@@ -431,12 +450,14 @@ Secrets must always be redacted from every logging path.
 - provider registration
 - picker refresh on settings changes
 - text-only request round trip against a mocked `9router` endpoint
+- reasoning followed by visible text with metadata-only diagnostics
 - timeout and cancellation behavior
 
 ### Compatibility tests
 
 - selected VS Code versions
 - selected Copilot Chat versions
+- hosts with and without the proposed `LanguageModelThinkingPart` constructor
 - degraded behavior when host capabilities evolve
 
 ## Deployment and Runtime Model
@@ -473,6 +494,7 @@ This minimizes local operational burden and keeps installation simple for end us
 ### Phase 4: Vision and advanced capability handling
 
 - vision proxy
+- runtime-gated native reasoning detail
 - conservative capability gating
 - richer observability
 
@@ -496,6 +518,7 @@ This minimizes local operational burden and keeps installation simple for end us
 - The extension depends on stable combo ids from `9router`.
 - Capability signaling may be conservative until combo metadata is richer.
 - Vision proxying adds latency and operational complexity when enabled.
+- Native reasoning detail depends on a proposed host API and therefore degrades to hidden reasoning on unsupported hosts.
 - Host compatibility may still change across VS Code and Copilot Chat versions.
 
 ## References
@@ -514,6 +537,10 @@ This minimizes local operational burden and keeps installation simple for end us
   - https://github.com/github/copilot-language-server-release
 - VS Code Language Model API:
   - https://code.visualstudio.com/api/extension-guides/language-model
+- VS Code proposed thinking-part declaration:
+  - https://github.com/microsoft/vscode/blob/main/src/vscode-dts/vscode.proposed.languageModelThinkingPart.d.ts
+- Reasoning detail streaming design:
+  - `docs/superpowers/specs/2026-07-18-reasoning-detail-streaming-design.md`
 - Reference extension:
   - https://marketplace.visualstudio.com/items?itemName=Vizards.deepseek-v4-for-copilot
   - https://github.com/Vizards/deepseek-v4-for-copilot

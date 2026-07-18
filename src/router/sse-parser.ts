@@ -1,6 +1,23 @@
 import { NineRouterError } from './errors';
 import type { RouterStreamEvent } from '../types/router-contract';
 
+interface RouterSseDelta {
+  content?: string;
+  cot_summary?: unknown;
+  reasoning_text?: unknown;
+  reasoning_content?: unknown;
+  reasoning?: unknown;
+  thinking?: unknown;
+  tool_calls?: Array<{
+    index?: number;
+    id?: string;
+    function?: {
+      name?: string;
+      arguments?: string;
+    };
+  }>;
+}
+
 interface RouterSsePayload {
   id?: string;
   usage?: {
@@ -13,23 +30,13 @@ interface RouterSsePayload {
   };
   choices?: Array<{
     finish_reason?: string | null;
-    delta?: {
-      content?: string;
-      tool_calls?: Array<{
-        index?: number;
-        id?: string;
-        function?: {
-          name?: string;
-          arguments?: string;
-        };
-      }>;
-    };
+    delta?: RouterSseDelta;
   }>;
 }
 
 export function parseSseChunk(chunk: string): RouterStreamEvent[] {
   const frames = chunk
-    .split('\n\n')
+    .split(/\r?\n\r?\n/)
     .map((frame) => frame.trim())
     .filter((frame) => frame.length > 0);
 
@@ -38,7 +45,7 @@ export function parseSseChunk(chunk: string): RouterStreamEvent[] {
 
 function parseSseFrame(frame: string): RouterStreamEvent[] {
   const lines = frame
-    .split('\n')
+    .split(/\r?\n/)
     .map((line) => line.trim())
     .filter((line) => line.startsWith('data:'));
 
@@ -96,6 +103,11 @@ function parseSseFrame(frame: string): RouterStreamEvent[] {
     return events;
   }
 
+  const reasoning = getReasoningDelta(choice.delta);
+  if (reasoning) {
+    events.push({ type: 'reasoning-delta', text: reasoning });
+  }
+
   const text = choice.delta?.content;
   if (typeof text === 'string' && text.length > 0) {
     events.push({ type: 'text-delta', text });
@@ -149,6 +161,32 @@ function isNonNegativeInteger(value: unknown): value is number {
   return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
 }
 
+function getReasoningDelta(delta: RouterSseDelta | undefined): string | undefined {
+  if (!delta) {
+    return undefined;
+  }
+
+  const candidates = [
+    delta.cot_summary,
+    delta.reasoning_text,
+    delta.reasoning_content,
+    delta.reasoning,
+    delta.thinking
+  ];
+  return candidates.find(
+    (candidate): candidate is string => typeof candidate === 'string' && candidate.length > 0
+  );
+}
+
+function findSseFrameBoundary(buffer: string): { index: number; length: number } | undefined {
+  const match = /\r?\n\r?\n/.exec(buffer);
+  if (typeof match?.index !== 'number') {
+    return undefined;
+  }
+
+  return { index: match.index, length: match[0].length };
+}
+
 export async function* parseRouterEventStream(
   stream: ReadableStream<Uint8Array>
 ): AsyncIterable<RouterStreamEvent> {
@@ -163,14 +201,15 @@ export async function* parseRouterEventStream(
     }
 
     buffer += decoder.decode(value, { stream: true });
-    let boundaryIndex = buffer.indexOf('\n\n');
-    while (boundaryIndex >= 0) {
-      const frame = buffer.slice(0, boundaryIndex + 2);
-      buffer = buffer.slice(boundaryIndex + 2);
+    let boundary = findSseFrameBoundary(buffer);
+    while (boundary) {
+      const frameEnd = boundary.index + boundary.length;
+      const frame = buffer.slice(0, frameEnd);
+      buffer = buffer.slice(frameEnd);
       for (const event of parseSseChunk(frame)) {
         yield event;
       }
-      boundaryIndex = buffer.indexOf('\n\n');
+      boundary = findSseFrameBoundary(buffer);
     }
   }
 

@@ -9,7 +9,12 @@ import type {
 } from '../types/router-contract';
 import type { HostToolDefinition } from './tool-adapter';
 import type { HostChatRequestMessage } from './vision-proxy';
-import { createRouterImagePart, isHostImageDataPart } from './image-input-adapter';
+import {
+  createRouterImagePart,
+  isHostImageDataPart,
+  isHostNonImageDataPart
+} from './image-input-adapter';
+import { isLanguageModelThinkingPart } from './reasoning-part-compat';
 
 function mapRole(role: unknown): RouterMessage['role'] {
   if (role === 0 || role === 'system') {
@@ -34,6 +39,14 @@ function extractTextContent(content: HostChatRequestMessage['content']): string 
         return part;
       }
 
+      if (isLanguageModelThinkingPart(part)) {
+        return '';
+      }
+
+      if (isHostNonImageDataPart(part)) {
+        return '';
+      }
+
       if (typeof part === 'object' && part !== null && 'value' in part && typeof part.value === 'string') {
         return part.value;
       }
@@ -53,31 +66,39 @@ function adaptNativeVisionContent(content: HostChatRequestMessage['content']): R
     return content;
   }
 
-  return content.map((part): RouterContentPart => {
+  return content.flatMap((part): RouterContentPart[] => {
     if (typeof part === 'string') {
-      return { type: 'text', text: part };
+      return [{ type: 'text', text: part }];
+    }
+
+    if (isLanguageModelThinkingPart(part)) {
+      return [];
     }
 
     if (isHostImageDataPart(part)) {
-      return createRouterImagePart(part);
+      return [createRouterImagePart(part)];
+    }
+
+    if (isHostNonImageDataPart(part)) {
+      return [];
     }
 
     if (typeof part === 'object' && part !== null && 'value' in part && typeof part.value === 'string') {
-      return { type: 'text', text: part.value };
+      return [{ type: 'text', text: part.value }];
     }
 
     if (typeof part === 'object' && part !== null) {
-      return part as Record<string, unknown>;
+      return [part as Record<string, unknown>];
     }
 
-    return { type: 'text', text: String(part) };
+    return [{ type: 'text', text: String(part) }];
   });
 }
 
 function adaptOrdinaryMessage(
   message: HostChatRequestMessage,
   selectedModel: ConfiguredModel
-): RouterMessage {
+): RouterMessage | undefined {
   const routerMessage: RouterMessage = {
     role: mapRole(message.role),
     content:
@@ -85,6 +106,14 @@ function adaptOrdinaryMessage(
         ? adaptNativeVisionContent(message.content)
         : extractTextContent(message.content)
   };
+
+  if (
+    routerMessage.role === 'assistant' &&
+    (routerMessage.content === '' ||
+      (Array.isArray(routerMessage.content) && routerMessage.content.length === 0))
+  ) {
+    return undefined;
+  }
 
   if (message.name) {
     routerMessage.name = message.name;
@@ -286,7 +315,10 @@ export function adaptMessagesToRouterRequest(input: {
     }
 
     activeToolCallIds.clear();
-    messages.push(adaptOrdinaryMessage(message, input.selectedModel));
+    const routerMessage = adaptOrdinaryMessage(message, input.selectedModel);
+    if (routerMessage) {
+      messages.push(routerMessage);
+    }
   }
 
   const request: RouterChatCompletionRequest = {
