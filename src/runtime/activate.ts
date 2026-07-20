@@ -1,21 +1,35 @@
 import * as vscode from 'vscode';
-import { buildSettingsSnapshot, getExtensionConfiguration } from '../config/settings';
+import {
+  buildSettingsSnapshot,
+  getExtensionConfiguration,
+  loadRuntimeSettings
+} from '../config/settings';
 import { disposeOutputChannel } from '../debug/output-channel';
 import { createRouterClient } from '../router/client';
 import { NineRouterChatProvider } from '../provider/provider';
 import { registerCommands } from './commands';
+import { createVisionProxyConfigurator } from './vision-configuration';
 
 let providerRegistration: vscode.Disposable | undefined;
 let provider: NineRouterChatProvider | undefined;
 
 export async function activateExtension(context: vscode.ExtensionContext): Promise<void> {
+  const routerClient = createRouterClient({ fetch: globalThis.fetch });
+  const configureVisionProxy = createVisionProxyConfigurator({
+    secrets: context.secrets,
+    routerClient,
+    getRuntimeSettings: () => loadRuntimeSettings(getExtensionConfiguration())
+  });
+
   provider = new NineRouterChatProvider(
     context,
-    createRouterClient({ fetch: globalThis.fetch }),
-    buildSettingsSnapshot(getExtensionConfiguration())
+    routerClient,
+    buildSettingsSnapshot(getExtensionConfiguration()),
+    { configureVisionProxy }
   );
   registerCommands(context, {
-    getSettingsSnapshot: () => provider?.getSnapshot()
+    getSettingsSnapshot: () => provider?.getSnapshot(),
+    configureVisionProxy
   });
   providerRegistration = vscode.lm.registerLanguageModelChatProvider('9router', provider);
   context.subscriptions.push(providerRegistration);

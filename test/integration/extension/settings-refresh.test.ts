@@ -129,18 +129,52 @@ describe('NineRouterChatProvider snapshot refresh', () => {
     ).rejects.toMatchObject({ code: 'CONFIGURATION_ERROR' });
   });
 
-  it('refreshes proxy image capability when the shared Vision model is configured', async () => {
-    const snapshotWithProxy = (visionProxyModelId?: string) =>
+  it('requires source, model, and prompt before publishing proxy image capability', async () => {
+    const snapshotWithProxy = (overrides: Record<string, unknown> = {}) =>
       createSnapshot(
         [{ id: 'agent', name: 'Agent', modelId: 'router/agent', visionMode: 'proxy' }],
-        { visionProxyModelId }
+        overrides
       );
     const provider = new NineRouterChatProvider(context, routerClient, snapshotWithProxy());
 
     const initialModels = await provider.provideLanguageModelChatInformation({} as never, {} as never);
     expect(initialModels[0]?.capabilities.imageInput).toBeUndefined();
 
-    provider.refreshFromSnapshot(snapshotWithProxy('router/vision'));
+    provider.refreshFromSnapshot(
+      snapshotWithProxy({
+        visionProxySource: 'invalid-source',
+        visionProxyModelId: 'router/vision',
+        visionProxyPrompt: 'Describe image.'
+      })
+    );
+
+    const invalidSourceModels = await provider.provideLanguageModelChatInformation(
+      {} as never,
+      {} as never
+    );
+    expect(invalidSourceModels[0]?.capabilities.imageInput).toBeUndefined();
+
+    provider.refreshFromSnapshot(
+      snapshotWithProxy({
+        visionProxySource: '9router',
+        visionProxyModelId: 'router/vision',
+        visionProxyPrompt: '   '
+      })
+    );
+
+    const missingPromptModels = await provider.provideLanguageModelChatInformation(
+      {} as never,
+      {} as never
+    );
+    expect(missingPromptModels[0]?.capabilities.imageInput).toBeUndefined();
+
+    provider.refreshFromSnapshot(
+      snapshotWithProxy({
+        visionProxySource: 'copilot',
+        visionProxyModelId: 'copilot/vision',
+        visionProxyPrompt: 'Describe image.'
+      })
+    );
 
     const refreshedModels = await provider.provideLanguageModelChatInformation({} as never, {} as never);
     expect(refreshedModels[0]?.capabilities.imageInput).toBe(true);

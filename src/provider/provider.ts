@@ -9,12 +9,18 @@ import { createRouterEventEmitter } from './stream-adapter';
 import { createAbortSignalFromToken } from './cancellation';
 import { resolveEffectiveThinkingMode } from './thinking-effort';
 import { VisionProxyService } from './vision-proxy';
+import { hasImageParts } from './image-input-adapter';
 import type { RouterClient } from '../router/client';
 import type { SettingsSnapshot } from '../config/settings';
 import type { ConfiguredModel, PublishedModel } from '../types/product-model';
 import type { ModelConfigurationResponseOptions } from '../types/vscode-chat-compat';
 import type { HostToolDefinition } from './tool-adapter';
 import type { HostChatRequestMessage } from './vision-proxy';
+import type { VisionProxyConfigurator } from '../runtime/vision-configuration';
+
+interface NineRouterChatProviderOptions {
+  configureVisionProxy?: VisionProxyConfigurator;
+}
 
 function getRequestTools(options: unknown): readonly HostToolDefinition[] | undefined {
   if (typeof options !== 'object' || options === null || !('tools' in options)) {
@@ -50,14 +56,17 @@ export class NineRouterChatProvider
 {
   private readonly onDidChangeEmitter = new vscode.EventEmitter<void>();
   private readonly visionProxyService: VisionProxyService;
+  private readonly options: NineRouterChatProviderOptions;
 
   public readonly onDidChangeLanguageModelChatInformation = this.onDidChangeEmitter.event;
 
   public constructor(
     private readonly context: Pick<vscode.ExtensionContext, 'secrets'>,
     private readonly routerClient: RouterClient,
-    private snapshot: SettingsSnapshot = buildSettingsSnapshot(getExtensionConfiguration())
+    private snapshot: SettingsSnapshot = buildSettingsSnapshot(getExtensionConfiguration()),
+    options: NineRouterChatProviderOptions = {}
   ) {
+    this.options = options;
     this.visionProxyService = new VisionProxyService(routerClient);
   }
 
@@ -114,15 +123,36 @@ export class NineRouterChatProvider
       ...selectedModel,
       thinkingMode: effectiveThinking.thinkingMode
     };
+    const hasVisionInput = messages.some((message) => hasImageParts(message.content));
+    let visionProxySource = this.snapshot.runtime.visionProxySource;
+    let visionProxyModelId = this.snapshot.runtime.visionProxyModelId;
+    const needsVisionSetup =
+      requestSelectedModel.visionMode === 'proxy' &&
+      hasVisionInput &&
+      (!visionProxySource || visionProxyModelId.length === 0);
     const requestCancellation = createAbortSignalFromToken(token);
     const visionStartedAt = Date.now();
 
     try {
+      if (needsVisionSetup) {
+        const selection = await this.options.configureVisionProxy?.(token);
+        if (!selection) {
+          throw new NineRouterError(
+            'CONFIGURATION_ERROR',
+            'Vision proxy configuration was cancelled. Run 9router: Configure Vision Proxy before sending images.',
+            { details: { phase: 'vision-configuration' } }
+          );
+        }
+
+        visionProxySource = selection.source;
+        visionProxyModelId = selection.modelId;
+      }
+
       const visionResult = await this.visionProxyService.prepare({
         selectedModel: requestSelectedModel,
         messages: messages as readonly HostChatRequestMessage[],
-        visionProxySource: this.snapshot.runtime.visionProxySource,
-        visionProxyModelId: this.snapshot.runtime.visionProxyModelId,
+        visionProxySource,
+        visionProxyModelId,
         visionProxyPrompt: this.snapshot.runtime.visionProxyPrompt,
         baseUrl: this.snapshot.runtime.baseUrl,
         apiKey,

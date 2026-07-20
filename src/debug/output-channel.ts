@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { redactObject } from './redaction';
+import { isVisionProxyConfigured } from '../config/settings';
 import type { SettingsSnapshot } from '../config/settings';
 
 export type DebugMode = 'minimal' | 'metadata' | 'verbose';
@@ -57,7 +58,8 @@ export function formatSettingsSnapshotDiagnostics(snapshot: SettingsSnapshot): s
           requestTimeoutMs: snapshot.runtime.requestTimeoutMs,
           maxTokens: snapshot.runtime.maxTokens,
           debugMode: snapshot.runtime.debugMode,
-          visionProxyConfigured: snapshot.runtime.visionProxyModelId.length > 0
+          visionProxySource: snapshot.runtime.visionProxySource ?? 'none',
+          visionProxyConfigured: isVisionProxyConfigured(snapshot.runtime)
         })
       )}`
     : 'Runtime: invalid';

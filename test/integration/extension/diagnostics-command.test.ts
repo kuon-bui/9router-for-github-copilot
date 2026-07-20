@@ -39,7 +39,15 @@ describe('9routerCopilot.showDiagnostics', () => {
                 }
 
                 if (key === 'visionProxyModelId') {
-                  return 'combo/vision-private';
+                  return 'copilot/private-model-id';
+                }
+
+                if (key === 'visionProxySource') {
+                  return 'copilot';
+                }
+
+                if (key === 'visionProxyPrompt') {
+                  return 'private custom prompt';
                 }
 
                 return undefined;
@@ -54,8 +62,11 @@ describe('9routerCopilot.showDiagnostics', () => {
 
     expect(__getOutputLines().join('\n')).toContain('Snapshot state: degraded');
     expect(__getOutputLines().join('\n')).toContain('Rejected models: agent (INVALID_MODEL_MAPPING)');
-    expect(__getOutputLines().join('\n')).toContain('"visionProxyConfigured":true');
-    expect(__getOutputLines().join('\n')).not.toContain('combo/vision-private');
+    const output = __getOutputLines().join('\n');
+    expect(output).toContain('"visionProxySource":"copilot"');
+    expect(output).toContain('"visionProxyConfigured":true');
+    expect(output).not.toContain('copilot/private-model-id');
+    expect(output).not.toContain('private custom prompt');
   });
 
   it('reports one broken model without hiding unrelated valid models', () => {

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import * as vscode from 'vscode';
 import { NineRouterChatProvider } from '../../../src/provider/provider';
 import { NineRouterError } from '../../../src/router/errors';
@@ -7,7 +7,8 @@ import {
   __createCancellationToken,
   __getOutputLines,
   __resetVscodeState,
-  __setConfigurationValues
+  __setConfigurationValues,
+  __setSelectedChatModels
 } from '../../support/vscode';
 
 describe('NineRouterChatProvider', () => {
@@ -405,6 +406,275 @@ describe('NineRouterChatProvider', () => {
     expect(visible).toEqual(['Primary answer']);
   });
 
+  it('configures missing Vision analyzer and continues the current request', async () => {
+    __setConfigurationValues({
+      models: [
+        {
+          id: 'agent',
+          name: 'Agent',
+          modelId: 'router/agent',
+          visionMode: 'proxy'
+        }
+      ],
+      visionProxyPrompt: 'Describe image.',
+      baseUrl: 'https://router.example.com/v1',
+      maxTokens: 128,
+      requestTimeoutMs: 5_000,
+      debugMode: 'minimal'
+    });
+
+    const configureVisionProxy = vi.fn().mockResolvedValue({
+      source: '9router' as const,
+      modelId: 'router/vision'
+    });
+    const modelsCalled: string[] = [];
+    let primaryPayload = '';
+    const provider = new NineRouterChatProvider(
+      { secrets: { get: async () => 'token' } } as never,
+      {
+        async *streamChatCompletion(input: { request: RouterChatCompletionRequest }) {
+          modelsCalled.push(input.request.model);
+          if (input.request.model === 'router/vision') {
+            yield { type: 'text-delta', text: 'configured summary' };
+          } else {
+            primaryPayload = JSON.stringify(input.request.messages);
+            yield { type: 'text-delta', text: 'primary answer' };
+          }
+          yield { type: 'response-complete' };
+        }
+      } as never,
+      undefined,
+      { configureVisionProxy }
+    );
+
+    await provider.provideLanguageModelChatResponse(
+      {
+        id: 'agent',
+        name: 'Agent',
+        vendor: '9router',
+        family: 'agent',
+        version: '1',
+        maxInputTokens: 128_000,
+        maxOutputTokens: 8_192,
+        capabilities: { imageInput: true }
+      },
+      [
+        {
+          role: 1,
+          content: [{ mimeType: 'image/png', data: new Uint8Array([1]) }]
+        }
+      ] as never,
+      {} as never,
+      { report: () => undefined } as never,
+      __createCancellationToken().value as never
+    );
+
+    expect(configureVisionProxy).toHaveBeenCalledTimes(1);
+    expect(modelsCalled).toEqual(['router/vision', 'router/agent']);
+    expect(primaryPayload).toContain('configured summary');
+    expect(primaryPayload).not.toContain('data:image/png');
+  });
+
+  it('blocks the request when guided Vision setup is cancelled', async () => {
+    __setConfigurationValues({
+      models: [
+        {
+          id: 'agent',
+          name: 'Agent',
+          modelId: 'router/agent',
+          visionMode: 'proxy'
+        }
+      ],
+      visionProxyPrompt: 'Describe image.',
+      baseUrl: 'https://router.example.com/v1',
+      maxTokens: 128,
+      requestTimeoutMs: 5_000,
+      debugMode: 'minimal'
+    });
+
+    const configureVisionProxy = vi.fn().mockResolvedValue(undefined);
+    let calls = 0;
+    const provider = new NineRouterChatProvider(
+      { secrets: { get: async () => 'token' } } as never,
+      {
+        async *streamChatCompletion() {
+          calls += 1;
+          yield { type: 'response-complete' };
+        }
+      } as never,
+      undefined,
+      { configureVisionProxy }
+    );
+
+    await expect(
+      provider.provideLanguageModelChatResponse(
+        {
+          id: 'agent',
+          name: 'Agent',
+          vendor: '9router',
+          family: 'agent',
+          version: '1',
+          maxInputTokens: 128_000,
+          maxOutputTokens: 8_192,
+          capabilities: { imageInput: true }
+        },
+        [{ role: 1, content: [{ mimeType: 'image/png', data: new Uint8Array([1]) }] }] as never,
+        {} as never,
+        { report: () => undefined } as never,
+        __createCancellationToken().value as never
+      )
+    ).rejects.toMatchObject({
+      code: 'CONFIGURATION_ERROR',
+      details: expect.objectContaining({ phase: 'vision-configuration' })
+    });
+    expect(configureVisionProxy).toHaveBeenCalledTimes(1);
+    expect(calls).toBe(0);
+  });
+
+  it('blocks the request when guided Vision setup fails', async () => {
+    __setConfigurationValues({
+      models: [
+        {
+          id: 'agent',
+          name: 'Agent',
+          modelId: 'router/agent',
+          visionMode: 'proxy'
+        }
+      ],
+      visionProxyPrompt: 'Describe image.',
+      baseUrl: 'https://router.example.com/v1',
+      maxTokens: 128,
+      requestTimeoutMs: 5_000,
+      debugMode: 'minimal'
+    });
+
+    const configureVisionProxy = vi.fn(async () => {
+      throw new NineRouterError(
+        'CONFIGURATION_ERROR',
+        'vision setup failed',
+        { details: { phase: 'vision-configuration' } }
+      );
+    });
+    let calls = 0;
+    const provider = new NineRouterChatProvider(
+      { secrets: { get: async () => 'token' } } as never,
+      {
+        async *streamChatCompletion() {
+          calls += 1;
+          yield { type: 'response-complete' };
+        }
+      } as never,
+      undefined,
+      { configureVisionProxy }
+    );
+
+    await expect(
+      provider.provideLanguageModelChatResponse(
+        {
+          id: 'agent',
+          name: 'Agent',
+          vendor: '9router',
+          family: 'agent',
+          version: '1',
+          maxInputTokens: 128_000,
+          maxOutputTokens: 8_192,
+          capabilities: { imageInput: true }
+        },
+        [{ role: 1, content: [{ mimeType: 'image/png', data: new Uint8Array([1]) }] }] as never,
+        {} as never,
+        { report: () => undefined } as never,
+        __createCancellationToken().value as never
+      )
+    ).rejects.toMatchObject({
+      code: 'CONFIGURATION_ERROR',
+      details: expect.objectContaining({ phase: 'vision-configuration' })
+    });
+    expect(configureVisionProxy).toHaveBeenCalledTimes(1);
+    expect(calls).toBe(0);
+  });
+
+  it('uses Copilot Vision source without issuing a secondary 9router Vision request', async () => {
+    __setConfigurationValues({
+      models: [
+        {
+          id: 'agent',
+          name: 'Agent',
+          modelId: 'combo/agent',
+          visionMode: 'proxy'
+        }
+      ],
+      visionProxySource: 'copilot',
+      visionProxyModelId: 'copilot/vision',
+      visionProxyPrompt: 'Describe image.',
+      baseUrl: 'https://router.example.com/v1',
+      maxTokens: 128,
+      requestTimeoutMs: 5_000,
+      debugMode: 'minimal'
+    });
+
+    __setSelectedChatModels([
+      {
+        id: 'copilot/vision',
+        name: 'Copilot Vision',
+        family: 'gpt-4.1',
+        async sendRequest() {
+          return {
+            text: (async function* () {
+              yield 'native summary';
+            })()
+          };
+        }
+      }
+    ]);
+
+    const modelsCalled: string[] = [];
+    let primaryPayload = '';
+    const provider = new NineRouterChatProvider(
+      { secrets: { get: async () => 'token' } } as never,
+      {
+        async *streamChatCompletion(input: { request: RouterChatCompletionRequest }) {
+          modelsCalled.push(input.request.model);
+          if (input.request.model !== 'combo/agent') {
+            throw new Error(`unexpected model: ${input.request.model}`);
+          }
+          primaryPayload = JSON.stringify(input.request.messages);
+          yield { type: 'text-delta', text: 'primary answer' };
+          yield { type: 'response-complete' };
+        }
+      } as never
+    );
+
+    await provider.provideLanguageModelChatResponse(
+      {
+        id: 'agent',
+        name: 'Agent',
+        vendor: '9router',
+        family: 'agent',
+        version: '1',
+        maxInputTokens: 128_000,
+        maxOutputTokens: 8_192,
+        capabilities: { imageInput: true }
+      },
+      [
+        {
+          role: 1,
+          content: [
+            new vscode.LanguageModelTextPart('Explain this'),
+            { mimeType: 'image/png', data: new Uint8Array([1]) }
+          ]
+        }
+      ] as never,
+      {} as never,
+      { report: () => undefined } as never,
+      __createCancellationToken().value as never
+    );
+
+    expect(modelsCalled).toEqual(['combo/agent']);
+    expect(primaryPayload).toContain('[Vision proxy summary]');
+    expect(primaryPayload).toContain('native summary');
+    expect(primaryPayload).not.toContain('data:image/png');
+  });
+
   it('omits max_tokens from Vision and primary requests when maxTokens is zero', async () => {
     __setConfigurationValues({
       models: [
@@ -517,7 +787,7 @@ describe('NineRouterChatProvider', () => {
     expect(modelsCalled).toEqual(['combo/vision']);
   });
 
-  it('fails before any router call when the shared Vision model is empty', async () => {
+  it('fails before any router call when Vision setup cannot complete', async () => {
     __setConfigurationValues({
       models: [
         {
@@ -564,7 +834,7 @@ describe('NineRouterChatProvider', () => {
     ).rejects.toMatchObject({
       code: 'CONFIGURATION_ERROR',
       details: expect.objectContaining({
-        settingsKey: '9router-copilot.visionProxyModelId'
+        phase: 'vision-configuration'
       })
     });
     expect(calls).toBe(0);
@@ -587,6 +857,10 @@ describe('NineRouterChatProvider', () => {
       debugMode: 'minimal'
     });
     const modelsCalled: string[] = [];
+    const configureVisionProxy = vi.fn().mockResolvedValue({
+      source: '9router' as const,
+      modelId: 'combo/fallback'
+    });
     const provider = new NineRouterChatProvider(
       { secrets: { get: async () => 'token' } } as never,
       {
@@ -597,7 +871,9 @@ describe('NineRouterChatProvider', () => {
             details: { status: 404, responseText: 'must-not-leak' }
           });
         }
-      } as never
+      } as never,
+      undefined,
+      { configureVisionProxy }
     );
 
     const responsePromise = provider.provideLanguageModelChatResponse(
@@ -627,6 +903,7 @@ describe('NineRouterChatProvider', () => {
         settingsKey: '9router-copilot.visionProxyModelId'
       }
     });
+    expect(configureVisionProxy).not.toHaveBeenCalled();
     expect(modelsCalled).toEqual(['combo/vision']);
   });
 

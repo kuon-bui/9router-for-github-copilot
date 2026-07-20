@@ -188,7 +188,7 @@ function mapVisionProxyError(
     details.settingsKey = '9router-copilot.visionProxyModelId';
     return new NineRouterError(
       'CONFIGURATION_ERROR',
-      'The configured 9router Vision proxy model was not found. Update 9router-copilot.visionProxyModelId to a valid model id.',
+      'The configured Vision proxy model was not found. Update 9router-copilot.visionProxyModelId to a valid model id.',
       options
     );
   }
@@ -231,7 +231,7 @@ export class VisionProxyService {
     if (modelId.length === 0) {
       throw new NineRouterError(
         'CONFIGURATION_ERROR',
-        'Proxy Vision requires 9router-copilot.visionProxyModelId to reference an existing 9router model.',
+        'Proxy Vision requires 9router-copilot.visionProxyModelId to reference an existing Vision-capable model id.',
         {
           details: {
             phase: 'vision-proxy',
