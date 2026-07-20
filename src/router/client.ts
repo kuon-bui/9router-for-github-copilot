@@ -1,6 +1,8 @@
 import { NineRouterError } from './errors';
+import { parseVisionModels } from './model-catalog';
 import { parseRouterEventStream } from './sse-parser';
-import { buildChatCompletionsUrl } from './url';
+import { buildChatCompletionsUrl, buildModelsUrl } from './url';
+import type { RouterVisionModel } from './model-catalog';
 import type { RouterChatCompletionRequest, RouterStreamEvent } from '../types/router-contract';
 
 export interface RouterClient {
@@ -11,6 +13,12 @@ export interface RouterClient {
     timeoutMs: number;
     signal: AbortSignal;
   }): AsyncIterable<RouterStreamEvent>;
+  listVisionModels(input: {
+    baseUrl: string;
+    apiKey: string;
+    timeoutMs: number;
+    signal: AbortSignal;
+  }): Promise<RouterVisionModel[]>;
 }
 
 function createCompositeAbortSignal(signal: AbortSignal, timeoutMs: number): {
@@ -109,8 +117,83 @@ export function createRouterClient(deps: { fetch: typeof globalThis.fetch }): Ro
       } finally {
         composite.cleanup();
       }
+    },
+
+    async listVisionModels(input) {
+      const composite = createCompositeAbortSignal(input.signal, input.timeoutMs);
+
+      try {
+        const response = await deps.fetch(buildModelsUrl(input.baseUrl), {
+          method: 'GET',
+          headers: {
+            authorization: `Bearer ${input.apiKey}`
+          },
+          signal: composite.signal
+        });
+
+        const requestId = response.headers.get('x-request-id') ?? undefined;
+        if (!response.ok) {
+          throw classifyDiscoveryStatusError(response.status, requestId);
+        }
+
+        let payload: unknown;
+        try {
+          payload = await response.json();
+        } catch {
+          throw createMalformedCatalogError(requestId);
+        }
+
+        try {
+          return parseVisionModels(payload);
+        } catch (error) {
+          if (error instanceof NineRouterError) {
+            throw withRequestId(error, requestId);
+          }
+
+          throw createMalformedCatalogError(requestId);
+        }
+      } catch (error) {
+        if (composite.didTimeout()) {
+          throw new NineRouterError('TIMEOUT_ERROR', '9router request timed out');
+        }
+
+        if (input.signal.aborted) {
+          throw new NineRouterError('CANCELLATION_ERROR', '9router request was cancelled');
+        }
+
+        if (error instanceof NineRouterError) {
+          throw error;
+        }
+
+        if (error instanceof Error) {
+          throw new NineRouterError('TRANSPORT_ERROR', error.message);
+        }
+
+        throw new NineRouterError('TRANSPORT_ERROR', 'Unknown transport error');
+      } finally {
+        composite.cleanup();
+      }
     }
   };
+}
+
+function createMalformedCatalogError(requestId: string | undefined): NineRouterError {
+  return new NineRouterError(
+    'UPSTREAM_UNAVAILABLE',
+    '9router model catalog response is malformed',
+    buildErrorOptions(requestId, { phase: 'vision-model-discovery' })
+  );
+}
+
+function withRequestId(error: NineRouterError, requestId: string | undefined): NineRouterError {
+  if (!requestId || error.requestId) {
+    return error;
+  }
+
+  return new NineRouterError(error.code, error.message, {
+    requestId,
+    details: error.details
+  });
 }
 
 function extractRouterErrorMessage(responseText: string): string {
@@ -177,6 +260,27 @@ function classifyStatusError(status: number, requestId: string | undefined, resp
     return new NineRouterError(
       'UPSTREAM_UNAVAILABLE',
       '9router upstream execution is unavailable',
+      buildErrorOptions(requestId, details)
+    );
+  }
+
+  return new NineRouterError(
+    'TRANSPORT_ERROR',
+    `9router request failed with status ${status}`,
+    buildErrorOptions(requestId, details)
+  );
+}
+
+function classifyDiscoveryStatusError(status: number, requestId: string | undefined): NineRouterError {
+  const details = {
+    status,
+    phase: 'vision-model-discovery'
+  };
+
+  if (status === 401 || status === 403) {
+    return new NineRouterError(
+      'AUTHENTICATION_ERROR',
+      '9router authentication failed',
       buildErrorOptions(requestId, details)
     );
   }

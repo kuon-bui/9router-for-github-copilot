@@ -122,4 +122,110 @@ describe('createRouterClient', () => {
       message: '9router request failed with status 404'
     });
   });
+
+  it('gets /v1/models with bearer auth and filters Vision models', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: new Headers(),
+      json: async () => ({
+        object: 'list',
+        data: [
+          { id: 'router/vision', capabilities: { vision: true } },
+          { id: 'router/text', capabilities: { vision: false } }
+        ]
+      })
+    });
+
+    const client = createRouterClient({ fetch: fetchMock as never });
+
+    await expect(
+      client.listVisionModels({
+        baseUrl: 'https://router.example.com/v1',
+        apiKey: 'secret-token',
+        timeoutMs: 1000,
+        signal: new AbortController().signal
+      })
+    ).resolves.toEqual([{ id: 'router/vision' }]);
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://router.example.com/v1/models',
+      expect.objectContaining({
+        method: 'GET',
+        headers: expect.objectContaining({ authorization: 'Bearer secret-token' })
+      })
+    );
+  });
+
+  it('maps unauthorized discovery status to AUTHENTICATION_ERROR', async () => {
+    const client = createRouterClient({
+      fetch: vi.fn().mockResolvedValue({
+        ok: false,
+        status: 401,
+        headers: new Headers()
+      }) as never
+    });
+
+    await expect(
+      client.listVisionModels({
+        baseUrl: 'https://router.example.com',
+        apiKey: 'secret-token',
+        timeoutMs: 1000,
+        signal: new AbortController().signal
+      })
+    ).rejects.toMatchObject({ code: 'AUTHENTICATION_ERROR' });
+  });
+
+  it('maps model discovery timeout to TIMEOUT_ERROR', async () => {
+    const fetchMock = vi.fn().mockImplementation(
+      (_url: string, options: { signal?: AbortSignal } | undefined) =>
+        new Promise((_resolve, reject) => {
+          const signal = options?.signal;
+          if (signal?.aborted) {
+            reject(signal.reason ?? new Error('aborted'));
+            return;
+          }
+
+          signal?.addEventListener(
+            'abort',
+            () => {
+              reject(signal.reason ?? new Error('aborted'));
+            },
+            { once: true }
+          );
+        })
+    );
+
+    const client = createRouterClient({ fetch: fetchMock as never });
+
+    await expect(
+      client.listVisionModels({
+        baseUrl: 'https://router.example.com',
+        apiKey: 'secret-token',
+        timeoutMs: 5,
+        signal: new AbortController().signal
+      })
+    ).rejects.toMatchObject({ code: 'TIMEOUT_ERROR' });
+  });
+
+  it('maps caller cancellation during discovery to CANCELLATION_ERROR', async () => {
+    const controller = new AbortController();
+    controller.abort(new Error('cancelled by caller'));
+
+    const fetchMock = vi.fn().mockImplementation(
+      (_url: string, options: { signal?: AbortSignal } | undefined) =>
+        Promise.reject(options?.signal?.reason ?? new Error('aborted'))
+    );
+
+    const client = createRouterClient({ fetch: fetchMock as never });
+
+    await expect(
+      client.listVisionModels({
+        baseUrl: 'https://router.example.com',
+        apiKey: 'secret-token',
+        timeoutMs: 1000,
+        signal: controller.signal
+      })
+    ).rejects.toMatchObject({ code: 'CANCELLATION_ERROR' });
+  });
 });
