@@ -186,7 +186,9 @@ Recommended configuration keys:
 
 - `9router-copilot.baseUrl`
 - `9router-copilot.models`: ordered objects containing `id`, `name`, `modelId`, `toolMode`, `visionMode`, `thinkingMode`, `maxInputTokens`, and `maxOutputTokens`
+- `9router-copilot.visionProxySource`
 - `9router-copilot.visionProxyModelId`
+- `9router-copilot.visionProxyPrompt`
 - `9router-copilot.maxTokens`
 - `9router-copilot.requestTimeoutMs`
 - `9router-copilot.debugMode`
@@ -305,27 +307,67 @@ If a mapped combo is not approved for tools, the extension should degrade gracef
 
 ## Vision Compatibility Strategy
 
-Some `9router` models may not reliably support native multimodal input. To avoid blocking image-driven workflows entirely, the extension supports a Vision proxy path through one shared `9router` model configured by `9router-copilot.visionProxyModelId`.
+Some `9router` models may not reliably support native multimodal input. To preserve image workflows while keeping `9router` as the primary routing authority, proxy-mode image analysis uses one shared analyzer selected from either `9router` or native `GitHub Copilot`.
 
-Recommended vision proxy flow:
+### Shared Vision proxy configuration
+
+Proxy mode uses three flat settings:
+
+- `9router-copilot.visionProxySource`: `9router` or `copilot`
+- `9router-copilot.visionProxyModelId`: opaque id from the selected source
+- `9router-copilot.visionProxyPrompt`: full analyzer instruction (editable; default prompt is built in)
+
+Legacy migration remains compatibility-safe: if `visionProxySource` is unset and `visionProxyModelId` is non-empty, runtime treats the source as `9router`.
+
+### Guided setup and automatic setup
+
+The extension contributes command `9routerCopilot.configureVisionProxy` with the display title `9router: Configure Vision Proxy`. The same flow is used when proxy-mode image requests arrive without a usable source/model configuration.
+
+1. select source (`9router` or `GitHub Copilot`)
+2. select model from that source
+3. persist User settings in order: `visionProxyModelId`, then `visionProxySource`
+
+If setup succeeds, the current request continues immediately with the returned selection. If setup is cancelled or fails, the request stops with an actionable configuration error.
+
+### 9router analyzer discovery
+
+For `9router` source, discovery uses authenticated `GET /v1/models` and treats the response as untrusted JSON. Candidates are retained only when:
+
+- `id` is a non-empty string
+- `capabilities` is an object
+- `capabilities.vision === true`
+
+Results are deduplicated by exact `id` and sorted before Quick Pick display.
+
+### Native Copilot analyzer discovery
+
+For `copilot` source, discovery uses `vscode.lm.selectChatModels({ vendor: 'copilot' })`.
+
+Stable VS Code consumer APIs do not expose image capability metadata on selected models. The extension therefore does not infer support from model names and does not publish guessed capability flags. Compatibility is enforced at runtime by the native request result for the exact selected model id.
+
+### Runtime flow and boundaries
+
+Recommended proxy flow:
 
 1. detect image attachments in the host request
 2. check the selected display model's local `visionMode` configuration
 3. send image inputs directly to `9router` when `visionMode` is `native`
-4. when `visionMode` is `proxy`, have `VisionProxyService` process each image-bearing message sequentially through the shared model from `9router-copilot.visionProxyModelId`
-5. use `image-input-adapter.ts` to convert each VS Code `LanguageModelDataPart` into an OpenAI-compatible `image_url` data URL; batch multiple images from the same message into one Vision request
-6. replace the raw images in each successfully processed message with a `[Vision proxy summary]` text block
-7. send the transformed conversation to the selected display model's primary `9router` combo
-8. block image inputs when `visionMode` is `off`
-9. mark the request as native-vision, vision-proxied, or vision-blocked in diagnostics when debug mode allows it
+4. when `visionMode` is `proxy`, run guided setup if source/model is missing
+5. run `VisionProxyService` per image-bearing message, sequentially, through the selected analyzer source
+6. convert VS Code `LanguageModelDataPart` values into OpenAI-compatible `image_url` data URLs for proxy requests
+7. require a non-empty textual summary, replace raw images with `[Vision proxy summary]`
+8. send the transformed conversation to the selected display model's primary `9router` combo
+9. block image input when `visionMode` is `off`
 
-The shared combo must already exist in `9router` and accept `image_url` data URLs. One sequential Vision request runs per image-bearing message. Tools and Thinking Effort are omitted from Vision-stage requests and apply only to the primary request. Diagnostics may record counts, timing, outcomes, and request ids, but must never contain image data, prompt content, or Vision proxy summary content.
+Tools and Thinking Effort are omitted from Vision-stage analyzer requests and remain primary-request concerns.
 
-All Vision-stage errors are fail-closed. A missing shared combo, 404, timeout, cancellation, malformed stream, or upstream error stops processing, and the transformed request must not reach the primary combo. The extension must not retry images through the primary combo or create local MIME, size, routing, or fallback policy.
+### Fail-closed and privacy
 
-This keeps the UX coherent, but it comes with higher cost and latency. Vision proxying should therefore be explicit, optional, operationally visible, and independently testable through `VisionProxyService` and `image-input-adapter.ts`.
+Vision analysis is fail-closed across discovery, setup, and execution. Missing or stale model ids, consent/quota rejection, 404, timeout, cancellation, malformed streams, and upstream failures all stop processing before the primary request is submitted.
 
-Native vision remains explicit and must be configured only for display models whose mapped `9router` combo is confirmed to accept image inputs directly. Proxy mode is reserved for text-only primary combos that need image inputs converted to textual context before reaching `9router`. In both modes, `9router` retains ownership of combo routing, provider selection, and fallback behavior.
+Diagnostics may include safe metadata such as source, model id, counts, timing, and request ids. Diagnostics must never include prompt content, image bytes, data URLs, source message text, API keys, or proxy summaries.
+
+This keeps UX coherent while preserving explicit operational control and testability through focused vision adapters.
 
 ## Reliability and Error Handling
 

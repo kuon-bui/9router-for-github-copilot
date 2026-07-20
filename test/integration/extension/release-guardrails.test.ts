@@ -99,7 +99,18 @@ describe('release guardrails', () => {
     }
     expect(readme).toContain('9router-copilot.models');
     expect(readme).toContain('"modelId"');
-    expect(readme).toContain('9router-copilot.visionProxyModelId');
+    for (const text of [
+      '9router-copilot.visionProxySource',
+      '9router-copilot.visionProxyModelId',
+      '9router-copilot.visionProxyPrompt',
+      '9router: Configure Vision Proxy',
+      'capabilities.vision',
+      'GitHub Copilot'
+    ]) {
+      expect(readme).toContain(text);
+      expect(productionDesign).toContain(text);
+    }
+    expect(readme).toContain('GET /v1/models');
     expect(readme).toContain('Breaking configuration change');
     expect(readme).toContain('toolMode');
     expect(readme).toContain('visionMode');

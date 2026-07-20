@@ -47,7 +47,9 @@ Configuration is local per user under the `9router-copilot` namespace. Array ord
       "maxOutputTokens": 8192
     }
   ],
-  "9router-copilot.visionProxyModelId": "",
+  "9router-copilot.visionProxySource": "9router",
+  "9router-copilot.visionProxyModelId": "provider/vision-model",
+  "9router-copilot.visionProxyPrompt": "Describe the supplied images faithfully for another language model. Include visible text, code, tables, diagrams, layout, and uncertainty. Do not answer the user request; provide only image context.",
   "9router-copilot.maxTokens": 0,
   "9router-copilot.requestTimeoutMs": 60000,
   "9router-copilot.debugMode": "minimal"
@@ -79,10 +81,24 @@ Models default to `toolMode: "off"`; the manifest's initial `agent` example expl
 ### Vision
 
 - `native`: Send image input directly to the selected model.
-- `proxy`: Summarize each image-bearing message with the shared model configured by `9router-copilot.visionProxyModelId`, replace the raw image with a `[Vision proxy summary]`, then call the selected model.
+- `proxy`: Summarize each image-bearing message with one shared analyzer, replace the raw image with a `[Vision proxy summary]`, then call the selected model.
 - `off`: Reject image input.
 
-The proxy model must accept OpenAI-compatible `image_url` data URLs. Proxy mode is fail-closed: a missing model, 404, timeout, cancellation, malformed stream, or upstream error stops the request before the primary model is called. Diagnostics contain safe counts and timing only, never image data, prompts, API keys, raw response bodies, or proxy summaries.
+Shared analyzer settings:
+
+- `9router-copilot.visionProxySource`: `9router` or `copilot`
+- `9router-copilot.visionProxyModelId`: opaque model id selected from the chosen source
+- `9router-copilot.visionProxyPrompt`: complete analyzer instruction (default prompt is editable in Settings)
+
+Use `9router: Configure Vision Proxy` to configure source and model with Quick Pick, or let the extension run the same wizard automatically when a `visionMode: "proxy"` request arrives with missing source or model id.
+
+When source is `9router`, the wizard uses authenticated `GET /v1/models` discovery and keeps only models where `capabilities.vision === true`, then deduplicates and sorts by `id`.
+
+When source is native `GitHub Copilot`, the wizard uses `vscode.lm.selectChatModels({ vendor: 'copilot' })`. The stable selector does not expose capability metadata, so the extension does not guess by model name and enforces compatibility at runtime.
+
+Legacy migration is fail-safe: if `9router-copilot.visionProxySource` is unset but `9router-copilot.visionProxyModelId` is already populated, runtime interprets it as `9router`.
+
+Proxy mode is fail-closed: discovery errors, missing/stale analyzer ids, consent/quota rejection, timeout, cancellation, malformed stream, or upstream failures stop the request before the primary model is called. Privacy exclusions are strict: diagnostics contain safe counts and timing only, never image data, prompt content, source message text, API keys, raw response bodies, or proxy summaries.
 
 ### Thinking Effort
 
@@ -104,7 +120,7 @@ Common fixes:
 - Invalid base URL: use an `http` or `https` URL that ends at, or can normalize to, `/v1`.
 - Missing model: update the affected object's `modelId` to an existing 9router model.
 - Image input blocked: set that object's `visionMode` to `native` or `proxy` only when supported.
-- Missing Vision proxy: configure `9router-copilot.visionProxyModelId`; proxy mode remains fail-closed until then.
+- Missing Vision proxy: run `9router: Configure Vision Proxy` (or set `9router-copilot.visionProxySource`, `9router-copilot.visionProxyModelId`, and optionally `9router-copilot.visionProxyPrompt` directly); proxy mode remains fail-closed until configuration is complete.
 - Invalid thinking mode: use `off`, `minimal`, `low`, `medium`, `high`, `xhigh`, or `max`.
 - Suffixed model id: remove the `(level)` suffix and set `thinkingMode` separately.
 
