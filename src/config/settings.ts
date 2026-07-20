@@ -81,7 +81,9 @@ export function normalizeVisionProxySource(
     return source;
   }
 
-  return source === undefined && modelId.length > 0 ? '9router' : undefined;
+  return (source === undefined || source === DEFAULT_VISION_PROXY_SOURCE) && modelId.length > 0
+    ? '9router'
+    : undefined;
 }
 
 export function isVisionProxyConfigured(runtime: RuntimeSettings): boolean {

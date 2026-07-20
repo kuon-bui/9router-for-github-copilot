@@ -62,6 +62,19 @@ describe('runtime settings', () => {
 
     expect(runtime.visionProxySource).toBe('9router');
   });
+
+  it('treats an empty manifest source with a configured model as 9router', () => {
+    const runtime = loadRuntimeSettings(
+      configuration({
+        visionProxySource: '',
+        visionProxyModelId: 'router/vision',
+        visionProxyPrompt: 'Describe images faithfully.'
+      })
+    );
+
+    expect(runtime.visionProxySource).toBe('9router');
+    expect(isVisionProxyConfigured(runtime)).toBe(true);
+  });
 });
 
 describe('max token normalization', () => {
