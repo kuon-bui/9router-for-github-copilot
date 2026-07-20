@@ -72,7 +72,15 @@ export function parseVisionModels(payload: unknown): RouterVisionModel[] {
       continue;
     }
 
-    byId.set(parsed.id, parsed.ownedBy ? { id: parsed.id, ownedBy: parsed.ownedBy } : { id: parsed.id });
+    const existing = byId.get(parsed.id);
+    if (!existing) {
+      byId.set(parsed.id, parsed.ownedBy ? { id: parsed.id, ownedBy: parsed.ownedBy } : { id: parsed.id });
+      continue;
+    }
+
+    if (!existing.ownedBy && parsed.ownedBy) {
+      byId.set(parsed.id, { id: parsed.id, ownedBy: parsed.ownedBy });
+    }
   }
 
   return [...byId.values()].sort((left, right) => left.id.localeCompare(right.id));

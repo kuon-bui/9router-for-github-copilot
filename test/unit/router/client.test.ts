@@ -176,36 +176,111 @@ describe('createRouterClient', () => {
     ).rejects.toMatchObject({ code: 'AUTHENTICATION_ERROR' });
   });
 
-  it('maps model discovery timeout to TIMEOUT_ERROR', async () => {
-    const fetchMock = vi.fn().mockImplementation(
-      (_url: string, options: { signal?: AbortSignal } | undefined) =>
-        new Promise((_resolve, reject) => {
-          const signal = options?.signal;
-          if (signal?.aborted) {
-            reject(signal.reason ?? new Error('aborted'));
-            return;
-          }
+  it('maps discovery JSON parsing failures to UPSTREAM_UNAVAILABLE without raw body details', async () => {
+    const client = createRouterClient({
+      fetch: vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        headers: new Headers({ 'x-request-id': 'req-json-parse' }),
+        json: async () => {
+          throw new SyntaxError('Unexpected token <');
+        }
+      }) as never
+    });
 
-          signal?.addEventListener(
-            'abort',
-            () => {
-              reject(signal.reason ?? new Error('aborted'));
-            },
-            { once: true }
-          );
-        })
+    const result = client.listVisionModels({
+      baseUrl: 'https://router.example.com',
+      apiKey: 'secret-token',
+      timeoutMs: 1000,
+      signal: new AbortController().signal
+    });
+
+    await expect(result).rejects.toMatchObject({
+      code: 'UPSTREAM_UNAVAILABLE',
+      requestId: 'req-json-parse',
+      details: { phase: 'vision-model-discovery' }
+    });
+
+    const error = await result.catch(
+      (caught: unknown) => caught as { details?: Record<string, unknown> }
     );
+    expect(error.details).not.toHaveProperty('responseText');
+    expect(error.details).not.toHaveProperty('rawBody');
+  });
 
-    const client = createRouterClient({ fetch: fetchMock as never });
+  it('maps malformed discovery payload roots to UPSTREAM_UNAVAILABLE without raw body details', async () => {
+    const client = createRouterClient({
+      fetch: vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        headers: new Headers(),
+        json: async () => ({ data: null })
+      }) as never
+    });
 
-    await expect(
-      client.listVisionModels({
+    const result = client.listVisionModels({
+      baseUrl: 'https://router.example.com',
+      apiKey: 'secret-token',
+      timeoutMs: 1000,
+      signal: new AbortController().signal
+    });
+
+    await expect(result).rejects.toMatchObject({
+      code: 'UPSTREAM_UNAVAILABLE',
+      details: { phase: 'vision-model-discovery' }
+    });
+
+    const error = await result.catch(
+      (caught: unknown) => caught as { details?: Record<string, unknown> }
+    );
+    expect(error.details).not.toHaveProperty('responseText');
+    expect(error.details).not.toHaveProperty('rawBody');
+  });
+
+  it('maps model discovery timeout to TIMEOUT_ERROR', async () => {
+    vi.useFakeTimers();
+
+    try {
+      const fetchMock = vi.fn().mockImplementation(
+        (_url: string, options: { signal?: AbortSignal } | undefined) =>
+          new Promise((_resolve, reject) => {
+            const signal = options?.signal;
+            if (!signal) {
+              reject(new Error('Missing abort signal'));
+              return;
+            }
+
+            if (signal.aborted) {
+              reject(signal.reason ?? new Error('aborted'));
+              return;
+            }
+
+            signal.addEventListener(
+              'abort',
+              () => {
+                reject(signal.reason ?? new Error('aborted'));
+              },
+              { once: true }
+            );
+          })
+      );
+
+      const client = createRouterClient({ fetch: fetchMock as never });
+      const result = client.listVisionModels({
         baseUrl: 'https://router.example.com',
         apiKey: 'secret-token',
-        timeoutMs: 5,
+        timeoutMs: 1000,
         signal: new AbortController().signal
-      })
-    ).rejects.toMatchObject({ code: 'TIMEOUT_ERROR' });
+      });
+
+      const rejection = expect(result).rejects.toMatchObject({ code: 'TIMEOUT_ERROR' });
+
+      await vi.advanceTimersByTimeAsync(1000);
+      await rejection;
+    } finally {
+      vi.clearAllTimers();
+      vi.useRealTimers();
+    }
   });
 
   it('maps caller cancellation during discovery to CANCELLATION_ERROR', async () => {

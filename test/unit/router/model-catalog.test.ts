@@ -22,6 +22,23 @@ describe('parseVisionModels', () => {
     ]);
   });
 
+  it('preserves ownedBy metadata across duplicate ids', () => {
+    expect(
+      parseVisionModels({
+        object: 'list',
+        data: [
+          { id: 'router/first', owned_by: 'team-first', capabilities: { vision: true } },
+          { id: 'router/first', capabilities: { vision: true } },
+          { id: 'router/second', capabilities: { vision: true } },
+          { id: 'router/second', owned_by: 'team-second', capabilities: { vision: true } }
+        ]
+      })
+    ).toEqual([
+      { id: 'router/first', ownedBy: 'team-first' },
+      { id: 'router/second', ownedBy: 'team-second' }
+    ]);
+  });
+
   it.each([null, {}, { data: null }, { data: {} }])('rejects malformed root %j', (payload) => {
     expect(() => parseVisionModels(payload)).toThrowError(
       expect.objectContaining({ code: 'UPSTREAM_UNAVAILABLE' })
