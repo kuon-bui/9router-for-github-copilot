@@ -112,20 +112,25 @@ export class CopilotVisionAnalyzer {
       throw createCancellationError();
     }
 
-    const models = await this.dependencies.selectChatModels({
-      vendor: 'copilot',
-      id: input.modelId
-    });
-    const model = models.find((candidate) => candidate.id === input.modelId);
+    let model: vscode.LanguageModelChat | undefined;
+    try {
+      const models = await this.dependencies.selectChatModels({
+        vendor: 'copilot',
+        id: input.modelId
+      });
+      model = models.find((candidate) => candidate.id === input.modelId);
 
-    if (!model) {
-      throw new NineRouterError(
-        'CONFIGURATION_ERROR',
-        'Configured GitHub Copilot Vision model is unavailable. Run 9router: Configure Vision Proxy.',
-        {
-          details: createPhaseDetails()
-        }
-      );
+      if (!model) {
+        throw new NineRouterError(
+          'CONFIGURATION_ERROR',
+          'Configured GitHub Copilot Vision model is unavailable. Run 9router: Configure Vision Proxy.',
+          {
+            details: createPhaseDetails()
+          }
+        );
+      }
+    } catch (error) {
+      throw mapCopilotVisionError(error);
     }
 
     if (input.token.isCancellationRequested) {

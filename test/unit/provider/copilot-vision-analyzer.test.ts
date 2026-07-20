@@ -138,6 +138,135 @@ describe('CopilotVisionAnalyzer', () => {
     });
   });
 
+  it('maps selectChatModels NoPermissions to AUTHENTICATION_ERROR without raw cause leakage', async () => {
+    const promptSecret = 'prompt-secret';
+    const sourceSecret = 'local context secret';
+    const rawCauseSecret = 'raw-cause-secret';
+    const partialSecret = 'partial-summary-secret';
+    const analyzer = new CopilotVisionAnalyzer({
+      selectChatModels: async () => {
+        throw Object.assign(
+          new Error(`${rawCauseSecret} ${promptSecret} ${sourceSecret} ${partialSecret}`),
+          {
+            code: 'NoPermissions'
+          }
+        );
+      }
+    });
+
+    const promise = analyzer.summarize({
+      message: createMessage(),
+      modelId: 'copilot/vision',
+      prompt: promptSecret,
+      token: createToken()
+    });
+
+    await expect(promise).rejects.toMatchObject({
+      code: 'AUTHENTICATION_ERROR',
+      details: { phase: 'vision-proxy', source: 'copilot' }
+    });
+    await expectNoSecretLeak(promise, [
+      promptSecret,
+      sourceSecret,
+      'image/png',
+      rawCauseSecret,
+      partialSecret
+    ]);
+  });
+
+  it('maps selectChatModels NotFound to CONFIGURATION_ERROR without raw cause leakage', async () => {
+    const promptSecret = 'prompt-secret';
+    const sourceSecret = 'local context secret';
+    const rawCauseSecret = 'raw-cause-secret';
+    const analyzer = new CopilotVisionAnalyzer({
+      selectChatModels: async () => {
+        throw Object.assign(new Error(`${rawCauseSecret} ${promptSecret} ${sourceSecret}`), {
+          code: 'NotFound'
+        });
+      }
+    });
+
+    const promise = analyzer.summarize({
+      message: createMessage(),
+      modelId: 'copilot/vision',
+      prompt: promptSecret,
+      token: createToken()
+    });
+
+    await expect(promise).rejects.toMatchObject({
+      code: 'CONFIGURATION_ERROR',
+      details: { phase: 'vision-proxy', source: 'copilot' }
+    });
+    await expectNoSecretLeak(promise, [promptSecret, sourceSecret, 'image/png', rawCauseSecret]);
+  });
+
+  it('maps selectChatModels Blocked to UPSTREAM_UNAVAILABLE without raw cause leakage', async () => {
+    const promptSecret = 'prompt-secret';
+    const sourceSecret = 'local context secret';
+    const rawCauseSecret = 'raw-cause-secret';
+    const analyzer = new CopilotVisionAnalyzer({
+      selectChatModels: async () => {
+        throw Object.assign(new Error(`${rawCauseSecret} ${promptSecret} ${sourceSecret}`), {
+          code: 'Blocked'
+        });
+      }
+    });
+
+    const promise = analyzer.summarize({
+      message: createMessage(),
+      modelId: 'copilot/vision',
+      prompt: promptSecret,
+      token: createToken()
+    });
+
+    await expect(promise).rejects.toMatchObject({
+      code: 'UPSTREAM_UNAVAILABLE',
+      details: { phase: 'vision-proxy', source: 'copilot' }
+    });
+    await expectNoSecretLeak(promise, [promptSecret, sourceSecret, 'image/png', rawCauseSecret]);
+  });
+
+  it('maps unknown selectChatModels errors to UPSTREAM_UNAVAILABLE without leaking cause fields', async () => {
+    const promptSecret = 'prompt-secret';
+    const sourceSecret = 'local context secret';
+    const rawCauseSecret = 'raw-cause-secret';
+    const partialSecret = 'partial-summary-secret';
+    const analyzer = new CopilotVisionAnalyzer({
+      selectChatModels: async () => {
+        const failure = new Error(rawCauseSecret);
+        Object.assign(failure, {
+          cause: {
+            prompt: promptSecret,
+            source: sourceSecret,
+            image: 'data:image/png;base64,YQ==',
+            partial: partialSecret
+          }
+        });
+        throw failure;
+      }
+    });
+
+    const promise = analyzer.summarize({
+      message: createMessage(),
+      modelId: 'copilot/vision',
+      prompt: promptSecret,
+      token: createToken()
+    });
+
+    await expect(promise).rejects.toMatchObject({
+      code: 'UPSTREAM_UNAVAILABLE',
+      details: { phase: 'vision-proxy', source: 'copilot' }
+    });
+    await expectNoSecretLeak(promise, [
+      promptSecret,
+      sourceSecret,
+      'image/png',
+      rawCauseSecret,
+      partialSecret,
+      'data:image/png;base64,YQ=='
+    ]);
+  });
+
   it('maps NoPermissions to AUTHENTICATION_ERROR without prompt leakage', async () => {
     const promptSecret = 'prompt-secret';
     const sourceSecret = 'local context secret';
