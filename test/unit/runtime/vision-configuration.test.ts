@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
+import * as vscode from 'vscode';
 import { loadRuntimeSettings } from '../../../src/config/settings';
+import { NineRouterError } from '../../../src/router/errors';
 import { createVisionProxyConfigurator } from '../../../src/runtime/vision-configuration';
 import {
   __createCancellationToken,
@@ -8,6 +10,42 @@ import {
   __setQuickPickValues,
   __setSelectedChatModels
 } from '../../support/vscode';
+
+const defaultSelectChatModels = vscode.lm.selectChatModels;
+
+function setSelectChatModels(fn: typeof vscode.lm.selectChatModels): void {
+  (
+    vscode.lm as unknown as {
+      selectChatModels: typeof vscode.lm.selectChatModels;
+    }
+  ).selectChatModels = fn;
+}
+
+async function expectMappedSafeError(
+  promise: Promise<unknown>,
+  expectedCode: NineRouterError['code'],
+  forbiddenValues: readonly string[]
+): Promise<void> {
+  const failure = await promise.catch((error: unknown) => error);
+  expect(failure).toBeInstanceOf(NineRouterError);
+
+  const error = failure as NineRouterError;
+  expect(error.code).toBe(expectedCode);
+  expect(error.details).toMatchObject({
+    phase: 'vision-configuration',
+    source: 'copilot'
+  });
+
+  const exposed = JSON.stringify({
+    message: error.message,
+    requestId: error.requestId,
+    details: error.details
+  });
+
+  for (const forbidden of forbiddenValues) {
+    expect(exposed).not.toContain(forbidden);
+  }
+}
 
 function configuration(values: Record<string, unknown>) {
   return {
@@ -43,6 +81,7 @@ function createDependencies(overrides?: {
 describe('createVisionProxyConfigurator', () => {
   beforeEach(() => {
     __resetVscodeState();
+    setSelectChatModels(defaultSelectChatModels);
   });
 
   it('selects a discovered 9router Vision model and writes model before source', async () => {
@@ -145,6 +184,104 @@ describe('createVisionProxyConfigurator', () => {
     await expect(configure(__createCancellationToken().value as never)).rejects.toMatchObject({
       code: 'CONFIGURATION_ERROR'
     });
+    expect(__getConfigurationUpdates()).toEqual([]);
+  });
+
+  it.each([
+    {
+      languageModelError: 'NoPermissions',
+      expectedCode: 'AUTHENTICATION_ERROR',
+      createError: (message: string) => vscode.LanguageModelError.NoPermissions(message)
+    },
+    {
+      languageModelError: 'NotFound',
+      expectedCode: 'CONFIGURATION_ERROR',
+      createError: (message: string) => vscode.LanguageModelError.NotFound(message)
+    },
+    {
+      languageModelError: 'Blocked',
+      expectedCode: 'UPSTREAM_UNAVAILABLE',
+      createError: (message: string) => vscode.LanguageModelError.Blocked(message)
+    }
+  ] as const)(
+    'maps selectChatModels %s to a safe NineRouterError without raw cause leakage',
+    async ({ expectedCode, createError }) => {
+      const promptSecret = 'prompt-secret';
+      const rawCauseSecret = 'raw-cause-secret';
+      const sourceSecret = 'source-secret';
+      const imageSecret = 'data:image/png;base64,YQ==';
+
+      __setQuickPickValues([{ label: 'GitHub Copilot', source: 'copilot' }]);
+      setSelectChatModels(async () => {
+        throw Object.assign(createError(`${rawCauseSecret} ${promptSecret}`), {
+          cause: {
+            source: sourceSecret,
+            image: imageSecret
+          }
+        });
+      });
+
+      const configure = createVisionProxyConfigurator(createDependencies());
+      await expectMappedSafeError(
+        configure(__createCancellationToken().value as never),
+        expectedCode,
+        [promptSecret, rawCauseSecret, sourceSecret, imageSecret]
+      );
+      expect(__getConfigurationUpdates()).toEqual([]);
+    }
+  );
+
+  it('maps selectChatModels cancellation to CANCELLATION_ERROR without leaking raw details', async () => {
+    const promptSecret = 'prompt-secret';
+    const rawCauseSecret = 'raw-cause-secret';
+    const sourceSecret = 'source-secret';
+
+    __setQuickPickValues([{ label: 'GitHub Copilot', source: 'copilot' }]);
+    setSelectChatModels(async () => {
+      const failure = new Error(`${rawCauseSecret} ${promptSecret}`);
+      failure.name = 'AbortError';
+
+      throw Object.assign(failure, {
+        cause: {
+          source: sourceSecret
+        }
+      });
+    });
+
+    const configure = createVisionProxyConfigurator(createDependencies());
+    await expectMappedSafeError(
+      configure(__createCancellationToken().value as never),
+      'CANCELLATION_ERROR',
+      [promptSecret, rawCauseSecret, sourceSecret]
+    );
+    expect(__getConfigurationUpdates()).toEqual([]);
+  });
+
+  it('maps unknown selectChatModels errors to UPSTREAM_UNAVAILABLE without leaking raw details', async () => {
+    const promptSecret = 'prompt-secret';
+    const rawCauseSecret = 'raw-cause-secret';
+    const sourceSecret = 'source-secret';
+    const summarySecret = 'summary-secret';
+
+    __setQuickPickValues([{ label: 'GitHub Copilot', source: 'copilot' }]);
+    setSelectChatModels(async () => {
+      const failure = new Error(rawCauseSecret);
+
+      throw Object.assign(failure, {
+        cause: {
+          prompt: promptSecret,
+          source: sourceSecret,
+          summary: summarySecret
+        }
+      });
+    });
+
+    const configure = createVisionProxyConfigurator(createDependencies());
+    await expectMappedSafeError(
+      configure(__createCancellationToken().value as never),
+      'UPSTREAM_UNAVAILABLE',
+      [promptSecret, rawCauseSecret, sourceSecret, summarySecret]
+    );
     expect(__getConfigurationUpdates()).toEqual([]);
   });
 

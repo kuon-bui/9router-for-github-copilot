@@ -2,12 +2,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import * as vscode from 'vscode';
 import { NineRouterChatProvider } from '../../../src/provider/provider';
 import { NineRouterError } from '../../../src/router/errors';
+import { createVisionProxyConfigurator } from '../../../src/runtime/vision-configuration';
 import type { RouterChatCompletionRequest } from '../../../src/types/router-contract';
 import {
   __createCancellationToken,
   __getOutputLines,
   __resetVscodeState,
   __setConfigurationValues,
+  __setQuickPickValues,
   __setSelectedChatModels
 } from '../../support/vscode';
 
@@ -591,6 +593,121 @@ describe('NineRouterChatProvider', () => {
     });
     expect(configureVisionProxy).toHaveBeenCalledTimes(1);
     expect(calls).toBe(0);
+  });
+
+  it('surfaces guided setup discovery failures as safe NineRouterError values', async () => {
+    const promptSecret = 'prompt-secret';
+    const rawCauseSecret = 'raw-cause-secret';
+    const sourceSecret = 'source-secret';
+
+    __setConfigurationValues({
+      models: [
+        {
+          id: 'agent',
+          name: 'Agent',
+          modelId: 'router/agent',
+          visionMode: 'proxy'
+        }
+      ],
+      visionProxyPrompt: promptSecret,
+      baseUrl: 'https://router.example.com/v1',
+      maxTokens: 128,
+      requestTimeoutMs: 5_000,
+      debugMode: 'minimal'
+    });
+    __setQuickPickValues([{ label: 'GitHub Copilot', source: 'copilot' }]);
+
+    const originalSelectChatModels = vscode.lm.selectChatModels;
+    (
+      vscode.lm as unknown as {
+        selectChatModels: typeof vscode.lm.selectChatModels;
+      }
+    ).selectChatModels = async () => {
+      throw Object.assign(vscode.LanguageModelError.Blocked(`${rawCauseSecret} ${promptSecret}`), {
+        cause: {
+          source: sourceSecret
+        }
+      });
+    };
+
+    try {
+      const configureVisionProxy = createVisionProxyConfigurator({
+        secrets: {
+          get: async () => 'token'
+        } as never,
+        routerClient: {
+          listVisionModels: async () => [{ id: 'router/vision' }]
+        } as never,
+        getRuntimeSettings: () =>
+          ({
+            baseUrl: 'https://router.example.com/v1',
+            requestTimeoutMs: 5_000,
+            debugMode: 'minimal',
+            visionProxySource: undefined,
+            visionProxyModelId: '',
+            visionProxyPrompt: promptSecret
+          }) as never
+      });
+
+      let calls = 0;
+      const provider = new NineRouterChatProvider(
+        { secrets: { get: async () => 'token' } } as never,
+        {
+          async *streamChatCompletion() {
+            calls += 1;
+            yield { type: 'response-complete' };
+          }
+        } as never,
+        undefined,
+        { configureVisionProxy }
+      );
+
+      const promise = provider.provideLanguageModelChatResponse(
+        {
+          id: 'agent',
+          name: 'Agent',
+          vendor: '9router',
+          family: 'agent',
+          version: '1',
+          maxInputTokens: 128_000,
+          maxOutputTokens: 8_192,
+          capabilities: { imageInput: true }
+        },
+        [{ role: 1, content: [{ mimeType: 'image/png', data: new Uint8Array([1]) }] }] as never,
+        {} as never,
+        { report: () => undefined } as never,
+        __createCancellationToken().value as never
+      );
+
+      const failure = await promise.catch((error: unknown) => error);
+      expect(failure).toBeInstanceOf(NineRouterError);
+      expect(failure).toMatchObject({
+        code: 'UPSTREAM_UNAVAILABLE',
+        details: {
+          phase: 'vision-configuration',
+          source: 'copilot'
+        }
+      });
+
+      const error = failure as NineRouterError;
+      const exposed = JSON.stringify({
+        message: error.message,
+        details: error.details,
+        requestId: error.requestId
+      });
+
+      for (const forbidden of [promptSecret, rawCauseSecret, sourceSecret]) {
+        expect(exposed).not.toContain(forbidden);
+      }
+
+      expect(calls).toBe(0);
+    } finally {
+      (
+        vscode.lm as unknown as {
+          selectChatModels: typeof vscode.lm.selectChatModels;
+        }
+      ).selectChatModels = originalSelectChatModels;
+    }
   });
 
   it('uses Copilot Vision source without issuing a secondary 9router Vision request', async () => {

@@ -244,10 +244,16 @@ async function pickCopilotModel(
     return undefined;
   }
 
-  const discovered = await vscode.lm.selectChatModels({ vendor: 'copilot' });
+  let discovered: readonly vscode.LanguageModelChat[];
+
+  try {
+    discovered = await vscode.lm.selectChatModels({ vendor: 'copilot' });
+  } catch (error) {
+    throw mapCopilotDiscoveryError(error, token);
+  }
 
   if (token.isCancellationRequested) {
-    return undefined;
+    throw createCopilotDiscoveryCancellationError();
   }
 
   const options = toCopilotModelOptions(discovered);
@@ -271,6 +277,93 @@ async function pickCopilotModel(
       placeHolder: 'Select a GitHub Copilot model'
     },
     token
+  );
+}
+
+function createCopilotDiscoveryDetails(): Record<string, unknown> {
+  return {
+    phase: 'vision-configuration',
+    source: 'copilot'
+  };
+}
+
+function createCopilotDiscoveryCancellationError(): NineRouterError {
+  return new NineRouterError('CANCELLATION_ERROR', '9router request was cancelled', {
+    details: createCopilotDiscoveryDetails()
+  });
+}
+
+function isDiscoveryCancellationError(error: unknown): boolean {
+  if (error instanceof Error && error.name === 'AbortError') {
+    return true;
+  }
+
+  if (typeof error !== 'object' || error === null || !('code' in error)) {
+    return false;
+  }
+
+  const { code } = error;
+  return code === 'Canceled' || code === 'Cancelled';
+}
+
+function getLanguageModelErrorCode(error: unknown): string | undefined {
+  if (error instanceof vscode.LanguageModelError) {
+    return error.code;
+  }
+
+  if (typeof error !== 'object' || error === null || !('code' in error)) {
+    return undefined;
+  }
+
+  return typeof error.code === 'string' ? error.code : undefined;
+}
+
+function mapCopilotDiscoveryError(
+  error: unknown,
+  token: vscode.CancellationToken
+): NineRouterError {
+  if (error instanceof NineRouterError) {
+    return error;
+  }
+
+  const details = createCopilotDiscoveryDetails();
+
+  if (token.isCancellationRequested || isDiscoveryCancellationError(error)) {
+    return new NineRouterError('CANCELLATION_ERROR', '9router request was cancelled', {
+      details
+    });
+  }
+
+  const languageModelErrorCode = getLanguageModelErrorCode(error);
+
+  if (languageModelErrorCode === 'NoPermissions') {
+    return new NineRouterError(
+      'AUTHENTICATION_ERROR',
+      'GitHub Copilot model discovery requires permission.',
+      { details }
+    );
+  }
+
+  if (languageModelErrorCode === 'NotFound') {
+    return new NineRouterError(
+      'CONFIGURATION_ERROR',
+      'Configured GitHub Copilot model discovery is unavailable. Run 9router: Configure Vision Proxy.',
+      { details }
+    );
+  }
+
+  if (languageModelErrorCode === 'Blocked') {
+    return new NineRouterError(
+      'UPSTREAM_UNAVAILABLE',
+      'GitHub Copilot model discovery is currently unavailable.',
+      { details }
+    );
+  }
+
+  return new NineRouterError(
+    'UPSTREAM_UNAVAILABLE',
+    'GitHub Copilot model discovery failed.',
+    { details }
   );
 }
 

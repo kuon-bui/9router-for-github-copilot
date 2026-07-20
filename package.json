@@ -132,7 +132,7 @@
         "9router-copilot.visionProxyModelId": {
           "type": "string",
           "default": "",
-          "description": "Opaque 9router model id used to summarize image-bearing messages for models configured with visionMode proxy."
+          "description": "Opaque model id from the selected Vision proxy source used to summarize image-bearing messages for models configured with visionMode proxy."
         },
         "9router-copilot.visionProxySource": {
           "type": "string",

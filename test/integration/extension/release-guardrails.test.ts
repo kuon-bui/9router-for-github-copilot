@@ -35,8 +35,15 @@ describe('release guardrails', () => {
     });
     expect(properties['9router-copilot.visionProxyModelId']).toMatchObject({
       type: 'string',
-      default: ''
+      default: '',
+      description: expect.stringContaining('selected Vision proxy source')
     });
+    expect(
+      String(
+        (properties['9router-copilot.visionProxyModelId'] as { description?: string })
+          .description
+      )
+    ).not.toContain('9router model id');
     expect(properties['9router-copilot.visionProxySource']).toMatchObject({
       type: 'string',
       enum: ['', '9router', 'copilot'],
@@ -110,7 +117,10 @@ describe('release guardrails', () => {
       expect(readme).toContain(text);
       expect(productionDesign).toContain(text);
     }
-    expect(readme).toContain('GET /v1/models');
+    for (const document of [readme, productionDesign]) {
+      expect(document).toContain('GET /v1/models');
+      expect(document).toContain('fail-closed');
+    }
     expect(readme).toContain('Breaking configuration change');
     expect(readme).toContain('toolMode');
     expect(readme).toContain('visionMode');
@@ -118,7 +128,6 @@ describe('release guardrails', () => {
     expect(readme).toContain('maxInputTokens');
     expect(readme).toContain('maxOutputTokens');
     expect(readme).toContain('reasoning_effort');
-    expect(readme).toContain('fail-closed');
     expect(readme).toContain('stream_options.include_usage');
     expect(readme).not.toContain('9router-copilot.displayModels');
     expect(readme).not.toContain('9router-copilot.modelMappings.');

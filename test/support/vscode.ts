@@ -71,6 +71,28 @@ class LanguageModelDataPart {
   }
 }
 
+class LanguageModelError extends Error {
+  public readonly code: string;
+
+  public constructor(code: string, message?: string) {
+    super(message ?? code);
+    this.name = 'LanguageModelError';
+    this.code = code;
+  }
+
+  public static NoPermissions(message?: string): LanguageModelError {
+    return new LanguageModelError('NoPermissions', message);
+  }
+
+  public static Blocked(message?: string): LanguageModelError {
+    return new LanguageModelError('Blocked', message);
+  }
+
+  public static NotFound(message?: string): LanguageModelError {
+    return new LanguageModelError('NotFound', message);
+  }
+}
+
 class OutputChannel {
   public readonly lines: string[] = [];
 
@@ -250,6 +272,7 @@ export function __resetVscodeState(): void {
 export {
   Disposable,
   EventEmitter,
+  LanguageModelError,
   LanguageModelTextPart,
   LanguageModelDataPart,
   LanguageModelToolCallPart,
