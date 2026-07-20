@@ -1,3 +1,4 @@
+import type * as vscode from 'vscode';
 import { NineRouterError } from '../router/errors';
 import {
   countImageParts,
@@ -5,6 +6,7 @@ import {
   hasImageParts,
   isHostImageDataPart
 } from './image-input-adapter';
+import { CopilotVisionAnalyzer } from './copilot-vision-analyzer';
 import type { RouterClient } from '../router/client';
 import type { ConfiguredModel } from '../types/product-model';
 import type {
@@ -37,12 +39,15 @@ export interface VisionCompatibilityResult {
 export interface VisionProxyInput {
   selectedModel: ConfiguredModel;
   messages: readonly HostChatRequestMessage[];
+  visionProxySource: '9router' | 'copilot' | undefined;
   visionProxyModelId: string;
+  visionProxyPrompt: string;
   baseUrl: string;
   apiKey: string;
   maxTokens?: number;
   requestTimeoutMs: number;
   signal: AbortSignal;
+  cancellationToken: vscode.CancellationToken;
 }
 
 interface VisionInputCounts {
@@ -50,12 +55,10 @@ interface VisionInputCounts {
   imageMessageCount: number;
 }
 
-const VISION_PROXY_INSTRUCTION =
-  'Describe the supplied images faithfully for another language model. Include visible text, code, tables, diagrams, layout, and uncertainty. Do not answer the user request; provide only image context.';
-
 export function buildVisionProxyRequest(
   message: HostChatRequestMessage,
   modelId: string,
+  prompt: string,
   maxTokens?: number
 ): RouterChatCompletionRequest {
   const userContent: RouterContentPart[] = [];
@@ -80,7 +83,7 @@ export function buildVisionProxyRequest(
     model: modelId,
     stream: true,
     messages: [
-      { role: 'system', content: VISION_PROXY_INSTRUCTION },
+      { role: 'system', content: prompt },
       { role: 'user', content: userContent }
     ]
   };
@@ -159,16 +162,19 @@ function replaceImagesWithSummary(
   };
 }
 
-function mapVisionProxyError(error: unknown): NineRouterError {
+function mapVisionProxyError(
+  error: unknown,
+  source: '9router' | 'copilot'
+): NineRouterError {
   if (!(error instanceof NineRouterError)) {
     return new NineRouterError(
       'UPSTREAM_UNAVAILABLE',
       '9router Vision analysis failed',
-      { details: { phase: 'vision-proxy' } }
+      { details: { phase: 'vision-proxy', source } }
     );
   }
 
-  const details: Record<string, unknown> = { phase: 'vision-proxy' };
+  const details: Record<string, unknown> = { phase: 'vision-proxy', source };
   if (typeof error.details?.status === 'number') {
     details.status = error.details.status;
   }
@@ -191,7 +197,10 @@ function mapVisionProxyError(error: unknown): NineRouterError {
 }
 
 export class VisionProxyService {
-  public constructor(private readonly routerClient: RouterClient) {}
+  public constructor(
+    private readonly routerClient: RouterClient,
+    private readonly copilotAnalyzer = new CopilotVisionAnalyzer()
+  ) {}
 
   public async prepare(input: VisionProxyInput): Promise<VisionCompatibilityResult> {
     const counts = inspectVisionInput(input.messages);
@@ -204,6 +213,20 @@ export class VisionProxyService {
       return nonProxyResult;
     }
 
+    const source = input.visionProxySource;
+    if (source !== '9router' && source !== 'copilot') {
+      throw new NineRouterError(
+        'CONFIGURATION_ERROR',
+        'Proxy Vision requires 9router-copilot.visionProxySource to be set to 9router or copilot.',
+        {
+          details: {
+            phase: 'vision-proxy',
+            settingsKey: '9router-copilot.visionProxySource'
+          }
+        }
+      );
+    }
+
     const modelId = input.visionProxyModelId.trim();
     if (modelId.length === 0) {
       throw new NineRouterError(
@@ -212,7 +235,23 @@ export class VisionProxyService {
         {
           details: {
             phase: 'vision-proxy',
+            source,
             settingsKey: '9router-copilot.visionProxyModelId'
+          }
+        }
+      );
+    }
+
+    const prompt = input.visionProxyPrompt.trim();
+    if (prompt.length === 0) {
+      throw new NineRouterError(
+        'CONFIGURATION_ERROR',
+        'Proxy Vision requires 9router-copilot.visionProxyPrompt to contain a non-empty prompt.',
+        {
+          details: {
+            phase: 'vision-proxy',
+            source,
+            settingsKey: '9router-copilot.visionProxyPrompt'
           }
         }
       );
@@ -226,15 +265,18 @@ export class VisionProxyService {
         continue;
       }
 
-      if (input.signal.aborted) {
+      if (input.signal.aborted || input.cancellationToken.isCancellationRequested) {
         throw new NineRouterError(
           'CANCELLATION_ERROR',
           '9router request was cancelled',
-          { details: { phase: 'vision-proxy' } }
+          { details: { phase: 'vision-proxy', source } }
         );
       }
 
-      const result = await this.summarizeMessage(message, modelId, input);
+      const result =
+        source === '9router'
+          ? await this.summarizeWithNineRouter(message, modelId, prompt, input)
+          : await this.summarizeWithCopilot(message, modelId, prompt, input);
       messages.push(replaceImagesWithSummary(message, result.summary));
       if (result.requestId) {
         requestIds.push(result.requestId);
@@ -251,9 +293,10 @@ export class VisionProxyService {
     };
   }
 
-  private async summarizeMessage(
+  private async summarizeWithNineRouter(
     message: HostChatRequestMessage,
     modelId: string,
+    prompt: string,
     input: VisionProxyInput
   ): Promise<{ summary: string; requestId?: string }> {
     let summary = '';
@@ -264,7 +307,7 @@ export class VisionProxyService {
       const stream = this.routerClient.streamChatCompletion({
         baseUrl: input.baseUrl,
         apiKey: input.apiKey,
-        request: buildVisionProxyRequest(message, modelId, input.maxTokens),
+        request: buildVisionProxyRequest(message, modelId, prompt, input.maxTokens),
         timeoutMs: input.requestTimeoutMs,
         signal: input.signal
       });
@@ -293,7 +336,7 @@ export class VisionProxyService {
         }
       }
     } catch (error) {
-      throw mapVisionProxyError(error);
+      throw mapVisionProxyError(error, '9router');
     }
 
     if (!responseCompleted) {
@@ -320,5 +363,21 @@ export class VisionProxyService {
     }
 
     return requestId ? { summary: trimmed, requestId } : { summary: trimmed };
+  }
+
+  private async summarizeWithCopilot(
+    message: HostChatRequestMessage,
+    modelId: string,
+    prompt: string,
+    input: VisionProxyInput
+  ): Promise<{ summary: string; requestId?: string }> {
+    const result = await this.copilotAnalyzer.summarize({
+      message,
+      modelId,
+      prompt,
+      token: input.cancellationToken
+    });
+
+    return { summary: result.summary };
   }
 }

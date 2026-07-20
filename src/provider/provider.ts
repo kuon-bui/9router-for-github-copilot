@@ -121,14 +121,17 @@ export class NineRouterChatProvider
       const visionResult = await this.visionProxyService.prepare({
         selectedModel: requestSelectedModel,
         messages: messages as readonly HostChatRequestMessage[],
+        visionProxySource: this.snapshot.runtime.visionProxySource,
         visionProxyModelId: this.snapshot.runtime.visionProxyModelId,
+        visionProxyPrompt: this.snapshot.runtime.visionProxyPrompt,
         baseUrl: this.snapshot.runtime.baseUrl,
         apiKey,
         ...(typeof this.snapshot.runtime.maxTokens === 'number'
           ? { maxTokens: this.snapshot.runtime.maxTokens }
           : {}),
         requestTimeoutMs: this.snapshot.runtime.requestTimeoutMs,
-        signal: requestCancellation.signal
+        signal: requestCancellation.signal,
+        cancellationToken: token
       });
 
       logDebugEvent(this.snapshot.runtime.debugMode, 'Vision compatibility resolved', {

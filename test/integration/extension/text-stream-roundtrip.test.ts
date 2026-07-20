@@ -527,6 +527,7 @@ describe('NineRouterChatProvider', () => {
           visionMode: 'proxy'
         }
       ],
+      visionProxySource: '9router',
       baseUrl: 'https://router.example.com/v1',
       maxTokens: 128,
       requestTimeoutMs: 5000,

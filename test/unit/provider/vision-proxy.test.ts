@@ -5,6 +5,7 @@ import {
   buildVisionProxyRequest,
   VisionProxyService
 } from '../../../src/provider/vision-proxy';
+import { __createCancellationToken } from '../../support/vscode';
 
 const proxyModel = {
   sourceIndex: 0,
@@ -22,6 +23,10 @@ const image = (mimeType: string, byte: number): { mimeType: string; data: Uint8A
   mimeType,
   data: new Uint8Array([byte])
 });
+
+function createCancellationToken() {
+  return __createCancellationToken().value as never;
+}
 
 describe('VisionProxyService', () => {
   it('summarizes each image-bearing message sequentially', async () => {
@@ -53,12 +58,15 @@ describe('VisionProxyService', () => {
           ]
         }
       ],
+      visionProxySource: '9router',
       visionProxyModelId: 'combo/vision',
+      visionProxyPrompt: 'Custom image instruction.',
       baseUrl: 'https://router.example.com/v1',
       apiKey: 'secret',
       maxTokens: 128,
       requestTimeoutMs: 5_000,
-      signal: new AbortController().signal
+      signal: new AbortController().signal,
+      cancellationToken: createCancellationToken()
     });
 
     expect(requests.map((request) => request.model)).toEqual([
@@ -93,12 +101,15 @@ describe('VisionProxyService', () => {
       service.prepare({
         selectedModel: proxyModel,
         messages: [{ role: 1, content: [image('image/png', 1)] }],
+        visionProxySource: '9router',
         visionProxyModelId: '',
+        visionProxyPrompt: 'Custom image instruction.',
         baseUrl: 'https://router.example.com/v1',
         apiKey: 'secret',
         maxTokens: 128,
         requestTimeoutMs: 5_000,
-        signal: new AbortController().signal
+        signal: new AbortController().signal,
+        cancellationToken: createCancellationToken()
       })
     ).rejects.toMatchObject({
       code: 'CONFIGURATION_ERROR',
@@ -125,12 +136,15 @@ describe('VisionProxyService', () => {
     const result = await service.prepare({
       selectedModel: { ...proxyModel, visionMode },
       messages,
+      visionProxySource: '9router',
       visionProxyModelId: 'combo/vision',
+      visionProxyPrompt: 'Custom image instruction.',
       baseUrl: 'https://router.example.com/v1',
       apiKey: 'secret',
       maxTokens: 128,
       requestTimeoutMs: 5_000,
-      signal: new AbortController().signal
+      signal: new AbortController().signal,
+      cancellationToken: createCancellationToken()
     });
 
     expect(result.outcome).toBe(outcome);
@@ -147,12 +161,15 @@ describe('VisionProxyService', () => {
     const result = await service.prepare({
       selectedModel: proxyModel,
       messages: [{ role: 2, content: [{ callId: 'call-1', name: 'tool', input: {} }] }],
+      visionProxySource: '9router',
       visionProxyModelId: 'combo/vision',
+      visionProxyPrompt: 'Custom image instruction.',
       baseUrl: 'https://router.example.com/v1',
       apiKey: 'secret',
       maxTokens: 128,
       requestTimeoutMs: 5_000,
-      signal: new AbortController().signal
+      signal: new AbortController().signal,
+      cancellationToken: createCancellationToken()
     });
 
     expect(result.outcome).toBe('text-only');
@@ -169,12 +186,15 @@ describe('VisionProxyService', () => {
       service.prepare({
         selectedModel: proxyModel,
         messages: [{ role: 1, content: [image('image/png', 1)] }],
+        visionProxySource: '9router',
         visionProxyModelId: 'combo/vision',
+        visionProxyPrompt: 'Custom image instruction.',
         baseUrl: 'https://router.example.com/v1',
         apiKey: 'secret',
         maxTokens: 128,
         requestTimeoutMs: 5_000,
-        signal: new AbortController().signal
+        signal: new AbortController().signal,
+        cancellationToken: createCancellationToken()
       })
     ).rejects.toMatchObject({
       code: 'MALFORMED_STREAM_ERROR',
@@ -192,12 +212,15 @@ describe('VisionProxyService', () => {
     const promise = service.prepare({
       selectedModel: proxyModel,
       messages: [{ role: 1, content: [image('image/png', 1)] }],
+      visionProxySource: '9router',
       visionProxyModelId: 'combo/vision',
+      visionProxyPrompt: 'Custom image instruction.',
       baseUrl: 'https://router.example.com/v1',
       apiKey: 'secret',
       maxTokens: 128,
       requestTimeoutMs: 5_000,
-      signal: new AbortController().signal
+      signal: new AbortController().signal,
+      cancellationToken: createCancellationToken()
     });
 
     await expect(promise).rejects.toMatchObject({
@@ -224,12 +247,15 @@ describe('VisionProxyService', () => {
     const promise = service.prepare({
       selectedModel: proxyModel,
       messages: [{ role: 1, content: [image('image/png', 1)] }],
+      visionProxySource: '9router',
       visionProxyModelId: 'combo/missing',
+      visionProxyPrompt: 'Custom image instruction.',
       baseUrl: 'https://router.example.com/v1',
       apiKey: 'secret',
       maxTokens: 128,
       requestTimeoutMs: 5_000,
-      signal: new AbortController().signal
+      signal: new AbortController().signal,
+      cancellationToken: createCancellationToken()
     });
 
     await expect(promise).rejects.toMatchObject({
@@ -265,12 +291,15 @@ describe('VisionProxyService', () => {
       service.prepare({
         selectedModel: proxyModel,
         messages: [{ role: 1, content: [image('image/png', 1)] }],
+        visionProxySource: '9router',
         visionProxyModelId: 'combo/vision',
+        visionProxyPrompt: 'Custom image instruction.',
         baseUrl: 'https://router.example.com/v1',
         apiKey: 'secret',
         maxTokens: 128,
         requestTimeoutMs: 5_000,
-        signal: new AbortController().signal
+        signal: new AbortController().signal,
+        cancellationToken: createCancellationToken()
       })
     ).rejects.toMatchObject({ code, details: { phase: 'vision-proxy' } });
   });
@@ -286,18 +315,119 @@ describe('VisionProxyService', () => {
       service.prepare({
         selectedModel: proxyModel,
         messages: [{ role: 1, content: [image('image/png', 1)] }],
+        visionProxySource: '9router',
         visionProxyModelId: 'combo/vision',
+        visionProxyPrompt: 'Custom image instruction.',
         baseUrl: 'https://router.example.com/v1',
         apiKey: 'secret',
         maxTokens: 128,
         requestTimeoutMs: 5_000,
-        signal: new AbortController().signal
+        signal: new AbortController().signal,
+        cancellationToken: createCancellationToken()
       })
     ).rejects.toMatchObject({
       code: 'UPSTREAM_UNAVAILABLE',
       requestId: 'req-up',
       details: { phase: 'vision-proxy' }
     });
+  });
+
+  it('rejects a missing Vision source before calling analyzers', async () => {
+    let called = false;
+    const service = new VisionProxyService({
+      async *streamChatCompletion() {
+        called = true;
+        yield { type: 'response-complete' };
+      }
+    });
+
+    await expect(
+      service.prepare({
+        selectedModel: proxyModel,
+        messages: [{ role: 1, content: [image('image/png', 1)] }],
+        visionProxySource: undefined,
+        visionProxyModelId: 'combo/vision',
+        visionProxyPrompt: 'Custom image instruction.',
+        baseUrl: 'https://router.example.com/v1',
+        apiKey: 'secret',
+        maxTokens: 128,
+        requestTimeoutMs: 5_000,
+        signal: new AbortController().signal,
+        cancellationToken: createCancellationToken()
+      })
+    ).rejects.toMatchObject({
+      code: 'CONFIGURATION_ERROR',
+      details: expect.objectContaining({
+        phase: 'vision-proxy',
+        settingsKey: '9router-copilot.visionProxySource'
+      })
+    });
+    expect(called).toBe(false);
+  });
+
+  it('rejects a blank Vision prompt before calling analyzers', async () => {
+    let called = false;
+    const service = new VisionProxyService({
+      async *streamChatCompletion() {
+        called = true;
+        yield { type: 'response-complete' };
+      }
+    });
+
+    await expect(
+      service.prepare({
+        selectedModel: proxyModel,
+        messages: [{ role: 1, content: [image('image/png', 1)] }],
+        visionProxySource: '9router',
+        visionProxyModelId: 'combo/vision',
+        visionProxyPrompt: '   ',
+        baseUrl: 'https://router.example.com/v1',
+        apiKey: 'secret',
+        maxTokens: 128,
+        requestTimeoutMs: 5_000,
+        signal: new AbortController().signal,
+        cancellationToken: createCancellationToken()
+      })
+    ).rejects.toMatchObject({
+      code: 'CONFIGURATION_ERROR',
+      details: expect.objectContaining({
+        phase: 'vision-proxy',
+        settingsKey: '9router-copilot.visionProxyPrompt'
+      })
+    });
+    expect(called).toBe(false);
+  });
+
+  it('dispatches Copilot source without calling 9router', async () => {
+    let routerCalled = false;
+    const service = new VisionProxyService(
+      {
+        async *streamChatCompletion() {
+          routerCalled = true;
+          yield { type: 'response-complete' };
+        }
+      } as never,
+      {
+        summarize: async () => ({ summary: 'native summary' })
+      } as never
+    );
+
+    const result = await service.prepare({
+      selectedModel: proxyModel,
+      messages: [{ role: 1, content: [image('image/png', 1)] }],
+      visionProxySource: 'copilot',
+      visionProxyModelId: 'copilot/vision',
+      visionProxyPrompt: 'Describe.',
+      baseUrl: 'https://router.example.com/v1',
+      apiKey: 'secret',
+      requestTimeoutMs: 5_000,
+      signal: new AbortController().signal,
+      cancellationToken: createCancellationToken()
+    });
+
+    expect(result.outcome).toBe('vision-proxied');
+    expect(routerCalled).toBe(false);
+    expect(JSON.stringify(result.messages)).toContain('native summary');
   });
 });
 
@@ -306,6 +436,7 @@ describe('buildVisionProxyRequest', () => {
     const request = buildVisionProxyRequest(
       { role: 1, content: [{ value: 'read this' }, image('image/png', 97)] },
       'combo/vision',
+      'Custom image instruction.',
       256
     );
 
@@ -333,9 +464,25 @@ describe('buildVisionProxyRequest', () => {
         ]
       },
       'combo/vision'
+      ,
+      'Custom image instruction.'
     );
 
     expect(JSON.stringify(request.messages)).toContain('data:image/png;base64,YQ==');
     expect(JSON.stringify(request.messages)).not.toContain('must-not-replace-image');
+  });
+
+  it('uses the configured prompt as the complete 9router system instruction', () => {
+    const request = buildVisionProxyRequest(
+      { role: 1, content: [image('image/png', 97)] },
+      'combo/vision',
+      'Custom image instruction.',
+      256
+    );
+
+    expect(request.messages[0]).toEqual({
+      role: 'system',
+      content: 'Custom image instruction.'
+    });
   });
 });
