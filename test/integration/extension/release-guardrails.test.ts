@@ -37,6 +37,20 @@ describe('release guardrails', () => {
       type: 'string',
       default: ''
     });
+    expect(properties['9router-copilot.visionProxySource']).toMatchObject({
+      type: 'string',
+      enum: ['', '9router', 'copilot'],
+      default: ''
+    });
+    expect(properties['9router-copilot.visionProxyPrompt']).toMatchObject({
+      type: 'string',
+      minLength: 1
+    });
+    expect(manifest.contributes.commands).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ command: '9routerCopilot.configureVisionProxy' })
+      ])
+    );
   });
 
   it('defaults maxTokens to unlimited', () => {

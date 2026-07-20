@@ -7,7 +7,10 @@ export const DEFAULT_MODEL_VISION_MODE = 'off' as const;
 export const DEFAULT_MODEL_THINKING_MODE = 'off' as const;
 export const DEFAULT_MODEL_MAX_INPUT_TOKENS = 264_000;
 export const DEFAULT_MODEL_MAX_OUTPUT_TOKENS = 264_000;
+export const DEFAULT_VISION_PROXY_SOURCE = '' as const;
 export const DEFAULT_VISION_PROXY_MODEL_ID = '';
+export const DEFAULT_VISION_PROXY_PROMPT =
+  'Describe the supplied images faithfully for another language model. Include visible text, code, tables, diagrams, layout, and uncertainty. Do not answer the user request; provide only image context.';
 
 export const DEFAULT_MODELS = [
   {

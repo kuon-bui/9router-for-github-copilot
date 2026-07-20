@@ -5,7 +5,9 @@ import {
   DEFAULT_MAX_TOKENS,
   DEFAULT_MODELS,
   DEFAULT_REQUEST_TIMEOUT_MS,
-  DEFAULT_VISION_PROXY_MODEL_ID
+  DEFAULT_VISION_PROXY_MODEL_ID,
+  DEFAULT_VISION_PROXY_PROMPT,
+  DEFAULT_VISION_PROXY_SOURCE
 } from './defaults';
 import { parseModelSettings } from './model-settings';
 import { createPublishedModel } from '../provider/model-catalog';
@@ -17,12 +19,16 @@ import type { ConfiguredModel, PublishedModel } from '../types/product-model';
 
 const SECTION = '9router-copilot';
 
+export type VisionProxySource = '9router' | 'copilot';
+
 export interface RuntimeSettings {
   baseUrl: string;
   maxTokens?: number;
   requestTimeoutMs: number;
   debugMode: 'minimal' | 'metadata' | 'verbose';
+  visionProxySource: VisionProxySource | undefined;
   visionProxyModelId: string;
+  visionProxyPrompt: string;
 }
 
 interface RuntimeSettingsIssue {
@@ -34,7 +40,10 @@ interface RuntimeSettingsIssue {
 
 interface CapabilitySettingsIssue {
   scope: 'capability';
-  code: 'MISSING_VISION_PROXY_MODEL';
+  code:
+    | 'MISSING_VISION_PROXY_MODEL'
+    | 'INVALID_VISION_PROXY_SOURCE'
+    | 'MISSING_VISION_PROXY_PROMPT';
   message: string;
   path: string;
 }
@@ -64,6 +73,25 @@ export function normalizeMaxTokens(input: unknown): number | undefined {
     : undefined;
 }
 
+export function normalizeVisionProxySource(
+  source: unknown,
+  modelId: string
+): VisionProxySource | undefined {
+  if (source === '9router' || source === 'copilot') {
+    return source;
+  }
+
+  return source === undefined && modelId.length > 0 ? '9router' : undefined;
+}
+
+export function isVisionProxyConfigured(runtime: RuntimeSettings): boolean {
+  return (
+    runtime.visionProxySource !== undefined &&
+    runtime.visionProxyModelId.length > 0 &&
+    runtime.visionProxyPrompt.length > 0
+  );
+}
+
 export function loadRuntimeSettings(
   configuration: Pick<vscode.WorkspaceConfiguration, 'get'>
 ): RuntimeSettings {
@@ -78,13 +106,21 @@ export function loadRuntimeSettings(
   const visionProxyModelId =
     configuration.get<string>('visionProxyModelId')?.trim() ??
     DEFAULT_VISION_PROXY_MODEL_ID;
+  const visionProxySource = normalizeVisionProxySource(
+    configuration.get<unknown>('visionProxySource'),
+    visionProxyModelId
+  );
+  const visionProxyPrompt =
+    configuration.get<string>('visionProxyPrompt')?.trim() ?? DEFAULT_VISION_PROXY_PROMPT;
 
   return {
     baseUrl,
     ...(typeof maxTokens === 'number' ? { maxTokens } : {}),
     requestTimeoutMs,
     debugMode,
-    visionProxyModelId
+    visionProxySource,
+    visionProxyModelId,
+    visionProxyPrompt
   };
 }
 
@@ -101,27 +137,50 @@ export function buildSettingsSnapshot(
   );
   const issues: SettingsIssue[] = [...parsedModels.issues];
   const runtime = validateRuntimeSettings(configuration, issues);
-  const visionProxyModelId =
-    configuration.get<string>('visionProxyModelId')?.trim() ??
-    DEFAULT_VISION_PROXY_MODEL_ID;
+  const hasProxyModel = parsedModels.models.some((model) => model.visionMode === 'proxy');
+  const configuredVisionProxySource = configuration.get<unknown>('visionProxySource');
 
   const publishedModels = parsedModels.models.map((model) =>
     createPublishedModel(model, {
-      visionProxyConfigured: visionProxyModelId.length > 0
+      visionProxyConfigured: runtime ? isVisionProxyConfigured(runtime) : false
     })
   );
 
-  if (
-    visionProxyModelId.length === 0 &&
-    parsedModels.models.some((model) => model.visionMode === 'proxy')
-  ) {
-    issues.push({
-      scope: 'capability',
-      code: 'MISSING_VISION_PROXY_MODEL',
-      message:
-        'Proxy Vision is disabled until 9router-copilot.visionProxyModelId references an existing 9router model.',
-      path: '9router-copilot.visionProxyModelId'
-    });
+  if (hasProxyModel && runtime) {
+    if (
+      configuredVisionProxySource !== undefined &&
+      configuredVisionProxySource !== DEFAULT_VISION_PROXY_SOURCE &&
+      configuredVisionProxySource !== '9router' &&
+      configuredVisionProxySource !== 'copilot'
+    ) {
+      issues.push({
+        scope: 'capability',
+        code: 'INVALID_VISION_PROXY_SOURCE',
+        message:
+          'Proxy Vision source must be one of: 9router, copilot, or an empty value to disable proxy publication.',
+        path: '9router-copilot.visionProxySource'
+      });
+    }
+
+    if (runtime.visionProxyModelId.length === 0) {
+      issues.push({
+        scope: 'capability',
+        code: 'MISSING_VISION_PROXY_MODEL',
+        message:
+          'Proxy Vision is disabled until 9router-copilot.visionProxyModelId references an existing 9router model.',
+        path: '9router-copilot.visionProxyModelId'
+      });
+    }
+
+    if (runtime.visionProxySource !== undefined && runtime.visionProxyPrompt.length === 0) {
+      issues.push({
+        scope: 'capability',
+        code: 'MISSING_VISION_PROXY_PROMPT',
+        message:
+          'Proxy Vision is disabled until 9router-copilot.visionProxyPrompt contains a non-empty prompt.',
+        path: '9router-copilot.visionProxyPrompt'
+      });
+    }
   }
 
   if (!runtime) {

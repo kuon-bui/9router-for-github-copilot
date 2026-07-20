@@ -28,6 +28,10 @@
       {
         "command": "9routerCopilot.showDiagnostics",
         "title": "9router: Show Diagnostics"
+      },
+      {
+        "command": "9routerCopilot.configureVisionProxy",
+        "title": "9router: Configure Vision Proxy"
       }
     ],
     "languageModelChatProviders": [
@@ -129,6 +133,27 @@
           "type": "string",
           "default": "",
           "description": "Opaque 9router model id used to summarize image-bearing messages for models configured with visionMode proxy."
+        },
+        "9router-copilot.visionProxySource": {
+          "type": "string",
+          "enum": [
+            "",
+            "9router",
+            "copilot"
+          ],
+          "enumDescriptions": [
+            "Not configured.",
+            "Use a Vision-capable model exposed by 9router.",
+            "Use a native GitHub Copilot model."
+          ],
+          "default": "",
+          "description": "Source used to describe images for models configured with visionMode proxy."
+        },
+        "9router-copilot.visionProxyPrompt": {
+          "type": "string",
+          "minLength": 1,
+          "default": "Describe the supplied images faithfully for another language model. Include visible text, code, tables, diagrams, layout, and uncertainty. Do not answer the user request; provide only image context.",
+          "description": "Complete prompt used by the selected Vision proxy model to describe image-bearing messages."
         },
         "9router-copilot.maxTokens": {
           "type": "integer",

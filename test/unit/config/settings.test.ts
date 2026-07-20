@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import { DEFAULT_VISION_PROXY_PROMPT } from '../../../src/config/defaults';
 import {
   buildSettingsSnapshot,
+  isVisionProxyConfigured,
   loadRuntimeSettings,
   normalizeBaseUrl,
   normalizeMaxTokens
@@ -17,12 +19,48 @@ describe('runtime settings', () => {
     expect(normalizeBaseUrl('https://router.example.com')).toBe('https://router.example.com/v1');
   });
 
+  it('loads default Vision prompt with no selected source', () => {
+    const runtime = loadRuntimeSettings(configuration({}));
+
+    expect(runtime.visionProxySource).toBeUndefined();
+    expect(runtime.visionProxyModelId).toBe('');
+    expect(runtime.visionProxyPrompt).toBe(DEFAULT_VISION_PROXY_PROMPT);
+    expect(isVisionProxyConfigured(runtime)).toBe(false);
+  });
+
+  it('loads explicit source, model, and custom prompt', () => {
+    const runtime = loadRuntimeSettings(
+      configuration({
+        visionProxySource: 'copilot',
+        visionProxyModelId: 'copilot/gpt-vision',
+        visionProxyPrompt: '  Extract visible UI details.  '
+      })
+    );
+
+    expect(runtime).toMatchObject({
+      visionProxySource: 'copilot',
+      visionProxyModelId: 'copilot/gpt-vision',
+      visionProxyPrompt: 'Extract visible UI details.'
+    });
+    expect(isVisionProxyConfigured(runtime)).toBe(true);
+  });
+
   it('loads and trims the shared Vision proxy model id', () => {
     const runtime = loadRuntimeSettings(
       configuration({ visionProxyModelId: '  router/vision  ' })
     );
 
     expect(runtime.visionProxyModelId).toBe('router/vision');
+  });
+
+  it('treats legacy model-only configuration as 9router', () => {
+    const runtime = loadRuntimeSettings(
+      configuration({
+        visionProxyModelId: 'router/vision'
+      })
+    );
+
+    expect(runtime.visionProxySource).toBe('9router');
   });
 });
 
@@ -226,6 +264,31 @@ describe('buildSettingsSnapshot', () => {
     );
   });
 
+  it('does not advertise proxy image input with invalid source or blank prompt', () => {
+    for (const values of [
+      {
+        visionProxySource: 'other',
+        visionProxyModelId: 'model',
+        visionProxyPrompt: 'prompt'
+      },
+      {
+        visionProxySource: '9router',
+        visionProxyModelId: 'model',
+        visionProxyPrompt: '   '
+      }
+    ]) {
+      const snapshot = buildSettingsSnapshot(
+        configuration({
+          models: [{ id: 'agent', name: 'Agent', modelId: 'router/agent', visionMode: 'proxy' }],
+          ...values
+        })
+      );
+
+      expect(snapshot.publishedModels[0]?.capabilities.imageInput).toBeUndefined();
+      expect(snapshot.state).toBe('degraded');
+    }
+  });
+
   it('advertises proxy image input when the shared model is configured', () => {
     const snapshot = buildSettingsSnapshot(
       configuration({
@@ -237,7 +300,9 @@ describe('buildSettingsSnapshot', () => {
             visionMode: 'proxy'
           }
         ],
-        visionProxyModelId: 'router/vision'
+        visionProxySource: '9router',
+        visionProxyModelId: 'router/vision',
+        visionProxyPrompt: 'Describe images faithfully.'
       })
     );
 
