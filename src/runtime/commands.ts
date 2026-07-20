@@ -2,9 +2,11 @@ import * as vscode from 'vscode';
 import { clearApiKey, setApiKey } from '../config/secret-store';
 import { showDiagnostics, showSettingsSnapshotDiagnostics } from '../debug/output-channel';
 import type { SettingsSnapshot } from '../config/settings';
+import type { VisionProxyConfigurator } from './vision-configuration';
 
 interface CommandDependencies {
   getSettingsSnapshot?: () => SettingsSnapshot | undefined;
+  configureVisionProxy?: VisionProxyConfigurator;
 }
 
 export function registerCommands(
@@ -39,6 +41,17 @@ export function registerCommands(
       }
 
       showDiagnostics();
+    })
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand('9routerCopilot.configureVisionProxy', async () => {
+      const cancellation = new vscode.CancellationTokenSource();
+      try {
+        await dependencies.configureVisionProxy?.(cancellation.token);
+      } finally {
+        cancellation.dispose();
+      }
     })
   );
 }

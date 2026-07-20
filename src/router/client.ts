@@ -190,10 +190,11 @@ function withRequestId(error: NineRouterError, requestId: string | undefined): N
     return error;
   }
 
-  return new NineRouterError(error.code, error.message, {
-    requestId,
-    details: error.details
-  });
+  return new NineRouterError(
+    error.code,
+    error.message,
+    error.details ? { requestId, details: error.details } : { requestId }
+  );
 }
 
 function extractRouterErrorMessage(responseText: string): string {

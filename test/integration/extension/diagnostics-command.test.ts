@@ -1,8 +1,9 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { buildSettingsSnapshot } from '../../../src/config/settings';
 import { formatSettingsSnapshotDiagnostics } from '../../../src/debug/output-channel';
 import { registerCommands } from '../../../src/runtime/commands';
 import {
+  __createCancellationToken,
   __getCommandHandler,
   __getOutputLines,
   __resetVscodeState
@@ -76,5 +77,34 @@ describe('9routerCopilot.showDiagnostics', () => {
         expect.stringContaining('INVALID_MODEL_MAPPING')
       ])
     );
+  });
+
+  it('invokes the guided Vision configurator command dependency', async () => {
+    const subscriptions: { dispose(): void }[] = [];
+    const configureVisionProxy = vi.fn(async (_token: unknown) => {
+      const cancellation = __createCancellationToken().value;
+      expect(_token).toMatchObject({
+        isCancellationRequested: cancellation.isCancellationRequested
+      });
+    });
+
+    registerCommands(
+      {
+        subscriptions,
+        secrets: {
+          get: async () => undefined,
+          store: async () => undefined,
+          delete: async () => undefined
+        }
+      } as never,
+      {
+        configureVisionProxy
+      }
+    );
+
+    const handler = __getCommandHandler('9routerCopilot.configureVisionProxy');
+    await handler?.();
+
+    expect(configureVisionProxy).toHaveBeenCalledTimes(1);
   });
 });

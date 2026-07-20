@@ -90,6 +90,33 @@ const commandHandlers = new Map<string, (...args: unknown[]) => unknown>();
 let registeredProvider: unknown;
 let inputBoxValue: string | undefined;
 const outputChannel = new OutputChannel();
+let quickPickValues: unknown[] = [];
+let selectedChatModels: unknown[] = [];
+const configurationUpdates: Array<{ key: string; value: unknown; target: unknown }> = [];
+
+export const ConfigurationTarget = { Global: 1 } as const;
+
+export class LanguageModelChatMessage {
+  public static User(content: unknown[]): LanguageModelChatMessage {
+    return new LanguageModelChatMessage(1, content);
+  }
+
+  public constructor(
+    public readonly role: number,
+    public readonly content: unknown[]
+  ) {}
+}
+
+export class CancellationTokenSource {
+  private readonly state = __createCancellationToken();
+  public readonly token = this.state.value;
+
+  public cancel(): void {
+    this.state.cancel();
+  }
+
+  public dispose(): void {}
+}
 
 export const commands = {
   registerCommand(command: string, handler: (...args: unknown[]) => unknown): Disposable {
@@ -106,14 +133,24 @@ export const window = {
   },
   async showInputBox(): Promise<string | undefined> {
     return inputBoxValue;
+  },
+  async showQuickPick(): Promise<unknown> {
+    return quickPickValues.shift();
   }
 };
 
 export const workspace = {
-  getConfiguration(): { get: <T>(key: string) => T | undefined } {
+  getConfiguration(): {
+    get: <T>(key: string) => T | undefined;
+    update: (key: string, value: unknown, target: unknown) => Promise<void>;
+  } {
     return {
       get<T>(key: string): T | undefined {
         return configurationValues.get(key) as T | undefined;
+      },
+      async update(key: string, value: unknown, target: unknown): Promise<void> {
+        configurationValues.set(key, value);
+        configurationUpdates.push({ key, value, target });
       }
     };
   },
@@ -133,6 +170,9 @@ export const lm = {
   registerLanguageModelChatProvider(_vendor: string, provider: unknown): Disposable {
     registeredProvider = provider;
     return new Disposable();
+  },
+  async selectChatModels(): Promise<unknown[]> {
+    return selectedChatModels;
   }
 };
 
@@ -145,6 +185,22 @@ export function __setConfigurationValues(values: Record<string, unknown>): void 
 
 export function __setInputBoxValue(value: string | undefined): void {
   inputBoxValue = value;
+}
+
+export function __setQuickPickValues(values: unknown[]): void {
+  quickPickValues = [...values];
+}
+
+export function __setSelectedChatModels(models: unknown[]): void {
+  selectedChatModels = [...models];
+}
+
+export function __getConfigurationUpdates(): Array<{
+  key: string;
+  value: unknown;
+  target: unknown;
+}> {
+  return [...configurationUpdates];
 }
 
 export function __getOutputLines(): string[] {
@@ -186,6 +242,9 @@ export function __resetVscodeState(): void {
   registeredProvider = undefined;
   inputBoxValue = undefined;
   outputChannel.lines.length = 0;
+  quickPickValues = [];
+  selectedChatModels = [];
+  configurationUpdates.length = 0;
 }
 
 export {
