@@ -272,6 +272,8 @@ describe('buildSettingsSnapshot', () => {
       expect.objectContaining({
         scope: 'capability',
         code: 'MISSING_VISION_PROXY_MODEL',
+        message:
+          'Proxy Vision is disabled until 9router-copilot.visionProxyModelId references an existing model id for the selected Vision proxy source.',
         path: '9router-copilot.visionProxyModelId'
       })
     );

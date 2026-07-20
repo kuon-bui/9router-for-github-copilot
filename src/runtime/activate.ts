@@ -9,11 +9,33 @@ import { createRouterClient } from '../router/client';
 import { NineRouterChatProvider } from '../provider/provider';
 import { registerCommands } from './commands';
 import { createVisionProxyConfigurator } from './vision-configuration';
+import type { RouterClient } from '../router/client';
+import type { SettingsSnapshot } from '../config/settings';
+import type { VisionProxyConfigurator } from './vision-configuration';
 
 let providerRegistration: vscode.Disposable | undefined;
 let provider: NineRouterChatProvider | undefined;
 
-export async function activateExtension(context: vscode.ExtensionContext): Promise<void> {
+interface ActivationHooks {
+  createProvider?: (
+    context: Pick<vscode.ExtensionContext, 'secrets'>,
+    routerClient: RouterClient,
+    snapshot: SettingsSnapshot,
+    options: { configureVisionProxy: VisionProxyConfigurator }
+  ) => NineRouterChatProvider;
+  registerCommands?: typeof registerCommands;
+}
+
+export async function activateExtension(
+  context: vscode.ExtensionContext,
+  hooks: ActivationHooks = {}
+): Promise<void> {
+  const createProvider =
+    hooks.createProvider ??
+    ((providerContext, routerClient, snapshot, options) =>
+      new NineRouterChatProvider(providerContext, routerClient, snapshot, options));
+  const registerRuntimeCommands = hooks.registerCommands ?? registerCommands;
+
   const routerClient = createRouterClient({ fetch: globalThis.fetch });
   const configureVisionProxy = createVisionProxyConfigurator({
     secrets: context.secrets,
@@ -21,13 +43,13 @@ export async function activateExtension(context: vscode.ExtensionContext): Promi
     getRuntimeSettings: () => loadRuntimeSettings(getExtensionConfiguration())
   });
 
-  provider = new NineRouterChatProvider(
+  provider = createProvider(
     context,
     routerClient,
     buildSettingsSnapshot(getExtensionConfiguration()),
     { configureVisionProxy }
   );
-  registerCommands(context, {
+  registerRuntimeCommands(context, {
     getSettingsSnapshot: () => provider?.getSnapshot(),
     configureVisionProxy
   });

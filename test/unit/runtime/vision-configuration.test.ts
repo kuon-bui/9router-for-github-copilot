@@ -181,4 +181,100 @@ describe('createVisionProxyConfigurator', () => {
     expect(listCalls).toBe(1);
     expect(__getConfigurationUpdates()).toHaveLength(2);
   });
+
+  it('returns promptly for a cancelled first caller while a second caller still completes setup', async () => {
+    __setQuickPickValues([
+      { label: '9router', source: '9router' },
+      { label: 'router/vision', modelId: 'router/vision' }
+    ]);
+
+    let listCalls = 0;
+    let release: (() => void) | undefined;
+    const blockedCall = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+
+    const configure = createVisionProxyConfigurator(
+      createDependencies({
+        listVisionModels: async () => {
+          listCalls += 1;
+          await blockedCall;
+          return [{ id: 'router/vision' }];
+        }
+      })
+    );
+
+    const firstCaller = __createCancellationToken();
+    const secondCaller = __createCancellationToken();
+    const first = configure(firstCaller.value as never);
+    const second = configure(secondCaller.value as never);
+
+    firstCaller.cancel();
+
+    const timedOut = Symbol('timed-out');
+    const firstResult = await Promise.race([
+      first,
+      new Promise<typeof timedOut>((resolve) => {
+        setTimeout(() => {
+          resolve(timedOut);
+        }, 0);
+      })
+    ]);
+
+    expect(firstResult).toBeUndefined();
+
+    release?.();
+
+    await expect(second).resolves.toEqual({ source: '9router', modelId: 'router/vision' });
+    expect(listCalls).toBe(1);
+    expect(__getConfigurationUpdates()).toHaveLength(2);
+  });
+
+  it('returns promptly for a cancelled second caller while the first caller still completes setup', async () => {
+    __setQuickPickValues([
+      { label: '9router', source: '9router' },
+      { label: 'router/vision', modelId: 'router/vision' }
+    ]);
+
+    let listCalls = 0;
+    let release: (() => void) | undefined;
+    const blockedCall = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+
+    const configure = createVisionProxyConfigurator(
+      createDependencies({
+        listVisionModels: async () => {
+          listCalls += 1;
+          await blockedCall;
+          return [{ id: 'router/vision' }];
+        }
+      })
+    );
+
+    const firstCaller = __createCancellationToken();
+    const secondCaller = __createCancellationToken();
+    const first = configure(firstCaller.value as never);
+    const second = configure(secondCaller.value as never);
+
+    secondCaller.cancel();
+
+    const timedOut = Symbol('timed-out');
+    const secondResult = await Promise.race([
+      second,
+      new Promise<typeof timedOut>((resolve) => {
+        setTimeout(() => {
+          resolve(timedOut);
+        }, 0);
+      })
+    ]);
+
+    expect(secondResult).toBeUndefined();
+
+    release?.();
+
+    await expect(first).resolves.toEqual({ source: '9router', modelId: 'router/vision' });
+    expect(listCalls).toBe(1);
+    expect(__getConfigurationUpdates()).toHaveLength(2);
+  });
 });

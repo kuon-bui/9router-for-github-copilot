@@ -34,20 +34,90 @@ interface CopilotModelOption {
   family?: string;
 }
 
+interface InFlightConfiguration {
+  promise: Promise<VisionProxySelection | undefined>;
+  cancellation: vscode.CancellationTokenSource;
+  waiters: number;
+}
+
 export function createVisionProxyConfigurator(
   dependencies: Dependencies
 ): VisionProxyConfigurator {
-  let inFlight: Promise<VisionProxySelection | undefined> | undefined;
+  let inFlight: InFlightConfiguration | undefined;
 
   return async (token: vscode.CancellationToken): Promise<VisionProxySelection | undefined> => {
     if (!inFlight) {
-      inFlight = runConfiguration(dependencies, token).finally(() => {
-        inFlight = undefined;
-      });
+      const cancellation = new vscode.CancellationTokenSource();
+      const operation: InFlightConfiguration = {
+        waiters: 0,
+        cancellation,
+        promise: runConfiguration(dependencies, cancellation.token).finally(() => {
+          cancellation.dispose();
+          if (inFlight === operation) {
+            inFlight = undefined;
+          }
+        })
+      };
+
+      inFlight = operation;
     }
 
-    return inFlight;
+    const operation = inFlight;
+    operation.waiters += 1;
+
+    try {
+      return await waitForCaller(operation.promise, token);
+    } finally {
+      operation.waiters -= 1;
+
+      if (operation.waiters === 0 && inFlight === operation) {
+        operation.cancellation.cancel();
+      }
+    }
   };
+}
+
+function waitForCaller(
+  promise: Promise<VisionProxySelection | undefined>,
+  token: vscode.CancellationToken
+): Promise<VisionProxySelection | undefined> {
+  if (token.isCancellationRequested) {
+    return Promise.resolve(undefined);
+  }
+
+  return new Promise<VisionProxySelection | undefined>((resolve, reject) => {
+    let settled = false;
+    const subscription = token.onCancellationRequested(() => {
+      if (settled) {
+        return;
+      }
+
+      settled = true;
+      subscription.dispose();
+      resolve(undefined);
+    });
+
+    promise.then(
+      (result) => {
+        if (settled) {
+          return;
+        }
+
+        settled = true;
+        subscription.dispose();
+        resolve(result);
+      },
+      (error) => {
+        if (settled) {
+          return;
+        }
+
+        settled = true;
+        subscription.dispose();
+        reject(error);
+      }
+    );
+  });
 }
 
 async function runConfiguration(
@@ -58,7 +128,7 @@ async function runConfiguration(
     return undefined;
   }
 
-  const sourceSelection = await pickSource();
+  const sourceSelection = await pickSource(token);
   if (!sourceSelection) {
     return undefined;
   }
@@ -87,7 +157,9 @@ async function runConfiguration(
   };
 }
 
-async function pickSource(): Promise<SourceQuickPickItem | undefined> {
+async function pickSource(
+  token: vscode.CancellationToken
+): Promise<SourceQuickPickItem | undefined> {
   return vscode.window.showQuickPick<SourceQuickPickItem>(
     [
       { label: '9router', source: '9router' },
@@ -96,7 +168,8 @@ async function pickSource(): Promise<SourceQuickPickItem | undefined> {
     {
       title: '9router: Configure Vision Proxy',
       placeHolder: 'Select the source used for Vision proxy summaries'
-    }
+    },
+    token
   );
 }
 
@@ -145,10 +218,14 @@ async function pickNineRouterModel(
       );
     }
 
-    return vscode.window.showQuickPick<ModelQuickPickItem>(options, {
-      title: '9router: Configure Vision Proxy',
-      placeHolder: 'Select a Vision-capable 9router model'
-    });
+    return vscode.window.showQuickPick<ModelQuickPickItem>(
+      options,
+      {
+        title: '9router: Configure Vision Proxy',
+        placeHolder: 'Select a Vision-capable 9router model'
+      },
+      token
+    );
   } catch (error) {
     if (error instanceof NineRouterError && error.code === 'CANCELLATION_ERROR') {
       return undefined;
@@ -163,6 +240,10 @@ async function pickNineRouterModel(
 async function pickCopilotModel(
   token: vscode.CancellationToken
 ): Promise<ModelQuickPickItem | undefined> {
+  if (token.isCancellationRequested) {
+    return undefined;
+  }
+
   const discovered = await vscode.lm.selectChatModels({ vendor: 'copilot' });
 
   if (token.isCancellationRequested) {
@@ -183,10 +264,14 @@ async function pickCopilotModel(
     );
   }
 
-  return vscode.window.showQuickPick<ModelQuickPickItem>(options, {
-    title: '9router: Configure Vision Proxy',
-    placeHolder: 'Select a GitHub Copilot model'
-  });
+  return vscode.window.showQuickPick<ModelQuickPickItem>(
+    options,
+    {
+      title: '9router: Configure Vision Proxy',
+      placeHolder: 'Select a GitHub Copilot model'
+    },
+    token
+  );
 }
 
 function toNineRouterModelOptions(models: Array<{ id: string }>): ModelQuickPickItem[] {
