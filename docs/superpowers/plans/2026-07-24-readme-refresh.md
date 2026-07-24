@@ -351,8 +351,8 @@ Run:
 ```bash
 grep -Fq '"version": "0.3.0"' package.json && \
 grep -Fq '"default": "http://127.0.0.1:20128/v1"' package.json && \
-for path in docs/configuration.md docs/9router-copilot-chat-provider-system-design.md CODE_CONVENTION.md LICENSE; do
-  test -f "$path" || exit 1
+for file_path in docs/configuration.md docs/9router-copilot-chat-provider-system-design.md CODE_CONVENTION.md LICENSE; do
+  test -f "$file_path" || exit 1
 done && \
 grep -Fq 'https://github.com/kuon-bui/9router-for-github-copilot/blob/main/docs/configuration.md' README.md
 ```
