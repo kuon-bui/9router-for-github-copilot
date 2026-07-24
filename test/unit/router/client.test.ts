@@ -320,4 +320,35 @@ describe('createRouterClient', () => {
       })
     ).rejects.toMatchObject({ code: 'CANCELLATION_ERROR' });
   });
+
+  it('preserves caller cancellation after the timeout deadline passes', async () => {
+    vi.useFakeTimers();
+
+    try {
+      let rejectFetch: ((reason: unknown) => void) | undefined;
+      const fetchMock = vi.fn().mockImplementation(
+        () =>
+          new Promise((_resolve, reject) => {
+            rejectFetch = reject;
+          })
+      );
+      const controller = new AbortController();
+      const client = createRouterClient({ fetch: fetchMock as never });
+      const result = client.listModels({
+        baseUrl: 'https://router.example.com',
+        apiKey: 'secret-token',
+        timeoutMs: 1_000,
+        signal: controller.signal
+      });
+      const rejection = expect(result).rejects.toMatchObject({ code: 'CANCELLATION_ERROR' });
+
+      controller.abort(new Error('cancelled by caller'));
+      await vi.advanceTimersByTimeAsync(1_000);
+      rejectFetch?.(new Error('delayed fetch cancellation'));
+      await rejection;
+    } finally {
+      vi.clearAllTimers();
+      vi.useRealTimers();
+    }
+  });
 });

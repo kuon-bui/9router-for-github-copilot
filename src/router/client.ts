@@ -30,6 +30,10 @@ function createCompositeAbortSignal(signal: AbortSignal, timeoutMs: number): {
   let timedOut = false;
 
   const forwardAbort = (): void => {
+    if (controller.signal.aborted) {
+      return;
+    }
+
     controller.abort(signal.reason);
   };
 
@@ -40,6 +44,10 @@ function createCompositeAbortSignal(signal: AbortSignal, timeoutMs: number): {
   }
 
   const timeoutHandle = setTimeout(() => {
+    if (controller.signal.aborted) {
+      return;
+    }
+
     timedOut = true;
     controller.abort(new Error('Timed out'));
   }, timeoutMs);

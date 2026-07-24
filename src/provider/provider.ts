@@ -64,6 +64,7 @@ export class NineRouterChatProvider
   private readonly visionProxyService: VisionProxyService;
   private readonly options: NineRouterChatProviderOptions;
   private latestModelCatalog: readonly RouterModelMetadata[] | undefined;
+  private snapshotVersion = 0;
 
   public readonly onDidChangeLanguageModelChatInformation = this.onDidChangeEmitter.event;
 
@@ -79,11 +80,13 @@ export class NineRouterChatProvider
 
   public refresh(): void {
     this.snapshot = buildSettingsSnapshot(getExtensionConfiguration());
+    this.snapshotVersion += 1;
     this.onDidChangeEmitter.fire();
   }
 
   public refreshFromSnapshot(snapshot: SettingsSnapshot): void {
     this.snapshot = snapshot;
+    this.snapshotVersion += 1;
     this.onDidChangeEmitter.fire();
   }
 
@@ -95,31 +98,33 @@ export class NineRouterChatProvider
     _options: vscode.PrepareLanguageModelChatModelOptions,
     token: vscode.CancellationToken
   ): Promise<PublishedModel[]> {
-    const runtime = this.snapshot.runtime;
-    if (!runtime || this.snapshot.models.length === 0) {
-      return this.snapshot.publishedModels;
+    const snapshot = this.snapshot;
+    const runtime = snapshot.runtime;
+    if (!runtime || snapshot.models.length === 0) {
+      return snapshot.publishedModels;
     }
 
-    await this.refreshModelCatalog(runtime, token);
+    const snapshotVersion = this.snapshotVersion;
+    const routerModels = await this.refreshModelCatalog(runtime, token, snapshotVersion);
 
-    return resolvePublishedModels(this.snapshot.models, {
+    return resolvePublishedModels(snapshot.models, {
       visionProxyConfigured: isVisionProxyConfigured(runtime),
-      ...(this.latestModelCatalog
-        ? { routerModels: this.latestModelCatalog }
-        : {})
+      ...(routerModels ? { routerModels } : {})
     });
   }
 
   private async refreshModelCatalog(
     runtime: RuntimeSettings,
-    token: vscode.CancellationToken
-  ): Promise<void> {
+    token: vscode.CancellationToken,
+    snapshotVersion: number
+  ): Promise<readonly RouterModelMetadata[] | undefined> {
     const startedAt = Date.now();
+    const fallbackCatalog = this.latestModelCatalog;
 
     try {
       const apiKey = await getApiKey(this.context.secrets);
       if (!apiKey) {
-        return;
+        return fallbackCatalog;
       }
 
       const requestCancellation = createAbortSignalFromToken(token);
@@ -131,11 +136,15 @@ export class NineRouterChatProvider
           signal: requestCancellation.signal
         });
 
-        this.latestModelCatalog = catalog;
+        if (snapshotVersion === this.snapshotVersion) {
+          this.latestModelCatalog = catalog;
+        }
+
         logDebugEvent(runtime.debugMode, '9router model catalog refreshed', {
           modelCount: catalog.length,
           durationMs: Date.now() - startedAt
         });
+        return catalog;
       } finally {
         requestCancellation.cleanup();
       }
@@ -146,6 +155,7 @@ export class NineRouterChatProvider
         cached: this.latestModelCatalog !== undefined,
         durationMs: Date.now() - startedAt
       });
+      return fallbackCatalog;
     }
   }
 

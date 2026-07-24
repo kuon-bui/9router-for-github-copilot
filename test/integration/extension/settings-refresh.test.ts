@@ -209,6 +209,59 @@ describe('NineRouterChatProvider snapshot refresh', () => {
     expect(listModels).not.toHaveBeenCalled();
   });
 
+  it('does not let an older runtime refresh overwrite a newer successful catalog', async () => {
+    let resolveFirst: ((models: unknown[]) => void) | undefined;
+    let resolveSecond: ((models: unknown[]) => void) | undefined;
+    const firstCatalog = new Promise<unknown[]>((resolve) => {
+      resolveFirst = resolve;
+    });
+    const secondCatalog = new Promise<unknown[]>((resolve) => {
+      resolveSecond = resolve;
+    });
+    const listModels = vi
+      .fn()
+      .mockReturnValueOnce(firstCatalog)
+      .mockReturnValueOnce(secondCatalog)
+      .mockRejectedValueOnce(new NineRouterError('TRANSPORT_ERROR', 'catalog unavailable'));
+    const model = {
+      id: 'coder',
+      name: 'Coder',
+      modelId: 'router/coder',
+      maxInputTokens: 32_000,
+      maxOutputTokens: 2_048
+    };
+    const provider = new NineRouterChatProvider(
+      context,
+      { listModels, streamChatCompletion } as never,
+      createSnapshot([model], { baseUrl: 'https://old-router.example.com/v1' })
+    );
+    const token = __createCancellationToken().value as never;
+
+    const oldInformation = provider.provideLanguageModelChatInformation({} as never, token);
+    provider.refreshFromSnapshot(
+      createSnapshot([model], { baseUrl: 'https://new-router.example.com/v1' })
+    );
+    const newInformation = provider.provideLanguageModelChatInformation({} as never, token);
+
+    resolveSecond?.([
+      { id: 'router/coder', contextWindow: 400_000, maxOutput: 128_000 }
+    ]);
+    await expect(newInformation).resolves.toEqual([
+      expect.objectContaining({ maxInputTokens: 400_000, maxOutputTokens: 128_000 })
+    ]);
+
+    resolveFirst?.([
+      { id: 'router/coder', contextWindow: 64_000, maxOutput: 8_192 }
+    ]);
+    await oldInformation;
+
+    await expect(
+      provider.provideLanguageModelChatInformation({} as never, token)
+    ).resolves.toEqual([
+      expect.objectContaining({ maxInputTokens: 400_000, maxOutputTokens: 128_000 })
+    ]);
+  });
+
   it('blocks requests when the current snapshot has invalid runtime settings', async () => {
     const provider = new NineRouterChatProvider(
       context,

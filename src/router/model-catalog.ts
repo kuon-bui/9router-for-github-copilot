@@ -38,8 +38,8 @@ function parseCatalogItem(item: unknown): RouterModelMetadata | undefined {
     return undefined;
   }
 
-  const id = item.id.trim();
-  if (id.length === 0) {
+  const id = item.id;
+  if (id.trim().length === 0) {
     return undefined;
   }
 

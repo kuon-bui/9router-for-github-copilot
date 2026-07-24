@@ -76,6 +76,25 @@ describe('parseRouterModels', () => {
     ]);
   });
 
+  it('preserves model ids exactly for exact configured model matching', () => {
+    expect(
+      parseRouterModels({
+        data: [
+          {
+            id: ' router/model ',
+            capabilities: { contextWindow: 128_000, maxOutput: 8_192 }
+          }
+        ]
+      })
+    ).toEqual([
+      {
+        id: ' router/model ',
+        contextWindow: 128_000,
+        maxOutput: 8_192
+      }
+    ]);
+  });
+
   it.each([null, {}, { data: null }, { data: {} }])(
     'rejects malformed general catalog root %j',
     (payload) => {
