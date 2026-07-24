@@ -1,15 +1,8 @@
-import type { ThinkingMode } from '../types/product-model';
+import { ENABLED_THINKING_MODES } from '../types/product-model';
+import type { EnabledThinkingMode, ThinkingMode } from '../types/product-model';
 import type { LanguageModelConfigurationSchema } from '../types/vscode-chat-compat';
 
-export const THINKING_EFFORTS = [
-  'none',
-  'minimal',
-  'low',
-  'medium',
-  'high',
-  'xhigh',
-  'max'
-] as const;
+export const THINKING_EFFORTS = ['none', ...ENABLED_THINKING_MODES] as const;
 
 export type ThinkingEffort = (typeof THINKING_EFFORTS)[number];
 export type ThinkingModeSource = 'modelConfiguration' | 'configuration' | 'settings';
@@ -19,27 +12,44 @@ export interface EffectiveThinkingMode {
   source: ThinkingModeSource;
 }
 
-const THINKING_EFFORT_SET = new Set<string>(THINKING_EFFORTS);
+const THINKING_EFFORT_METADATA: Record<
+  ThinkingEffort,
+  { label: string; description: string }
+> = {
+  none: {
+    label: 'None',
+    description: 'Disable thinking for faster responses'
+  },
+  minimal: {
+    label: 'Minimal',
+    description: 'Use minimal reasoning effort'
+  },
+  low: { label: 'Low', description: 'Use low reasoning effort' },
+  medium: { label: 'Medium', description: 'Use medium reasoning effort' },
+  high: { label: 'High', description: 'Use high reasoning effort' },
+  xhigh: {
+    label: 'XHigh',
+    description: 'Use extra-high reasoning effort'
+  },
+  max: { label: 'Max', description: 'Use maximum reasoning depth' }
+};
 
 export function createThinkingEffortConfigurationSchema(
-  defaultMode: ThinkingMode
+  defaultMode: ThinkingMode,
+  enabledModes: readonly EnabledThinkingMode[]
 ): LanguageModelConfigurationSchema {
+  const efforts: ThinkingEffort[] = ['none', ...enabledModes];
+
   return {
     properties: {
       reasoningEffort: {
         type: 'string',
         title: 'Thinking Effort',
-        enum: THINKING_EFFORTS,
-        enumItemLabels: ['None', 'Minimal', 'Low', 'Medium', 'High', 'XHigh', 'Max'],
-        enumDescriptions: [
-          'Disable thinking for faster responses',
-          'Use minimal reasoning effort',
-          'Use low reasoning effort',
-          'Use medium reasoning effort',
-          'Use high reasoning effort',
-          'Use extra-high reasoning effort',
-          'Use maximum reasoning depth'
-        ],
+        enum: efforts,
+        enumItemLabels: efforts.map((effort) => THINKING_EFFORT_METADATA[effort].label),
+        enumDescriptions: efforts.map(
+          (effort) => THINKING_EFFORT_METADATA[effort].description
+        ),
         default: defaultMode === 'off' ? 'none' : defaultMode,
         group: 'navigation'
       }
@@ -49,9 +59,15 @@ export function createThinkingEffortConfigurationSchema(
 
 export function resolveEffectiveThinkingMode(
   options: unknown,
-  configuredMode: ThinkingMode
+  configuredMode: ThinkingMode,
+  enabledModes: readonly EnabledThinkingMode[]
 ): EffectiveThinkingMode {
-  const modelConfigurationValue = readReasoningEffort(options, 'modelConfiguration');
+  const allowedEfforts = new Set<string>(['none', ...enabledModes]);
+  const modelConfigurationValue = readReasoningEffort(
+    options,
+    'modelConfiguration',
+    allowedEfforts
+  );
   if (modelConfigurationValue) {
     return {
       thinkingMode: toThinkingMode(modelConfigurationValue),
@@ -59,7 +75,11 @@ export function resolveEffectiveThinkingMode(
     };
   }
 
-  const compatibilityValue = readReasoningEffort(options, 'configuration');
+  const compatibilityValue = readReasoningEffort(
+    options,
+    'configuration',
+    allowedEfforts
+  );
   if (compatibilityValue) {
     return {
       thinkingMode: toThinkingMode(compatibilityValue),
@@ -75,7 +95,8 @@ export function resolveEffectiveThinkingMode(
 
 function readReasoningEffort(
   options: unknown,
-  property: 'modelConfiguration' | 'configuration'
+  property: 'modelConfiguration' | 'configuration',
+  allowedEfforts: ReadonlySet<string>
 ): ThinkingEffort | undefined {
   if (typeof options !== 'object' || options === null || !(property in options)) {
     return undefined;
@@ -91,7 +112,7 @@ function readReasoningEffort(
   }
 
   const value = configuration.reasoningEffort;
-  return typeof value === 'string' && THINKING_EFFORT_SET.has(value)
+  return typeof value === 'string' && allowedEfforts.has(value)
     ? (value as ThinkingEffort)
     : undefined;
 }

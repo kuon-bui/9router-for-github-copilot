@@ -5,59 +5,73 @@ import {
 } from '../../../src/provider/thinking-effort';
 
 describe('createThinkingEffortConfigurationSchema', () => {
-  it('publishes all seven picker choices with the configured model default', () => {
-    const schema = createThinkingEffortConfigurationSchema('xhigh');
+  it('publishes None followed by configured efforts in configured order', () => {
+    const schema = createThinkingEffortConfigurationSchema('xhigh', [
+      'high',
+      'minimal',
+      'xhigh'
+    ]);
 
     expect(schema.properties.reasoningEffort).toEqual({
       type: 'string',
       title: 'Thinking Effort',
-      enum: ['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'],
-      enumItemLabels: ['None', 'Minimal', 'Low', 'Medium', 'High', 'XHigh', 'Max'],
+      enum: ['none', 'high', 'minimal', 'xhigh'],
+      enumItemLabels: ['None', 'High', 'Minimal', 'XHigh'],
       enumDescriptions: [
         'Disable thinking for faster responses',
-        'Use minimal reasoning effort',
-        'Use low reasoning effort',
-        'Use medium reasoning effort',
         'Use high reasoning effort',
-        'Use extra-high reasoning effort',
-        'Use maximum reasoning depth'
+        'Use minimal reasoning effort',
+        'Use extra-high reasoning effort'
       ],
       default: 'xhigh',
       group: 'navigation'
     });
   });
 
-  it('maps the local off default to the picker none value', () => {
-    const schema = createThinkingEffortConfigurationSchema('off');
+  it('maps off default to none for a non-empty picker', () => {
+    const schema = createThinkingEffortConfigurationSchema('off', ['max']);
 
     expect(schema.properties.reasoningEffort.default).toBe('none');
   });
 });
 
 describe('resolveEffectiveThinkingMode', () => {
-  it.each([
-    ['none', 'off'],
-    ['minimal', 'minimal'],
-    ['low', 'low'],
-    ['medium', 'medium'],
-    ['high', 'high'],
-    ['xhigh', 'xhigh'],
-    ['max', 'max']
-  ] as const)('maps picker value %s to internal mode %s', (pickerValue, expectedMode) => {
+  it('accepts None regardless of enabled efforts', () => {
     expect(
       resolveEffectiveThinkingMode(
         {
           modelConfiguration: {
-            reasoningEffort: pickerValue
+            reasoningEffort: 'none'
           }
         },
-        'low'
+        'high',
+        ['high']
       )
     ).toEqual({
-      thinkingMode: expectedMode,
+      thinkingMode: 'off',
       source: 'modelConfiguration'
     });
   });
+
+  it.each(['minimal', 'low', 'medium', 'high', 'xhigh', 'max'] as const)(
+    'maps enabled picker value %s directly',
+    (pickerValue) => {
+      expect(
+        resolveEffectiveThinkingMode(
+          {
+            modelConfiguration: {
+              reasoningEffort: pickerValue
+            }
+          },
+          'low',
+          [pickerValue]
+        )
+      ).toEqual({
+        thinkingMode: pickerValue,
+        source: 'modelConfiguration'
+      });
+    }
+  );
 
   it('uses the compatibility configuration field when modelConfiguration is absent', () => {
     expect(
@@ -67,10 +81,45 @@ describe('resolveEffectiveThinkingMode', () => {
             reasoningEffort: 'max'
           }
         },
-        'low'
+        'low',
+        ['low', 'max']
       )
     ).toEqual({
       thinkingMode: 'max',
+      source: 'configuration'
+    });
+  });
+
+  it('falls back when modelConfiguration contains a stale effort', () => {
+    expect(
+      resolveEffectiveThinkingMode(
+        {
+          modelConfiguration: {
+            reasoningEffort: 'max'
+          }
+        },
+        'low',
+        ['low', 'medium']
+      )
+    ).toEqual({
+      thinkingMode: 'low',
+      source: 'settings'
+    });
+  });
+
+  it('applies the same allowlist to compatibility configuration', () => {
+    expect(
+      resolveEffectiveThinkingMode(
+        {
+          configuration: {
+            reasoningEffort: 'medium'
+          }
+        },
+        'low',
+        ['low', 'medium']
+      )
+    ).toEqual({
+      thinkingMode: 'medium',
       source: 'configuration'
     });
   });
@@ -86,7 +135,8 @@ describe('resolveEffectiveThinkingMode', () => {
             reasoningEffort: 42
           }
         },
-        'medium'
+        'medium',
+        ['medium']
       )
     ).toEqual({
       thinkingMode: 'medium',

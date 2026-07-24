@@ -33,7 +33,14 @@ export function createPublishedModel(
     maxInputTokens: options.routerModel?.contextWindow ?? setting.maxInputTokens,
     maxOutputTokens: options.routerModel?.maxOutput ?? setting.maxOutputTokens,
     capabilities,
-    configurationSchema: createThinkingEffortConfigurationSchema(setting.thinkingMode)
+    ...(setting.thinkingEfforts.length > 0
+      ? {
+          configurationSchema: createThinkingEffortConfigurationSchema(
+            setting.thinkingMode,
+            setting.thinkingEfforts
+          )
+        }
+      : {})
   };
 }
 

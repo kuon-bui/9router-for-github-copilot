@@ -36,7 +36,7 @@ describe('resolvePublishedModels', () => {
     ]);
   });
 
-  it('publishes an independent thinking effort schema for each model', () => {
+  it('publishes an independent allowlisted thinking schema for each model', () => {
     const models = resolvePublishedModels([
       {
         sourceIndex: 0,
@@ -58,15 +58,17 @@ describe('resolvePublishedModels', () => {
         toolMode: 'auto',
         visionMode: 'proxy',
         thinkingMode: 'max',
-        thinkingEfforts: ['max'],
+        thinkingEfforts: ['low', 'max'],
         maxInputTokens: 128_000,
         maxOutputTokens: 8_192
       }
     ]);
 
-    expect(models[0]?.configurationSchema?.properties.reasoningEffort.default).toBe('none');
-    expect(models[1]?.configurationSchema?.properties.reasoningEffort.default).toBe('max');
-    expect(models[0]?.configurationSchema).not.toBe(models[1]?.configurationSchema);
+    expect(models[0]?.configurationSchema).toBeUndefined();
+    expect(models[1]?.configurationSchema?.properties.reasoningEffort).toMatchObject({
+      enum: ['none', 'low', 'max'],
+      default: 'max'
+    });
   });
 
   it('requires proxy availability before publishing image input', () => {
