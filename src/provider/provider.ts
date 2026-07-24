@@ -1,6 +1,10 @@
 import * as vscode from 'vscode';
 import { getApiKey } from '../config/secret-store';
-import { buildSettingsSnapshot, getExtensionConfiguration } from '../config/settings';
+import {
+  buildSettingsSnapshot,
+  getExtensionConfiguration,
+  isVisionProxyConfigured
+} from '../config/settings';
 import { logDebugEvent } from '../debug/output-channel';
 import { NineRouterError } from '../router/errors';
 import { adaptToolOptionsForRouter } from './tool-adapter';
@@ -10,8 +14,10 @@ import { createAbortSignalFromToken } from './cancellation';
 import { resolveEffectiveThinkingMode } from './thinking-effort';
 import { VisionProxyService } from './vision-proxy';
 import { hasImageParts } from './image-input-adapter';
+import { resolvePublishedModels } from './model-catalog';
 import type { RouterClient } from '../router/client';
-import type { SettingsSnapshot } from '../config/settings';
+import type { RuntimeSettings, SettingsSnapshot } from '../config/settings';
+import type { RouterModelMetadata } from '../router/model-catalog';
 import type { ConfiguredModel, PublishedModel } from '../types/product-model';
 import type { ModelConfigurationResponseOptions } from '../types/vscode-chat-compat';
 import type { HostToolDefinition } from './tool-adapter';
@@ -57,6 +63,7 @@ export class NineRouterChatProvider
   private readonly onDidChangeEmitter = new vscode.EventEmitter<void>();
   private readonly visionProxyService: VisionProxyService;
   private readonly options: NineRouterChatProviderOptions;
+  private latestModelCatalog: readonly RouterModelMetadata[] | undefined;
 
   public readonly onDidChangeLanguageModelChatInformation = this.onDidChangeEmitter.event;
 
@@ -86,9 +93,60 @@ export class NineRouterChatProvider
 
   public async provideLanguageModelChatInformation(
     _options: vscode.PrepareLanguageModelChatModelOptions,
-    _token: vscode.CancellationToken
+    token: vscode.CancellationToken
   ): Promise<PublishedModel[]> {
-    return this.snapshot.publishedModels;
+    const runtime = this.snapshot.runtime;
+    if (!runtime || this.snapshot.models.length === 0) {
+      return this.snapshot.publishedModels;
+    }
+
+    await this.refreshModelCatalog(runtime, token);
+
+    return resolvePublishedModels(this.snapshot.models, {
+      visionProxyConfigured: isVisionProxyConfigured(runtime),
+      ...(this.latestModelCatalog
+        ? { routerModels: this.latestModelCatalog }
+        : {})
+    });
+  }
+
+  private async refreshModelCatalog(
+    runtime: RuntimeSettings,
+    token: vscode.CancellationToken
+  ): Promise<void> {
+    const startedAt = Date.now();
+
+    try {
+      const apiKey = await getApiKey(this.context.secrets);
+      if (!apiKey) {
+        return;
+      }
+
+      const requestCancellation = createAbortSignalFromToken(token);
+      try {
+        const catalog = await this.routerClient.listModels({
+          baseUrl: runtime.baseUrl,
+          apiKey,
+          timeoutMs: runtime.requestTimeoutMs,
+          signal: requestCancellation.signal
+        });
+
+        this.latestModelCatalog = catalog;
+        logDebugEvent(runtime.debugMode, '9router model catalog refreshed', {
+          modelCount: catalog.length,
+          durationMs: Date.now() - startedAt
+        });
+      } finally {
+        requestCancellation.cleanup();
+      }
+    } catch (error) {
+      logDebugEvent(runtime.debugMode, '9router model catalog refresh failed', {
+        errorCode: error instanceof NineRouterError ? error.code : 'UNKNOWN',
+        requestId: error instanceof NineRouterError ? error.requestId : undefined,
+        cached: this.latestModelCatalog !== undefined,
+        durationMs: Date.now() - startedAt
+      });
+    }
   }
 
   public async provideLanguageModelChatResponse(
