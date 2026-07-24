@@ -42,9 +42,7 @@ Configuration is local per user under the `9router-copilot` namespace. Array ord
       "modelId": "replace-with-existing-9router-model-id",
       "toolMode": "auto",
       "visionMode": "off",
-      "thinkingMode": "off",
-      "maxInputTokens": 128000,
-      "maxOutputTokens": 8192
+      "thinkingMode": "off"
     }
   ],
   "9router-copilot.visionProxySource": "9router",
@@ -68,11 +66,13 @@ This release replaces the old fixed-model settings. They are not read or migrate
 - `toolMode`: `auto` exposes supported host tools; `off` disables tools.
 - `visionMode`: `native`, `proxy`, or `off`.
 - `thinkingMode`: Default Thinking Effort: `off`, `minimal`, `low`, `medium`, `high`, `xhigh`, or `max`.
-- `maxInputTokens` and `maxOutputTokens`: Per-model Context Window metadata published to VS Code.
+- `maxInputTokens` and `maxOutputTokens`: Optional compatibility fallbacks for Context Window metadata. Normal operation reads `capabilities.contextWindow` and `capabilities.maxOutput` from authenticated `GET /v1/models` results.
 
 Unknown fields, duplicate ids, invalid values, and empty mappings are rejected per model. One broken entry does not hide unrelated valid entries. The default configuration contains one unpublished `agent` entry until its `modelId` is set.
 
-`9router-copilot.maxTokens` is independent of per-model Context Window metadata. Its default is `0`. A positive safe integer is sent as `max_tokens`; `0` or a malformed value omits `max_tokens`, applying no extension-level response limit. `9router` or an upstream provider may still enforce its own limit. Streaming requests continue to set `stream_options.include_usage`.
+Before returning picker models, the provider attempts one authenticated `GET /v1/models` refresh. Exact `modelId` matches use `capabilities.contextWindow` and `capabilities.maxOutput`. The latest successful catalog stays in RAM; a failed refresh keeps that cache. Missing or invalid metadata falls back per field to the model object's optional compatibility fallback, then `264000`.
+
+`9router-copilot.maxTokens` remains independent of Context Window metadata. Its default is `0`. A positive safe integer is sent as `max_tokens`; `0` or a malformed value omits `max_tokens`, applying no extension-level response limit. `9router` or an upstream provider may still enforce its own limit. Streaming requests continue to set `stream_options.include_usage`.
 
 ### Tools
 

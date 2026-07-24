@@ -10,7 +10,15 @@ describe('release guardrails', () => {
     const models = properties['9router-copilot.models'] as {
       type: string;
       default: unknown[];
-      items: { type: string; additionalProperties: boolean; required: string[] };
+      items: {
+        type: string;
+        additionalProperties: boolean;
+        required: string[];
+        properties: {
+          maxInputTokens: Record<string, unknown>;
+          maxOutputTokens: Record<string, unknown>;
+        };
+      };
     };
 
     expect(models).toMatchObject({
@@ -22,9 +30,7 @@ describe('release guardrails', () => {
           modelId: '',
           toolMode: 'auto',
           visionMode: 'off',
-          thinkingMode: 'off',
-          maxInputTokens: 264_000,
-          maxOutputTokens: 264_000
+          thinkingMode: 'off'
         }
       ],
       items: {
@@ -32,6 +38,18 @@ describe('release guardrails', () => {
         additionalProperties: false,
         required: ['id', 'name', 'modelId']
       }
+    });
+    expect(models.items.properties.maxInputTokens).toMatchObject({
+      type: 'integer',
+      minimum: 1,
+      default: 264_000,
+      description: expect.stringContaining('fallback')
+    });
+    expect(models.items.properties.maxOutputTokens).toMatchObject({
+      type: 'integer',
+      minimum: 1,
+      default: 264_000,
+      description: expect.stringContaining('fallback')
     });
     expect(properties['9router-copilot.visionProxyModelId']).toMatchObject({
       type: 'string',
@@ -129,6 +147,13 @@ describe('release guardrails', () => {
     expect(readme).toContain('maxOutputTokens');
     expect(readme).toContain('reasoning_effort');
     expect(readme).toContain('stream_options.include_usage');
+    for (const document of [readme, productionDesign]) {
+      expect(document).toContain('capabilities.contextWindow');
+      expect(document).toContain('capabilities.maxOutput');
+      expect(document).toContain('latest successful');
+      expect(document).toContain('264000');
+    }
+    expect(readme).toContain('compatibility fallback');
     expect(readme).not.toContain('9router-copilot.displayModels');
     expect(readme).not.toContain('9router-copilot.modelMappings.');
   });

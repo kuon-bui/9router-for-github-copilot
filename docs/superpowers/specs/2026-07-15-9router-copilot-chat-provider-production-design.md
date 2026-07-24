@@ -185,7 +185,7 @@ Secrets must be stored only in VS Code `SecretStorage`.
 Recommended configuration keys:
 
 - `9router-copilot.baseUrl`
-- `9router-copilot.models`: ordered objects containing `id`, `name`, `modelId`, `toolMode`, `visionMode`, `thinkingMode`, `maxInputTokens`, and `maxOutputTokens`
+- `9router-copilot.models`: ordered objects containing `id`, `name`, `modelId`, `toolMode`, `visionMode`, `thinkingMode`, and optional `maxInputTokens` and `maxOutputTokens` compatibility fallbacks
 - `9router-copilot.visionProxySource`
 - `9router-copilot.visionProxyModelId`
 - `9router-copilot.visionProxyPrompt`
@@ -195,10 +195,18 @@ Recommended configuration keys:
 
 ### Native context window metadata
 
-Every valid published model exposes its validated per-model
-`maxInputTokens` and `maxOutputTokens` values through
-`LanguageModelChatInformation`. These values provide the native Context Window
-denominator in Copilot Chat.
+Before returning picker models, the provider attempts one authenticated
+`GET /v1/models` refresh. Exact `modelId` matches read
+`capabilities.contextWindow` and `capabilities.maxOutput`, validate each as a
+positive safe integer, and publish them as `maxInputTokens` and
+`maxOutputTokens` through `LanguageModelChatInformation`. The latest successful
+catalog stays in RAM. A failed refresh keeps that cache; when metadata is
+missing or invalid, each field falls back independently to its optional model
+setting, then `264000`. Catalog failure never hides an otherwise valid model.
+
+Configured context-window values are compatibility fallbacks, not the primary
+metadata source. The cache is not persisted, no refresh timer is used, and
+catalog ids are matched exactly without deriving combo behavior.
 
 For the used-token numerator, every primary streaming request sets
 `stream_options.include_usage` to `true`. The SSE boundary validates the final
@@ -288,7 +296,7 @@ Host-visible capabilities should be conservative unless confirmed by `9router`.
 - vision input
 - reasoning or long-context features
 
-If `9router` later exposes per-combo capability metadata, the extension can enrich the picker and request path. Until then, capability exposure should prefer correctness over optimism.
+The extension consumes Context Window metadata from `GET /v1/models`. Tools, Vision, and reasoning capability exposure still prefer correctness over optimism and remain conservative unless confirmed by `9router`.
 
 ## Tool Calling Strategy
 

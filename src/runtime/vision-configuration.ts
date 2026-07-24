@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { getApiKey } from '../config/secret-store';
 import { NineRouterError } from '../router/errors';
+import { toVisionModels } from '../router/model-catalog';
 import { createAbortSignalFromToken } from '../provider/cancellation';
 import type { RuntimeSettings, VisionProxySource } from '../config/settings';
 import type { RouterClient } from '../router/client';
@@ -193,12 +194,14 @@ async function pickNineRouterModel(
   const requestCancellation = createAbortSignalFromToken(token);
 
   try {
-    const models = await dependencies.routerClient.listVisionModels({
-      baseUrl: runtime.baseUrl,
-      apiKey,
-      timeoutMs: runtime.requestTimeoutMs,
-      signal: requestCancellation.signal
-    });
+    const models = toVisionModels(
+      await dependencies.routerClient.listModels({
+        baseUrl: runtime.baseUrl,
+        apiKey,
+        timeoutMs: runtime.requestTimeoutMs,
+        signal: requestCancellation.signal
+      })
+    );
 
     if (token.isCancellationRequested) {
       return undefined;

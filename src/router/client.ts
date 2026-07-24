@@ -1,8 +1,8 @@
 import { NineRouterError } from './errors';
-import { parseVisionModels } from './model-catalog';
+import { parseRouterModels } from './model-catalog';
 import { parseRouterEventStream } from './sse-parser';
 import { buildChatCompletionsUrl, buildModelsUrl } from './url';
-import type { RouterVisionModel } from './model-catalog';
+import type { RouterModelMetadata } from './model-catalog';
 import type { RouterChatCompletionRequest, RouterStreamEvent } from '../types/router-contract';
 
 export interface RouterClient {
@@ -13,12 +13,12 @@ export interface RouterClient {
     timeoutMs: number;
     signal: AbortSignal;
   }): AsyncIterable<RouterStreamEvent>;
-  listVisionModels(input: {
+  listModels(input: {
     baseUrl: string;
     apiKey: string;
     timeoutMs: number;
     signal: AbortSignal;
-  }): Promise<RouterVisionModel[]>;
+  }): Promise<RouterModelMetadata[]>;
 }
 
 function createCompositeAbortSignal(signal: AbortSignal, timeoutMs: number): {
@@ -30,6 +30,10 @@ function createCompositeAbortSignal(signal: AbortSignal, timeoutMs: number): {
   let timedOut = false;
 
   const forwardAbort = (): void => {
+    if (controller.signal.aborted) {
+      return;
+    }
+
     controller.abort(signal.reason);
   };
 
@@ -40,6 +44,10 @@ function createCompositeAbortSignal(signal: AbortSignal, timeoutMs: number): {
   }
 
   const timeoutHandle = setTimeout(() => {
+    if (controller.signal.aborted) {
+      return;
+    }
+
     timedOut = true;
     controller.abort(new Error('Timed out'));
   }, timeoutMs);
@@ -119,7 +127,7 @@ export function createRouterClient(deps: { fetch: typeof globalThis.fetch }): Ro
       }
     },
 
-    async listVisionModels(input) {
+    async listModels(input) {
       const composite = createCompositeAbortSignal(input.signal, input.timeoutMs);
 
       try {
@@ -144,7 +152,7 @@ export function createRouterClient(deps: { fetch: typeof globalThis.fetch }): Ro
         }
 
         try {
-          return parseVisionModels(payload);
+          return parseRouterModels(payload);
         } catch (error) {
           if (error instanceof NineRouterError) {
             throw withRequestId(error, requestId);
@@ -181,7 +189,7 @@ function createMalformedCatalogError(requestId: string | undefined): NineRouterE
   return new NineRouterError(
     'UPSTREAM_UNAVAILABLE',
     '9router model catalog response is malformed',
-    buildErrorOptions(requestId, { phase: 'vision-model-discovery' })
+    buildErrorOptions(requestId, { phase: 'model-catalog-discovery' })
   );
 }
 
@@ -275,7 +283,7 @@ function classifyStatusError(status: number, requestId: string | undefined, resp
 function classifyDiscoveryStatusError(status: number, requestId: string | undefined): NineRouterError {
   const details = {
     status,
-    phase: 'vision-model-discovery'
+    phase: 'model-catalog-discovery'
   };
 
   if (status === 401 || status === 403) {

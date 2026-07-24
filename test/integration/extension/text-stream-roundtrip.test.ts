@@ -636,7 +636,7 @@ describe('NineRouterChatProvider', () => {
           get: async () => 'token'
         } as never,
         routerClient: {
-          listVisionModels: async () => [{ id: 'router/vision' }]
+          listModels: async () => [{ id: 'router/vision', vision: true }]
         } as never,
         getRuntimeSettings: () =>
           ({

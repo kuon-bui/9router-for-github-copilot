@@ -3,7 +3,7 @@
   "displayName": "9router Copilot Chat Provider",
   "description": "Expose 9router as a custom provider inside GitHub Copilot Chat.",
   "publisher": "local",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "license": "UNLICENSED",
   "engines": {
     "vscode": "^1.125.0"
@@ -57,9 +57,7 @@
               "modelId": "",
               "toolMode": "auto",
               "visionMode": "off",
-              "thinkingMode": "off",
-              "maxInputTokens": 264000,
-              "maxOutputTokens": 264000
+              "thinkingMode": "off"
             }
           ],
           "items": {
@@ -118,12 +116,14 @@
               "maxInputTokens": {
                 "type": "integer",
                 "minimum": 1,
-                "default": 264000
+                "default": 264000,
+                "description": "Optional max-input-token fallback used when 9router catalog metadata is unavailable."
               },
               "maxOutputTokens": {
                 "type": "integer",
                 "minimum": 1,
-                "default": 264000
+                "default": 264000,
+                "description": "Optional max-output-token fallback used when 9router catalog metadata is unavailable."
               }
             }
           },

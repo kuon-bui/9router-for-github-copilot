@@ -19,8 +19,6 @@ export const DEFAULT_MODELS = [
     modelId: '',
     toolMode: 'auto',
     visionMode: 'off',
-    thinkingMode: 'off',
-    maxInputTokens: DEFAULT_MODEL_MAX_INPUT_TOKENS,
-    maxOutputTokens: DEFAULT_MODEL_MAX_OUTPUT_TOKENS
+    thinkingMode: 'off'
   }
 ] as const;

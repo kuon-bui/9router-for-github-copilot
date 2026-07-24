@@ -1,5 +1,7 @@
 # Per-Model Context Window Settings Design
 
+> Superseded in part by `2026-07-24-router-model-context-metadata-design.md`: configured token limits remain compatibility fallbacks, while `GET /v1/models` metadata is the primary source.
+
 ## Status
 
 - Date: 2026-07-17
@@ -9,8 +11,9 @@
 ## Objective
 
 Make Copilot Chat's native Session Info surface show context-window information
-for each curated `9router` model using user-configurable input and output token
-limits.
+for each curated `9router` model. The original implementation used
+user-configurable input and output token limits; the newer catalog design uses
+them only as compatibility fallbacks.
 
 The extension will continue to use the native Copilot Chat UI. It will not add a
 custom context-window component or a separate chat surface.
@@ -32,7 +35,7 @@ The hard-coded metadata cannot describe different token limits for `Daily`,
 
 ## Configuration Contract
 
-Add six per-user VS Code settings:
+This design originally added six per-user VS Code settings:
 
 - `9router-copilot.maxInputTokens.daily`
 - `9router-copilot.maxInputTokens.agent`
@@ -41,7 +44,7 @@ Add six per-user VS Code settings:
 - `9router-copilot.maxOutputTokens.agent`
 - `9router-copilot.maxOutputTokens.fallback`
 
-Each setting is a positive integer. The defaults for every curated model are:
+Each setting is a positive integer. Their compatibility fallback defaults are:
 
 - `maxInputTokens`: `128000`
 - `maxOutputTokens`: `8192`
@@ -55,8 +58,9 @@ limits.
 
 ## Architecture and Data Flow
 
-`DisplayModelSetting` will own the validated `maxInputTokens` and
-`maxOutputTokens` values for one curated model.
+`DisplayModelSetting` owns validated fallback `maxInputTokens` and
+`maxOutputTokens` values for one curated model. Current primary values come from
+exact matching `GET /v1/models` metadata as defined by the newer design.
 
 The settings flow is:
 
@@ -64,7 +68,9 @@ The settings flow is:
 VS Code user settings
     -> settings loader and per-model validation
     -> DisplayModelSetting
-    -> createPublishedModel
+  -> fallback input to createPublishedModel
+9router GET /v1/models
+  -> primary context metadata input to createPublishedModel
     -> LanguageModelChatInformation
     -> native Copilot Chat Session Info UI
 ```
@@ -157,7 +163,7 @@ field sent to `9router`.
 ## Non-Goals
 
 - Adding a custom Session Info UI
-- Discovering limits from `GET /v1/models`
+- Persisting or periodically refreshing limits discovered from `GET /v1/models`
 - Changing the outgoing `max_tokens` selection policy
 - Replacing the heuristic token counter
 - Adding model-specific tokenizer implementations

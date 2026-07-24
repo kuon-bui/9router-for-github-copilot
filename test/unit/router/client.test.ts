@@ -123,7 +123,7 @@ describe('createRouterClient', () => {
     });
   });
 
-  it('gets /v1/models with bearer auth and filters Vision models', async () => {
+  it('gets and validates the full /v1/models catalog with bearer auth', async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       status: 200,
@@ -131,7 +131,15 @@ describe('createRouterClient', () => {
       json: async () => ({
         object: 'list',
         data: [
-          { id: 'router/vision', capabilities: { vision: true } },
+          {
+            id: 'router/vision',
+            owned_by: 'router',
+            capabilities: {
+              vision: true,
+              contextWindow: 400_000,
+              maxOutput: 128_000
+            }
+          },
           { id: 'router/text', capabilities: { vision: false } }
         ]
       })
@@ -140,13 +148,22 @@ describe('createRouterClient', () => {
     const client = createRouterClient({ fetch: fetchMock as never });
 
     await expect(
-      client.listVisionModels({
+      client.listModels({
         baseUrl: 'https://router.example.com/v1',
         apiKey: 'secret-token',
         timeoutMs: 1000,
         signal: new AbortController().signal
       })
-    ).resolves.toEqual([{ id: 'router/vision' }]);
+    ).resolves.toEqual([
+      { id: 'router/text' },
+      {
+        id: 'router/vision',
+        ownedBy: 'router',
+        vision: true,
+        contextWindow: 400_000,
+        maxOutput: 128_000
+      }
+    ]);
 
     expect(fetchMock).toHaveBeenCalledWith(
       'https://router.example.com/v1/models',
@@ -167,7 +184,7 @@ describe('createRouterClient', () => {
     });
 
     await expect(
-      client.listVisionModels({
+      client.listModels({
         baseUrl: 'https://router.example.com',
         apiKey: 'secret-token',
         timeoutMs: 1000,
@@ -188,7 +205,7 @@ describe('createRouterClient', () => {
       }) as never
     });
 
-    const result = client.listVisionModels({
+    const result = client.listModels({
       baseUrl: 'https://router.example.com',
       apiKey: 'secret-token',
       timeoutMs: 1000,
@@ -198,7 +215,7 @@ describe('createRouterClient', () => {
     await expect(result).rejects.toMatchObject({
       code: 'UPSTREAM_UNAVAILABLE',
       requestId: 'req-json-parse',
-      details: { phase: 'vision-model-discovery' }
+      details: { phase: 'model-catalog-discovery' }
     });
 
     const error = await result.catch(
@@ -218,7 +235,7 @@ describe('createRouterClient', () => {
       }) as never
     });
 
-    const result = client.listVisionModels({
+    const result = client.listModels({
       baseUrl: 'https://router.example.com',
       apiKey: 'secret-token',
       timeoutMs: 1000,
@@ -227,7 +244,7 @@ describe('createRouterClient', () => {
 
     await expect(result).rejects.toMatchObject({
       code: 'UPSTREAM_UNAVAILABLE',
-      details: { phase: 'vision-model-discovery' }
+      details: { phase: 'model-catalog-discovery' }
     });
 
     const error = await result.catch(
@@ -266,7 +283,7 @@ describe('createRouterClient', () => {
       );
 
       const client = createRouterClient({ fetch: fetchMock as never });
-      const result = client.listVisionModels({
+      const result = client.listModels({
         baseUrl: 'https://router.example.com',
         apiKey: 'secret-token',
         timeoutMs: 1000,
@@ -295,12 +312,43 @@ describe('createRouterClient', () => {
     const client = createRouterClient({ fetch: fetchMock as never });
 
     await expect(
-      client.listVisionModels({
+      client.listModels({
         baseUrl: 'https://router.example.com',
         apiKey: 'secret-token',
         timeoutMs: 1000,
         signal: controller.signal
       })
     ).rejects.toMatchObject({ code: 'CANCELLATION_ERROR' });
+  });
+
+  it('preserves caller cancellation after the timeout deadline passes', async () => {
+    vi.useFakeTimers();
+
+    try {
+      let rejectFetch: ((reason: unknown) => void) | undefined;
+      const fetchMock = vi.fn().mockImplementation(
+        () =>
+          new Promise((_resolve, reject) => {
+            rejectFetch = reject;
+          })
+      );
+      const controller = new AbortController();
+      const client = createRouterClient({ fetch: fetchMock as never });
+      const result = client.listModels({
+        baseUrl: 'https://router.example.com',
+        apiKey: 'secret-token',
+        timeoutMs: 1_000,
+        signal: controller.signal
+      });
+      const rejection = expect(result).rejects.toMatchObject({ code: 'CANCELLATION_ERROR' });
+
+      controller.abort(new Error('cancelled by caller'));
+      await vi.advanceTimersByTimeAsync(1_000);
+      rejectFetch?.(new Error('delayed fetch cancellation'));
+      await rejection;
+    } finally {
+      vi.clearAllTimers();
+      vi.useRealTimers();
+    }
   });
 });
