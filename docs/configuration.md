@@ -43,7 +43,7 @@ Configuration is local per user under the `9router-copilot` namespace. Array ord
 | `9router-copilot.visionProxyModelId` | empty | Opaque analyzer model ID from the selected source. |
 | `9router-copilot.visionProxyPrompt` | built in | Complete instruction used to describe images. |
 
-`9router-copilot.maxTokens` controls request output limits. It is independent from each display model's Context Window metadata. A malformed value or `0` omits `max_tokens`; `9router` or an upstream provider may still enforce its own limit.
+`9router-copilot.maxTokens` controls request output limits. Its default is `0`. Only a positive safe integer is sent as `max_tokens`; `0` or a malformed value omits `max_tokens`. `9router` or an upstream provider may still enforce its own limit. Streaming requests continue to set `stream_options.include_usage`.
 
 ## Model fields
 
@@ -58,7 +58,9 @@ Configuration is local per user under the `9router-copilot` namespace. Array ord
 | `maxInputTokens` | Positive safe integer | Input Context Window metadata published to VS Code. |
 | `maxOutputTokens` | Positive safe integer | Output Context Window metadata published to VS Code. |
 
-Unknown fields, duplicate display IDs, invalid values, and empty mappings reject only the affected model. One broken entry does not hide unrelated valid entries. The default `agent` entry remains unpublished until `modelId` names an existing `9router` model.
+Unknown fields, duplicate display IDs, invalid values, and empty mappings reject only the affected model. One broken entry does not hide unrelated valid entries. The default `agent` entry remains unpublished until `modelId` names an existing `9router` model. These objects are user-defined curated display models; their Copilot-facing IDs and names remain separate from opaque backend IDs.
+
+### Breaking configuration change
 
 The old fixed-model settings are not read or migrated. Recreate desired picker entries as objects in `9router-copilot.models`.
 
@@ -74,7 +76,9 @@ Models default to `toolMode: "off"`; the manifest's initial `agent` example uses
 
 Run `9router: Configure Vision Proxy` to choose source and model. The extension also opens the same setup flow when a proxy request needs missing configuration.
 
-For source `9router`, authenticated `GET /v1/models` discovery keeps models where `capabilities.vision === true`. For source `copilot`, selection uses native VS Code language models; compatibility is enforced at runtime rather than guessed from model names.
+For source `9router`, authenticated `GET /v1/models` discovery keeps models where `capabilities.vision === true`. For source `copilot`, selection uses native GitHub Copilot language models through VS Code; compatibility is enforced at runtime rather than guessed from model names.
+
+If `9router-copilot.visionProxySource` is unset but `9router-copilot.visionProxyModelId` already has a value, runtime treats the legacy configuration as source `9router`.
 
 Proxy mode is fail-closed. Discovery errors, missing or stale analyzer IDs, consent or quota rejection, timeout, cancellation, malformed streams, and upstream failures stop the request before the primary model runs.
 
@@ -113,7 +117,7 @@ Debug levels:
 - Invalid thinking mode: use `off`, `minimal`, `low`, `medium`, `high`, `xhigh`, or `max`.
 - Suffixed model ID: remove the `(level)` suffix and set `thinkingMode` separately.
 
-## Development
+## Debug in VS Code
 
 Press `F5` and choose `Watch and Debug Extension` to start the TypeScript watcher and open an Extension Development Host. Choose `Build Once and Debug Extension` for a clean one-shot build. Runtime diagnostics appear in the `9router Copilot` output channel.
 

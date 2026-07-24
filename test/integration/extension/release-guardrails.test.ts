@@ -91,6 +91,10 @@ describe('release guardrails', () => {
 
   it('documents the breaking dynamic model contract without legacy settings', async () => {
     const readme = await readFile(resolve(process.cwd(), 'README.md'), 'utf8');
+    const configurationGuide = await readFile(
+      resolve(process.cwd(), 'docs/configuration.md'),
+      'utf8'
+    );
     const productionDesign = await readFile(
       resolve(
         process.cwd(),
@@ -101,7 +105,7 @@ describe('release guardrails', () => {
     const agentGuidance = await readFile(resolve(process.cwd(), 'AGENTS.md'), 'utf8');
     const convention = await readFile(resolve(process.cwd(), 'CODE_CONVENTION.md'), 'utf8');
 
-    for (const document of [readme, productionDesign, agentGuidance, convention]) {
+    for (const document of [configurationGuide, productionDesign, agentGuidance, convention]) {
       expect(document).toContain('user-defined curated');
     }
     expect(readme).toContain('9router-copilot.models');
@@ -114,27 +118,30 @@ describe('release guardrails', () => {
       'capabilities.vision',
       'GitHub Copilot'
     ]) {
-      expect(readme).toContain(text);
+      expect(configurationGuide).toContain(text);
       expect(productionDesign).toContain(text);
     }
-    for (const document of [readme, productionDesign]) {
+    for (const document of [configurationGuide, productionDesign]) {
       expect(document).toContain('GET /v1/models');
       expect(document).toContain('fail-closed');
     }
-    expect(readme).toContain('Breaking configuration change');
-    expect(readme).toContain('toolMode');
-    expect(readme).toContain('visionMode');
-    expect(readme).toContain('thinkingMode');
-    expect(readme).toContain('maxInputTokens');
-    expect(readme).toContain('maxOutputTokens');
-    expect(readme).toContain('reasoning_effort');
-    expect(readme).toContain('stream_options.include_usage');
-    expect(readme).not.toContain('9router-copilot.displayModels');
-    expect(readme).not.toContain('9router-copilot.modelMappings.');
+    expect(configurationGuide).toContain('Breaking configuration change');
+    expect(configurationGuide).toContain('toolMode');
+    expect(configurationGuide).toContain('visionMode');
+    expect(configurationGuide).toContain('thinkingMode');
+    expect(configurationGuide).toContain('maxInputTokens');
+    expect(configurationGuide).toContain('maxOutputTokens');
+    expect(configurationGuide).toContain('reasoning_effort');
+    expect(configurationGuide).toContain('stream_options.include_usage');
+    expect(configurationGuide).not.toContain('9router-copilot.displayModels');
+    expect(configurationGuide).not.toContain('9router-copilot.modelMappings.');
   });
 
   it('documents unlimited maxTokens semantics', async () => {
-    const readme = await readFile(resolve(process.cwd(), 'README.md'), 'utf8');
+    const configurationGuide = await readFile(
+      resolve(process.cwd(), 'docs/configuration.md'),
+      'utf8'
+    );
     const productionDesign = await readFile(
       resolve(
         process.cwd(),
@@ -143,7 +150,7 @@ describe('release guardrails', () => {
       'utf8'
     );
 
-    for (const document of [readme, productionDesign]) {
+    for (const document of [configurationGuide, productionDesign]) {
       expect(document).toContain('default is `0`');
       expect(document).toContain('positive safe integer');
       expect(document).toContain('omits `max_tokens`');
@@ -211,11 +218,14 @@ describe('release guardrails', () => {
   });
 
   it('documents the VS Code debug workflow for local development', async () => {
-    const readme = await readFile(resolve(process.cwd(), 'README.md'), 'utf8');
+    const configurationGuide = await readFile(
+      resolve(process.cwd(), 'docs/configuration.md'),
+      'utf8'
+    );
 
-    expect(readme).toContain('## Debug in VS Code');
-    expect(readme).toContain('Watch and Debug Extension');
-    expect(readme).toContain('Build Once and Debug Extension');
-    expect(readme).toContain('9router Copilot');
+    expect(configurationGuide).toContain('## Debug in VS Code');
+    expect(configurationGuide).toContain('Watch and Debug Extension');
+    expect(configurationGuide).toContain('Build Once and Debug Extension');
+    expect(configurationGuide).toContain('9router Copilot');
   });
 });
