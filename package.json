@@ -57,7 +57,8 @@
               "modelId": "",
               "toolMode": "auto",
               "visionMode": "off",
-              "thinkingMode": "off"
+              "thinkingMode": "off",
+              "thinkingEfforts": []
             }
           ],
           "items": {
@@ -112,6 +113,23 @@
                   "max"
                 ],
                 "default": "off"
+              },
+              "thinkingEfforts": {
+                "type": "array",
+                "default": [],
+                "uniqueItems": true,
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "minimal",
+                    "low",
+                    "medium",
+                    "high",
+                    "xhigh",
+                    "max"
+                  ]
+                },
+                "description": "Ordered non-off Thinking Effort choices exposed for this model. Empty hides the Thinking Effort picker."
               },
               "maxInputTokens": {
                 "type": "integer",

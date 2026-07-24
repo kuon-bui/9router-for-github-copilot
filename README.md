@@ -42,7 +42,8 @@ Configuration is local per user under the `9router-copilot` namespace. Array ord
       "modelId": "replace-with-existing-9router-model-id",
       "toolMode": "auto",
       "visionMode": "off",
-      "thinkingMode": "off"
+      "thinkingMode": "medium",
+      "thinkingEfforts": ["minimal", "low", "medium", "high"]
     }
   ],
   "9router-copilot.visionProxySource": "9router",
@@ -58,6 +59,8 @@ Configuration is local per user under the `9router-copilot` namespace. Array ord
 
 This release replaces the old fixed-model settings. They are not read or migrated. Recreate each desired picker entry manually as an object in `9router-copilot.models`.
 
+Existing model objects with a non-`off` `thinkingMode` must add that value to `thinkingEfforts`. Invalid or duplicate entries reject only that model.
+
 ### Model fields
 
 - `id`: Stable Copilot-facing id matching `[a-z0-9][a-z0-9._-]*`.
@@ -66,6 +69,7 @@ This release replaces the old fixed-model settings. They are not read or migrate
 - `toolMode`: `auto` exposes supported host tools; `off` disables tools.
 - `visionMode`: `native`, `proxy`, or `off`.
 - `thinkingMode`: Default Thinking Effort: `off`, `minimal`, `low`, `medium`, `high`, `xhigh`, or `max`.
+- `thinkingEfforts`: Ordered non-`off` picker choices: `minimal`, `low`, `medium`, `high`, `xhigh`, or `max`. Array order controls picker order after `None`. Missing or empty lists support only `off` and omit `configurationSchema`, hiding the picker. A non-`off` `thinkingMode` must appear in this list.
 - `maxInputTokens` and `maxOutputTokens`: Optional compatibility fallbacks for Context Window metadata. Normal operation reads `capabilities.contextWindow` and `capabilities.maxOutput` from authenticated `GET /v1/models` results.
 
 Unknown fields, duplicate ids, invalid values, and empty mappings are rejected per model. One broken entry does not hide unrelated valid entries. The default configuration contains one unpublished `agent` entry until its `modelId` is set.
@@ -102,7 +106,7 @@ Proxy mode is fail-closed: discovery errors, missing/stale analyzer ids, consent
 
 ### Thinking Effort
 
-Each configured model gets the native Copilot Chat Thinking Effort picker. `None` omits a reasoning override; `Minimal`, `Low`, `Medium`, `High`, `XHigh`, and `Max` send the selected value through `reasoning_effort` while keeping `modelId` unchanged. The model object's `thinkingMode` is the fallback when the host supplies no valid selection. `9router` owns provider-specific reasoning translation.
+Each model with at least one configured `thinkingEfforts` value gets the native Copilot Chat Thinking Effort picker. `None` is always first, then configured values in array order. `None` omits `reasoning_effort`; allowed values send the selected value while keeping `modelId` unchanged. Missing, malformed, unsupported, or stale host selections fall back to that model's validated `thinkingMode`. An empty list omits `configurationSchema` and hides the picker. `9router` owns provider-specific reasoning translation.
 
 ### Debug Mode
 
@@ -121,7 +125,7 @@ Common fixes:
 - Missing model: update the affected object's `modelId` to an existing 9router model.
 - Image input blocked: set that object's `visionMode` to `native` or `proxy` only when supported.
 - Missing Vision proxy: run `9router: Configure Vision Proxy` (or set `9router-copilot.visionProxySource`, `9router-copilot.visionProxyModelId`, and optionally `9router-copilot.visionProxyPrompt` directly); proxy mode remains fail-closed until configuration is complete.
-- Invalid thinking mode: use `off`, `minimal`, `low`, `medium`, `high`, `xhigh`, or `max`.
+- Invalid thinking mode or effort list: use supported values and include every non-`off` `thinkingMode` in that model's unique `thinkingEfforts` list.
 - Suffixed model id: remove the `(level)` suffix and set `thinkingMode` separately.
 
 ## Debug in VS Code
