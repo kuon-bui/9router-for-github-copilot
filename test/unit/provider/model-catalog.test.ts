@@ -104,4 +104,87 @@ describe('resolvePublishedModels', () => {
       maxOutputTokens: 4_096
     });
   });
+
+  it('prefers validated router metadata over configured fallback limits', () => {
+    const model = createPublishedModel(
+      {
+        sourceIndex: 0,
+        id: 'agent',
+        name: 'Agent',
+        modelId: 'cx/gpt-5.6-sol',
+        toolMode: 'off',
+        visionMode: 'off',
+        thinkingMode: 'off',
+        maxInputTokens: 64_000,
+        maxOutputTokens: 8_192
+      },
+      {
+        routerModel: {
+          id: 'cx/gpt-5.6-sol',
+          contextWindow: 400_000,
+          maxOutput: 128_000
+        }
+      }
+    );
+
+    expect(model).toMatchObject({
+      maxInputTokens: 400_000,
+      maxOutputTokens: 128_000
+    });
+  });
+
+  it('falls back independently when catalog metadata omits one field', () => {
+    const model = createPublishedModel(
+      {
+        sourceIndex: 0,
+        id: 'agent',
+        name: 'Agent',
+        modelId: 'router/agent',
+        toolMode: 'off',
+        visionMode: 'off',
+        thinkingMode: 'off',
+        maxInputTokens: 64_000,
+        maxOutputTokens: 8_192
+      },
+      {
+        routerModel: {
+          id: 'router/agent',
+          contextWindow: 400_000
+        }
+      }
+    );
+
+    expect(model).toMatchObject({
+      maxInputTokens: 400_000,
+      maxOutputTokens: 8_192
+    });
+  });
+
+  it('matches catalog metadata by exact backend model id', () => {
+    const settings = [
+      {
+        sourceIndex: 0,
+        id: 'agent',
+        name: 'Agent',
+        modelId: 'cx/gpt-5.6-sol',
+        toolMode: 'off',
+        visionMode: 'off',
+        thinkingMode: 'off',
+        maxInputTokens: 264_000,
+        maxOutputTokens: 264_000
+      }
+    ] as const;
+
+    expect(
+      resolvePublishedModels([...settings], {
+        routerModels: [
+          { id: 'cx/gpt-5.6-sol-preview', contextWindow: 800_000, maxOutput: 256_000 },
+          { id: 'cx/gpt-5.6-sol', contextWindow: 400_000, maxOutput: 128_000 }
+        ]
+      })[0]
+    ).toMatchObject({
+      maxInputTokens: 400_000,
+      maxOutputTokens: 128_000
+    });
+  });
 });

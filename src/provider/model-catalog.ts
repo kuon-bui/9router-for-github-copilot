@@ -1,8 +1,15 @@
 import { createThinkingEffortConfigurationSchema } from './thinking-effort';
+import type { RouterModelMetadata } from '../router/model-catalog';
 import type { ConfiguredModel, PublishedModel } from '../types/product-model';
 
 export interface PublishedModelOptions {
   visionProxyConfigured?: boolean;
+  routerModel?: RouterModelMetadata;
+}
+
+export interface ResolvePublishedModelsOptions {
+  visionProxyConfigured?: boolean;
+  routerModels?: readonly RouterModelMetadata[];
 }
 
 export function createPublishedModel(
@@ -23,8 +30,8 @@ export function createPublishedModel(
     vendor: '9router',
     family: setting.id,
     version: '1',
-    maxInputTokens: setting.maxInputTokens,
-    maxOutputTokens: setting.maxOutputTokens,
+    maxInputTokens: options.routerModel?.contextWindow ?? setting.maxInputTokens,
+    maxOutputTokens: options.routerModel?.maxOutput ?? setting.maxOutputTokens,
     capabilities,
     configurationSchema: createThinkingEffortConfigurationSchema(setting.thinkingMode)
   };
@@ -32,7 +39,18 @@ export function createPublishedModel(
 
 export function resolvePublishedModels(
   settings: ConfiguredModel[],
-  options: PublishedModelOptions = {}
+  options: ResolvePublishedModelsOptions = {}
 ): PublishedModel[] {
-  return settings.map((setting) => createPublishedModel(setting, options));
+  const routerModelsById = new Map(
+    options.routerModels?.map((model) => [model.id, model] as const) ?? []
+  );
+
+  return settings.map((setting) => {
+    const routerModel = routerModelsById.get(setting.modelId);
+
+    return createPublishedModel(setting, {
+      ...(options.visionProxyConfigured === true ? { visionProxyConfigured: true } : {}),
+      ...(routerModel ? { routerModel } : {})
+    });
+  });
 }
