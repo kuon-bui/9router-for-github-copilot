@@ -15,6 +15,7 @@ const proxyModel = {
   toolMode: 'auto',
   visionMode: 'proxy',
   thinkingMode: 'max',
+  thinkingEfforts: ['max'],
   maxInputTokens: 128_000,
   maxOutputTokens: 8_192
 } as const;

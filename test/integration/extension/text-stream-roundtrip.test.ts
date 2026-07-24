@@ -75,7 +75,8 @@ describe('NineRouterChatProvider', () => {
           id: 'daily',
           name: 'Daily',
           modelId: 'combo/daily',
-          thinkingMode: 'xhigh'
+          thinkingMode: 'xhigh',
+          thinkingEfforts: ['xhigh', 'max']
         }
       ],
       baseUrl: 'https://router.example.com/v1',
@@ -137,7 +138,8 @@ describe('NineRouterChatProvider', () => {
           id: 'daily',
           name: 'Daily',
           modelId: 'combo/daily',
-          thinkingMode: 'high'
+          thinkingMode: 'high',
+          thinkingEfforts: ['high']
         }
       ],
       baseUrl: 'https://router.example.com/v1',
@@ -192,7 +194,8 @@ describe('NineRouterChatProvider', () => {
           id: 'daily',
           name: 'Daily',
           modelId: 'combo/daily',
-          thinkingMode: 'low'
+          thinkingMode: 'low',
+          thinkingEfforts: ['low', 'high']
         }
       ],
       baseUrl: 'https://router.example.com/v1',
@@ -303,7 +306,8 @@ describe('NineRouterChatProvider', () => {
           modelId: 'combo/agent',
           toolMode: 'auto',
           visionMode: 'proxy',
-          thinkingMode: 'high'
+          thinkingMode: 'high',
+          thinkingEfforts: ['high']
         }
       ],
       visionProxyModelId: 'combo/vision',

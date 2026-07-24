@@ -12,6 +12,7 @@ function selectedModel(overrides: Partial<ConfiguredModel> = {}): ConfiguredMode
     toolMode: 'auto',
     visionMode: 'off',
     thinkingMode: 'off',
+    thinkingEfforts: [],
     maxInputTokens: 128_000,
     maxOutputTokens: 8_192,
     ...overrides

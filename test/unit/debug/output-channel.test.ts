@@ -13,7 +13,8 @@ describe('formatSettingsSnapshotDiagnostics', () => {
                   id: 'daily',
                   name: 'Daily',
                   modelId: 'combo/daily',
-                  thinkingMode: 'high'
+                  thinkingMode: 'high',
+                  thinkingEfforts: ['high']
                 },
                 { id: 'agent', name: 'Agent', modelId: ' ' }
               ]

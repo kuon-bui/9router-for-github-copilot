@@ -12,6 +12,7 @@ describe('resolvePublishedModels', () => {
         toolMode: 'off',
         visionMode: 'off',
         thinkingMode: 'off',
+        thinkingEfforts: [],
         maxInputTokens: 128_000,
         maxOutputTokens: 8_192
       },
@@ -23,6 +24,7 @@ describe('resolvePublishedModels', () => {
         toolMode: 'auto',
         visionMode: 'off',
         thinkingMode: 'off',
+        thinkingEfforts: [],
         maxInputTokens: 128_000,
         maxOutputTokens: 8_192
       }
@@ -44,6 +46,7 @@ describe('resolvePublishedModels', () => {
         toolMode: 'off',
         visionMode: 'off',
         thinkingMode: 'off',
+        thinkingEfforts: [],
         maxInputTokens: 128_000,
         maxOutputTokens: 8_192
       },
@@ -55,6 +58,7 @@ describe('resolvePublishedModels', () => {
         toolMode: 'auto',
         visionMode: 'proxy',
         thinkingMode: 'max',
+        thinkingEfforts: ['max'],
         maxInputTokens: 128_000,
         maxOutputTokens: 8_192
       }
@@ -74,6 +78,7 @@ describe('resolvePublishedModels', () => {
       toolMode: 'auto',
       visionMode: 'proxy',
       thinkingMode: 'off',
+      thinkingEfforts: [],
       maxInputTokens: 128_000,
       maxOutputTokens: 8_192
     } as const;
@@ -95,6 +100,7 @@ describe('resolvePublishedModels', () => {
       toolMode: 'off',
       visionMode: 'off',
       thinkingMode: 'off',
+      thinkingEfforts: [],
       maxInputTokens: 64_000,
       maxOutputTokens: 4_096
     });
@@ -115,6 +121,7 @@ describe('resolvePublishedModels', () => {
         toolMode: 'off',
         visionMode: 'off',
         thinkingMode: 'off',
+        thinkingEfforts: [],
         maxInputTokens: 64_000,
         maxOutputTokens: 8_192
       },
@@ -143,6 +150,7 @@ describe('resolvePublishedModels', () => {
         toolMode: 'off',
         visionMode: 'off',
         thinkingMode: 'off',
+        thinkingEfforts: [],
         maxInputTokens: 64_000,
         maxOutputTokens: 8_192
       },
@@ -170,6 +178,7 @@ describe('resolvePublishedModels', () => {
         toolMode: 'off',
         visionMode: 'off',
         thinkingMode: 'off',
+        thinkingEfforts: [],
         maxInputTokens: 264_000,
         maxOutputTokens: 264_000
       }

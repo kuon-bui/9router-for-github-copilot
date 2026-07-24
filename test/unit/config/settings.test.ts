@@ -155,13 +155,15 @@ describe('buildSettingsSnapshot', () => {
             id: 'coder',
             name: 'Coder',
             modelId: 'router/coder',
-            thinkingMode: 'xhigh'
+            thinkingMode: 'xhigh',
+            thinkingEfforts: ['low', 'xhigh']
           }
         ]
       })
     );
 
     expect(snapshot.models[0]?.thinkingMode).toBe('xhigh');
+    expect(snapshot.models[0]?.thinkingEfforts).toEqual(['low', 'xhigh']);
     expect(
       snapshot.publishedModels[0]?.configurationSchema?.properties.reasoningEffort.default
     ).toBe('xhigh');
