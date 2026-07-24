@@ -55,7 +55,7 @@ function configuration(values: Record<string, unknown>) {
 
 function createDependencies(overrides?: {
   getApiKey?: () => Promise<string | undefined>;
-  listVisionModels?: () => Promise<Array<{ id: string }>>;
+  listModels?: () => Promise<Array<{ id: string; vision?: true }>>;
   runtimeValues?: Record<string, unknown>;
 }) {
   return {
@@ -63,9 +63,9 @@ function createDependencies(overrides?: {
       get: async () => (overrides?.getApiKey ? overrides.getApiKey() : 'secret')
     } as never,
     routerClient: {
-      listVisionModels:
-        overrides?.listVisionModels ??
-        (async () => [{ id: 'router/vision' }])
+      listModels:
+        overrides?.listModels ??
+        (async () => [{ id: 'router/vision', vision: true as const }])
     } as never,
     getRuntimeSettings: () =>
       loadRuntimeSettings(
@@ -165,7 +165,7 @@ describe('createVisionProxyConfigurator', () => {
 
     const configure = createVisionProxyConfigurator(
       createDependencies({
-        listVisionModels: async () => []
+        listModels: async () => []
       })
     );
 
@@ -299,10 +299,10 @@ describe('createVisionProxyConfigurator', () => {
 
     const configure = createVisionProxyConfigurator(
       createDependencies({
-        listVisionModels: async () => {
+        listModels: async () => {
           listCalls += 1;
           await blockedCall;
-          return [{ id: 'router/vision' }];
+          return [{ id: 'router/vision', vision: true as const }];
         }
       })
     );
@@ -333,10 +333,10 @@ describe('createVisionProxyConfigurator', () => {
 
     const configure = createVisionProxyConfigurator(
       createDependencies({
-        listVisionModels: async () => {
+        listModels: async () => {
           listCalls += 1;
           await blockedCall;
-          return [{ id: 'router/vision' }];
+          return [{ id: 'router/vision', vision: true as const }];
         }
       })
     );
@@ -381,10 +381,10 @@ describe('createVisionProxyConfigurator', () => {
 
     const configure = createVisionProxyConfigurator(
       createDependencies({
-        listVisionModels: async () => {
+        listModels: async () => {
           listCalls += 1;
           await blockedCall;
-          return [{ id: 'router/vision' }];
+          return [{ id: 'router/vision', vision: true as const }];
         }
       })
     );

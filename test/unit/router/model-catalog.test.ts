@@ -1,5 +1,99 @@
 import { describe, expect, it } from 'vitest';
-import { parseVisionModels } from '../../../src/router/model-catalog';
+import {
+  parseRouterModels,
+  parseVisionModels,
+  toVisionModels
+} from '../../../src/router/model-catalog';
+
+describe('parseRouterModels', () => {
+  it('validates context metadata while retaining catalog models without capabilities', () => {
+    expect(
+      parseRouterModels({
+        object: 'list',
+        data: [
+          {
+            id: 'cx/gpt-5.6-sol',
+            owned_by: 'cx',
+            capabilities: {
+              vision: true,
+              contextWindow: 400_000,
+              maxOutput: 128_000
+            }
+          },
+          { id: 'router/combo' },
+          {
+            id: 'partial/model',
+            capabilities: {
+              contextWindow: 64_000,
+              maxOutput: 0
+            }
+          },
+          {
+            id: 'invalid/model',
+            capabilities: {
+              contextWindow: 1.5,
+              maxOutput: '8192'
+            }
+          },
+          { id: '', capabilities: { contextWindow: 32_000 } },
+          null
+        ]
+      })
+    ).toEqual([
+      {
+        id: 'cx/gpt-5.6-sol',
+        ownedBy: 'cx',
+        vision: true,
+        contextWindow: 400_000,
+        maxOutput: 128_000
+      },
+      { id: 'invalid/model' },
+      { id: 'partial/model', contextWindow: 64_000 },
+      { id: 'router/combo' }
+    ]);
+  });
+
+  it('merges duplicate ids without replacing earlier valid metadata', () => {
+    expect(
+      parseRouterModels({
+        data: [
+          { id: 'router/model', capabilities: { contextWindow: 128_000 } },
+          {
+            id: 'router/model',
+            owned_by: 'router',
+            capabilities: { vision: true, contextWindow: 64_000, maxOutput: 8_192 }
+          }
+        ]
+      })
+    ).toEqual([
+      {
+        id: 'router/model',
+        ownedBy: 'router',
+        vision: true,
+        contextWindow: 128_000,
+        maxOutput: 8_192
+      }
+    ]);
+  });
+
+  it.each([null, {}, { data: null }, { data: {} }])(
+    'rejects malformed general catalog root %j',
+    (payload) => {
+      expect(() => parseRouterModels(payload)).toThrowError(
+        expect.objectContaining({ code: 'UPSTREAM_UNAVAILABLE' })
+      );
+    }
+  );
+
+  it('derives the Vision view from validated general metadata', () => {
+    expect(
+      toVisionModels([
+        { id: 'router/text' },
+        { id: 'router/vision', ownedBy: 'router', vision: true }
+      ])
+    ).toEqual([{ id: 'router/vision', ownedBy: 'router' }]);
+  });
+});
 
 describe('parseVisionModels', () => {
   it('keeps only explicit boolean Vision capability, deduplicated and sorted', () => {
