@@ -1,5 +1,6 @@
 import type { ConfiguredModel } from '../types/product-model';
 import type { RouterToolDefinition } from '../types/router-contract';
+import { canonicalizeJsonObject } from './canonical-json';
 
 export interface HostToolDefinition {
   name: string;
@@ -26,7 +27,9 @@ export function shouldExposeTools(setting: ConfiguredModel): boolean {
 export function adaptToolsToRouterDefinitions(
   tools: readonly HostToolDefinition[]
 ): RouterToolDefinition[] {
-  return tools.map((tool) => {
+  return [...tools]
+    .sort((left, right) => left.name.localeCompare(right.name))
+    .map((tool) => {
     const definition: RouterToolDefinition = {
       type: 'function',
       function: {
@@ -40,7 +43,7 @@ export function adaptToolsToRouterDefinitions(
     }
 
     return definition;
-  });
+    });
 }
 
 export function adaptToolOptionsForRouter(input: {
@@ -121,7 +124,7 @@ export function adaptToolOptionsForRouter(input: {
 
 function normalizeToolSchema(input: unknown): Record<string, unknown> {
   if (isPlainObject(input)) {
-    return input;
+    return canonicalizeJsonObject(input);
   }
 
   return {

@@ -10,6 +10,7 @@ import type {
 import type { HostToolDefinition } from './tool-adapter';
 import type { HostChatRequestMessage } from './vision-proxy';
 import { createRouterImagePart, isHostImageDataPart } from './image-input-adapter';
+import { canonicalJsonStringify } from './canonical-json';
 
 function mapRole(role: unknown): RouterMessage['role'] {
   if (role === 0 || role === 'system') {
@@ -161,7 +162,7 @@ function createRouterToolCall(part: unknown): RouterToolCall | undefined {
 
   let serializedInput: string | undefined;
   try {
-    serializedInput = JSON.stringify(part.input);
+    serializedInput = canonicalJsonStringify(part.input);
   } catch {
     return undefined;
   }
@@ -207,7 +208,8 @@ function extractToolResultText(toolResult: ToolResultLike): string {
         return part.value;
       }
 
-      return JSON.stringify(part);
+      const serializedPart = canonicalJsonStringify(part);
+      return serializedPart ?? '';
     })
     .join('\n');
 }
