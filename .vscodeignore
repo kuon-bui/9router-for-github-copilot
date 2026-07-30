@@ -16,3 +16,4 @@ dist/test/**
 dist/vitest.config.js
 vitest.config.ts
 eslint.config.js
+pnpm-workspace.yaml

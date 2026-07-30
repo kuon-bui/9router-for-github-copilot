@@ -23,10 +23,18 @@ function canonicalizeValue(
   }
 
   if (Array.isArray(value)) {
-    return value.map((item) => {
-      const canonical = canonicalizeValue(item, seen);
-      return canonical === undefined ? null : canonical;
-    });
+    if (seen.has(value)) {
+      throw new TypeError('Converting circular structure to JSON');
+    }
+    seen.add(value);
+    try {
+      return value.map((item) => {
+        const canonical = canonicalizeValue(item, seen);
+        return canonical === undefined ? null : canonical;
+      });
+    } finally {
+      seen.delete(value);
+    }
   }
 
   if (!isPlainObject(value)) {

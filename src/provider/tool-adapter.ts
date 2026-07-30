@@ -28,7 +28,9 @@ export function adaptToolsToRouterDefinitions(
   tools: readonly HostToolDefinition[]
 ): RouterToolDefinition[] {
   return [...tools]
-    .sort((left, right) => left.name.localeCompare(right.name))
+    .sort((left, right) =>
+      left.name < right.name ? -1 : left.name > right.name ? 1 : 0
+    )
     .map((tool) => {
     const definition: RouterToolDefinition = {
       type: 'function',
