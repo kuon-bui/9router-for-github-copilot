@@ -14,8 +14,7 @@
   ],
   "packages": {
     ".": {
-      "changelog-path": "CHANGELOG.md",
-      "release-as": "0.5.0"
+      "changelog-path": "CHANGELOG.md"
     }
   }
 }
