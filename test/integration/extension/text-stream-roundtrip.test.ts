@@ -75,7 +75,8 @@ describe('NineRouterChatProvider', () => {
           id: 'daily',
           name: 'Daily',
           modelId: 'combo/daily',
-          thinkingMode: 'xhigh'
+          thinkingMode: 'xhigh',
+          thinkingEfforts: ['xhigh', 'max']
         }
       ],
       baseUrl: 'https://router.example.com/v1',
@@ -137,7 +138,8 @@ describe('NineRouterChatProvider', () => {
           id: 'daily',
           name: 'Daily',
           modelId: 'combo/daily',
-          thinkingMode: 'high'
+          thinkingMode: 'high',
+          thinkingEfforts: ['high']
         }
       ],
       baseUrl: 'https://router.example.com/v1',
@@ -185,6 +187,57 @@ describe('NineRouterChatProvider', () => {
     expect(submittedModel).toBe('combo/daily');
   });
 
+  it('falls back to the model default when the host sends a stale thinking effort', async () => {
+    __setConfigurationValues({
+      models: [
+        {
+          id: 'daily',
+          name: 'Daily',
+          modelId: 'combo/daily',
+          thinkingMode: 'low',
+          thinkingEfforts: ['low', 'medium']
+        }
+      ],
+      baseUrl: 'https://router.example.com/v1',
+      maxTokens: 128,
+      requestTimeoutMs: 5000,
+      debugMode: 'minimal'
+    });
+
+    let submittedRequest: RouterChatCompletionRequest | undefined;
+    const provider = new NineRouterChatProvider(
+      { secrets: { get: async () => 'token' } } as never,
+      {
+        async *streamChatCompletion(input: { request: RouterChatCompletionRequest }) {
+          submittedRequest = input.request;
+          yield { type: 'response-complete' };
+        }
+      } as never
+    );
+
+    await provider.provideLanguageModelChatResponse(
+      {
+        id: 'daily',
+        name: 'Daily',
+        vendor: '9router',
+        family: 'daily',
+        version: '1',
+        maxInputTokens: 128000,
+        maxOutputTokens: 8192,
+        capabilities: {}
+      },
+      [{ role: 1, content: 'Think' }] as never,
+      { modelConfiguration: { reasoningEffort: 'max' } } as never,
+      { report: () => undefined } as never,
+      __createCancellationToken().value as never
+    );
+
+    expect(submittedRequest).toMatchObject({
+      model: 'combo/daily',
+      reasoning_effort: 'low'
+    });
+  });
+
   it('logs configured and effective thinking metadata without dumping host configuration', async () => {
     __setConfigurationValues({
       models: [
@@ -192,7 +245,8 @@ describe('NineRouterChatProvider', () => {
           id: 'daily',
           name: 'Daily',
           modelId: 'combo/daily',
-          thinkingMode: 'low'
+          thinkingMode: 'low',
+          thinkingEfforts: ['low', 'high']
         }
       ],
       baseUrl: 'https://router.example.com/v1',
@@ -303,7 +357,8 @@ describe('NineRouterChatProvider', () => {
           modelId: 'combo/agent',
           toolMode: 'auto',
           visionMode: 'proxy',
-          thinkingMode: 'high'
+          thinkingMode: 'high',
+          thinkingEfforts: ['high', 'max']
         }
       ],
       visionProxyModelId: 'combo/vision',

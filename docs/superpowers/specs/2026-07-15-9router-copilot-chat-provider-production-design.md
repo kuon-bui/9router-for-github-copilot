@@ -227,11 +227,11 @@ own limit.
 
 ### Native thinking effort picker
 
-Every valid published model exposes a `configurationSchema` navigation property named `reasoningEffort`. Copilot Chat renders the property as an independent per-model **Thinking Effort** submenu with `None`, `Minimal`, `Low`, `Medium`, `High`, `XHigh`, and `Max`.
+Each valid model configures ordered non-`off` choices through `thinkingEfforts`; array order controls picker order after host-only `None`. A missing or empty list means `off` only, omits `configurationSchema`, and hides the picker.
 
-The validated model object's `thinkingMode` value supplies that model's schema default and request fallback. A valid `modelConfiguration.reasoningEffort` value overrides the local default for the current request; `none` maps to internal `off`, while the remaining values map directly.
+A non-`off` `thinkingMode` must appear in that model's `thinkingEfforts`; invalid or duplicate lists reject only the affected model. A valid host selection overrides the default for the request. `none` maps to internal `off`; enabled values are accepted only when selected model allowlist contains them. Missing, malformed, unsupported, or stale host values fall back to validated `thinkingMode`.
 
-The extension keeps the configured `modelId` unchanged in `model`. For a non-`off` effective level, it sets the OpenAI-compatible `reasoning_effort` request field. `9router` owns provider-specific reasoning translation and compatibility policy. Reasoning deltas remain hidden.
+Extension keeps configured `modelId` unchanged. Non-`off` effective levels set OpenAI-compatible `reasoning_effort`; `off` omits it. `9router` owns provider-specific reasoning translation and compatibility policy. Reasoning deltas remain hidden.
 
 ### Recommended behavior
 

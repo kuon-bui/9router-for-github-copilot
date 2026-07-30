@@ -19,6 +19,7 @@ export const DEFAULT_MODELS = [
     modelId: '',
     toolMode: 'auto',
     visionMode: 'off',
-    thinkingMode: 'off'
+    thinkingMode: 'off',
+    thinkingEfforts: []
   }
 ] as const;

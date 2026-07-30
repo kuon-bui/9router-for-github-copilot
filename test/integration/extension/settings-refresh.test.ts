@@ -104,6 +104,66 @@ describe('NineRouterChatProvider snapshot refresh', () => {
     });
   });
 
+  it('refreshes each model thinking effort schema from settings', async () => {
+    const provider = new NineRouterChatProvider(
+      context,
+      routerClient,
+      createSnapshot([
+        {
+          id: 'coder',
+          name: 'Coder',
+          modelId: 'router/coder',
+          thinkingMode: 'low',
+          thinkingEfforts: ['low']
+        }
+      ])
+    );
+
+    const initial = await provider.provideLanguageModelChatInformation({} as never, {} as never);
+    expect(initial[0]?.configurationSchema?.properties.reasoningEffort.enum).toEqual([
+      'none',
+      'low'
+    ]);
+
+    provider.refreshFromSnapshot(
+      createSnapshot([
+        {
+          id: 'coder',
+          name: 'Coder',
+          modelId: 'router/coder',
+          thinkingMode: 'off',
+          thinkingEfforts: ['high', 'max']
+        }
+      ])
+    );
+
+    const refreshed = await provider.provideLanguageModelChatInformation({} as never, {} as never);
+    expect(refreshed[0]?.configurationSchema?.properties.reasoningEffort).toMatchObject({
+      enum: ['none', 'high', 'max'],
+      default: 'none'
+    });
+  });
+
+  it('keeps valid models when one thinking effort configuration is invalid', async () => {
+    const provider = new NineRouterChatProvider(
+      context,
+      routerClient,
+      createSnapshot([
+        {
+          id: 'broken',
+          name: 'Broken',
+          modelId: 'router/broken',
+          thinkingMode: 'high',
+          thinkingEfforts: ['low']
+        },
+        { id: 'coder', name: 'Coder', modelId: 'router/coder' }
+      ])
+    );
+
+    const models = await provider.provideLanguageModelChatInformation({} as never, {} as never);
+    expect(models.map((model) => model.id)).toEqual(['coder']);
+  });
+
   it('refreshes on every information call, retains failed cache, and replaces it after success', async () => {
     const listModels = vi
       .fn()

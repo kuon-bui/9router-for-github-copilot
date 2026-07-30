@@ -12,6 +12,7 @@ describe('parseModelSettings', () => {
         toolMode: 'auto',
         visionMode: 'native',
         thinkingMode: 'high',
+        thinkingEfforts: ['high'],
         maxInputTokens: 64_000,
         maxOutputTokens: 4_096
       }
@@ -26,6 +27,7 @@ describe('parseModelSettings', () => {
         toolMode: 'off',
         visionMode: 'off',
         thinkingMode: 'off',
+        thinkingEfforts: [],
         maxInputTokens: 264_000,
         maxOutputTokens: 264_000
       },
@@ -37,12 +39,89 @@ describe('parseModelSettings', () => {
         toolMode: 'auto',
         visionMode: 'native',
         thinkingMode: 'high',
+        thinkingEfforts: ['high'],
         maxInputTokens: 64_000,
         maxOutputTokens: 4_096
       }
     ]);
     expect(result.rejectedModels).toEqual([]);
     expect(result.issues).toEqual([]);
+  });
+
+  it('preserves ordered enabled thinking efforts', () => {
+    const result = parseModelSettings([
+      {
+        id: 'agent',
+        name: 'Agent',
+        modelId: 'router/agent',
+        thinkingMode: 'medium',
+        thinkingEfforts: ['high', 'minimal', 'medium']
+      }
+    ]);
+
+    expect(result.models[0]).toMatchObject({
+      thinkingMode: 'medium',
+      thinkingEfforts: ['high', 'minimal', 'medium']
+    });
+  });
+
+  it.each([
+    ['null', null],
+    ['non-array', 'high'],
+    ['unsupported value', ['turbo']],
+    ['non-string value', ['low', 42]],
+    ['duplicate value', ['low', 'low']]
+  ])('rejects %s thinkingEfforts', (_label, thinkingEfforts) => {
+    const result = parseModelSettings([
+      { id: 'agent', name: 'Agent', modelId: 'router/agent', thinkingEfforts }
+    ]);
+
+    expect(result.models).toEqual([]);
+    expect(result.rejectedModels).toEqual([
+      expect.objectContaining({
+        sourceIndex: 0,
+        id: 'agent',
+        code: 'INVALID_THINKING_EFFORTS',
+        path: '9router-copilot.models[0].thinkingEfforts'
+      })
+    ]);
+  });
+
+  it('rejects a non-off default outside thinkingEfforts', () => {
+    const result = parseModelSettings([
+      {
+        id: 'agent',
+        name: 'Agent',
+        modelId: 'router/agent',
+        thinkingMode: 'high',
+        thinkingEfforts: ['low', 'medium']
+      },
+      { id: 'daily', name: 'Daily', modelId: 'router/daily' }
+    ]);
+
+    expect(result.models.map((model) => model.id)).toEqual(['daily']);
+    expect(result.rejectedModels[0]).toMatchObject({
+      id: 'agent',
+      code: 'INVALID_THINKING_EFFORTS',
+      path: '9router-copilot.models[0].thinkingEfforts'
+    });
+  });
+
+  it('keeps off valid with an enabled effort allowlist', () => {
+    const result = parseModelSettings([
+      {
+        id: 'agent',
+        name: 'Agent',
+        modelId: 'router/agent',
+        thinkingMode: 'off',
+        thinkingEfforts: ['max']
+      }
+    ]);
+
+    expect(result.models[0]).toMatchObject({
+      thinkingMode: 'off',
+      thinkingEfforts: ['max']
+    });
   });
 
   it('rejects every duplicate id while preserving unrelated models', () => {
@@ -127,6 +206,7 @@ describe('parseModelSettings', () => {
     ['toolMode', 'INVALID_TOOL_MODE'],
     ['visionMode', 'INVALID_VISION_MODE'],
     ['thinkingMode', 'INVALID_THINKING_MODE'],
+    ['thinkingEfforts', 'INVALID_THINKING_EFFORTS'],
     ['maxInputTokens', 'INVALID_MAX_INPUT_TOKENS'],
     ['maxOutputTokens', 'INVALID_MAX_OUTPUT_TOKENS']
   ])('rejects explicit null for optional field %s', (field, code) => {

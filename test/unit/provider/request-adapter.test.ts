@@ -12,6 +12,7 @@ function selectedModel(overrides: Partial<ConfiguredModel> = {}): ConfiguredMode
     toolMode: 'auto',
     visionMode: 'off',
     thinkingMode: 'off',
+    thinkingEfforts: [],
     maxInputTokens: 128_000,
     maxOutputTokens: 8_192,
     ...overrides
@@ -99,6 +100,38 @@ describe('adaptMessagesToRouterRequest', () => {
         tool_call_id: 'call-1'
       }
     ]);
+  });
+
+  it('serializes tool-call arguments with deterministic key ordering', () => {
+    const request = adaptMessagesToRouterRequest({
+      selectedModel: selectedModel(),
+      messages: [
+        {
+          role: 2,
+          content: [
+            new vscode.LanguageModelToolCallPart('call-1', 'lookupUser', {
+              zebra: 'last',
+              alpha: 'first'
+            })
+          ]
+        }
+      ]
+    });
+
+    expect(request.messages[0]).toEqual({
+      role: 'assistant',
+      content: null,
+      tool_calls: [
+        {
+          id: 'call-1',
+          type: 'function',
+          function: {
+            name: 'lookupUser',
+            arguments: '{"alpha":"first","zebra":"last"}'
+          }
+        }
+      ]
+    });
   });
 
   it('preserves multiple tool calls and results in order', () => {

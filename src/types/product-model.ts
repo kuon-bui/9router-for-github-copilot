@@ -1,8 +1,7 @@
 import type * as vscode from 'vscode';
 import type { LanguageModelConfigurationSchema } from './vscode-chat-compat';
 
-export const THINKING_MODES = [
-  'off',
+export const ENABLED_THINKING_MODES = [
   'minimal',
   'low',
   'medium',
@@ -11,6 +10,9 @@ export const THINKING_MODES = [
   'max'
 ] as const;
 
+export const THINKING_MODES = ['off', ...ENABLED_THINKING_MODES] as const;
+
+export type EnabledThinkingMode = (typeof ENABLED_THINKING_MODES)[number];
 export type ThinkingMode = (typeof THINKING_MODES)[number];
 export type ToolMode = 'auto' | 'off';
 export type VisionMode = 'native' | 'proxy' | 'off';
@@ -23,6 +25,7 @@ export interface ConfiguredModel {
   toolMode: ToolMode;
   visionMode: VisionMode;
   thinkingMode: ThinkingMode;
+  thinkingEfforts: EnabledThinkingMode[];
   maxInputTokens: number;
   maxOutputTokens: number;
 }

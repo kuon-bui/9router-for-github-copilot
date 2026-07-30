@@ -15,6 +15,7 @@ describe('release guardrails', () => {
         additionalProperties: boolean;
         required: string[];
         properties: {
+          thinkingEfforts: Record<string, unknown>;
           maxInputTokens: Record<string, unknown>;
           maxOutputTokens: Record<string, unknown>;
         };
@@ -30,13 +31,23 @@ describe('release guardrails', () => {
           modelId: '',
           toolMode: 'auto',
           visionMode: 'off',
-          thinkingMode: 'off'
+          thinkingMode: 'off',
+          thinkingEfforts: []
         }
       ],
       items: {
         type: 'object',
         additionalProperties: false,
         required: ['id', 'name', 'modelId']
+      }
+    });
+    expect(models.items.properties.thinkingEfforts).toMatchObject({
+      type: 'array',
+      default: [],
+      uniqueItems: true,
+      items: {
+        type: 'string',
+        enum: ['minimal', 'low', 'medium', 'high', 'xhigh', 'max']
       }
     });
     expect(models.items.properties.maxInputTokens).toMatchObject({
@@ -143,6 +154,7 @@ describe('release guardrails', () => {
     expect(readme).toContain('toolMode');
     expect(readme).toContain('visionMode');
     expect(readme).toContain('thinkingMode');
+    expect(readme).toContain('thinkingEfforts');
     expect(readme).toContain('maxInputTokens');
     expect(readme).toContain('maxOutputTokens');
     expect(readme).toContain('reasoning_effort');
@@ -152,6 +164,10 @@ describe('release guardrails', () => {
       expect(document).toContain('capabilities.maxOutput');
       expect(document).toContain('latest successful');
       expect(document).toContain('264000');
+      expect(document).toContain('thinkingEfforts');
+      expect(document).toContain('array order');
+      expect(document).toContain('omits `configurationSchema`');
+      expect(document).toContain('stale');
     }
     expect(readme).toContain('compatibility fallback');
     expect(readme).not.toContain('9router-copilot.displayModels');

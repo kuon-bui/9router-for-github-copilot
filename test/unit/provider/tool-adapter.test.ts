@@ -15,6 +15,7 @@ function selectedModel(overrides: Partial<ConfiguredModel> = {}): ConfiguredMode
     toolMode: 'auto',
     visionMode: 'off',
     thinkingMode: 'off',
+    thinkingEfforts: [],
     maxInputTokens: 128_000,
     maxOutputTokens: 8_192,
     ...overrides
@@ -80,6 +81,45 @@ describe('adaptToolsToRouterDefinitions', () => {
         }
       }
     ]);
+  });
+
+  it('orders tools and canonicalizes schema keys for cache-stable prefixes', () => {
+    const definitions = adaptToolsToRouterDefinitions([
+      {
+        name: 'zetaTool',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            zeta: { type: 'string' },
+            alpha: {
+              type: 'object',
+              properties: {
+                second: { type: 'number' },
+                first: { type: 'number' }
+              }
+            }
+          },
+          required: ['zeta', 'alpha']
+        }
+      },
+      {
+        name: 'alphaTool',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            foo: { type: 'string' }
+          }
+        }
+      }
+    ]);
+
+    expect(definitions.map((definition) => definition.function.name)).toEqual([
+      'alphaTool',
+      'zetaTool'
+    ]);
+    expect(JSON.stringify(definitions[1]?.function.parameters)).toBe(
+      '{"properties":{"alpha":{"properties":{"first":{"type":"number"},"second":{"type":"number"}},"type":"object"},"zeta":{"type":"string"}},"required":["zeta","alpha"],"type":"object"}'
+    );
   });
 });
 

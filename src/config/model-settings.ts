@@ -5,9 +5,10 @@ import {
   DEFAULT_MODEL_TOOL_MODE,
   DEFAULT_MODEL_VISION_MODE
 } from './defaults';
-import { THINKING_MODES } from '../types/product-model';
+import { ENABLED_THINKING_MODES, THINKING_MODES } from '../types/product-model';
 import type {
   ConfiguredModel,
+  EnabledThinkingMode,
   ThinkingMode,
   ToolMode,
   VisionMode
@@ -25,12 +26,14 @@ const ALLOWED_FIELDS = new Set([
   'toolMode',
   'visionMode',
   'thinkingMode',
+  'thinkingEfforts',
   'maxInputTokens',
   'maxOutputTokens'
 ]);
 const TOOL_MODES = new Set<ToolMode>(['auto', 'off']);
 const VISION_MODES = new Set<VisionMode>(['native', 'proxy', 'off']);
 const THINKING_MODE_SET = new Set<string>(THINKING_MODES);
+const ENABLED_THINKING_MODE_SET = new Set<string>(ENABLED_THINKING_MODES);
 
 export type ModelSettingsIssueCode =
   | 'INVALID_MODELS_SETTING'
@@ -43,6 +46,7 @@ export type ModelSettingsIssueCode =
   | 'INVALID_TOOL_MODE'
   | 'INVALID_VISION_MODE'
   | 'INVALID_THINKING_MODE'
+  | 'INVALID_THINKING_EFFORTS'
   | 'INVALID_MAX_INPUT_TOKENS'
   | 'INVALID_MAX_OUTPUT_TOKENS';
 
@@ -229,6 +233,33 @@ export function parseModelSettings(input: unknown): ParsedModelSettings {
       );
       return;
     }
+    const thinkingEfforts = item.thinkingEfforts === undefined ? [] : item.thinkingEfforts;
+    if (
+      !Array.isArray(thinkingEfforts) ||
+      thinkingEfforts.some(
+        (effort) => typeof effort !== 'string' || !ENABLED_THINKING_MODE_SET.has(effort)
+      ) ||
+      new Set(thinkingEfforts).size !== thinkingEfforts.length
+    ) {
+      reject(
+        sourceIndex,
+        id,
+        'INVALID_THINKING_EFFORTS',
+        'thinkingEfforts',
+        'thinkingEfforts must be an array of unique supported non-off thinking modes.'
+      );
+      return;
+    }
+    if (thinkingMode !== 'off' && !thinkingEfforts.includes(thinkingMode)) {
+      reject(
+        sourceIndex,
+        id,
+        'INVALID_THINKING_EFFORTS',
+        'thinkingEfforts',
+        'thinkingEfforts must include the configured non-off thinkingMode.'
+      );
+      return;
+    }
     const maxInputTokens =
       item.maxInputTokens === undefined
         ? DEFAULT_MODEL_MAX_INPUT_TOKENS
@@ -266,6 +297,7 @@ export function parseModelSettings(input: unknown): ParsedModelSettings {
       toolMode: toolMode as ToolMode,
       visionMode: visionMode as VisionMode,
       thinkingMode: thinkingMode as ThinkingMode,
+      thinkingEfforts: [...thinkingEfforts] as EnabledThinkingMode[],
       maxInputTokens,
       maxOutputTokens
     });

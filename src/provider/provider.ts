@@ -186,7 +186,11 @@ export class NineRouterChatProvider
       );
     }
 
-    const effectiveThinking = resolveEffectiveThinkingMode(options, selectedModel.thinkingMode);
+    const effectiveThinking = resolveEffectiveThinkingMode(
+      options,
+      selectedModel.thinkingMode,
+      selectedModel.thinkingEfforts
+    );
     const requestSelectedModel: ConfiguredModel = {
       ...selectedModel,
       thinkingMode: effectiveThinking.thinkingMode
