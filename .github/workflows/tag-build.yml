@@ -4,6 +4,12 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing release tag to rebuild and attach
+        required: true
+        type: string
 
 concurrency:
   group: release-${{ github.ref }}
@@ -11,6 +17,7 @@ concurrency:
 
 jobs:
   release:
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -31,7 +38,9 @@ jobs:
 
   build:
     needs: release
-    if: needs.release.outputs.release_created == 'true'
+    if: >-
+      always() &&
+      (needs.release.outputs.release_created == 'true' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -40,7 +49,12 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
         with:
-          ref: ${{ needs.release.outputs.tag_name }}
+          ref: ${{ github.event_name == 'workflow_dispatch' && github.sha || needs.release.outputs.tag_name }}
+
+      - name: Verify manual release version
+        if: github.event_name == 'workflow_dispatch'
+        shell: bash
+        run: test "v$(node -p "require('./package.json').version")" = "${{ inputs.tag }}"
 
       - name: Set up pnpm
         uses: pnpm/action-setup@v4
@@ -74,13 +88,13 @@ jobs:
       - name: Upload VSIX artifact
         uses: actions/upload-artifact@v4
         with:
-          name: 9router-copilot-${{ needs.release.outputs.tag_name }}
+          name: 9router-copilot-${{ needs.release.outputs.tag_name || inputs.tag }}
           path: "*.vsix"
           if-no-files-found: error
 
       - name: Attach VSIX to GitHub release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ needs.release.outputs.tag_name }}
+          tag_name: ${{ needs.release.outputs.tag_name || inputs.tag }}
           files: "*.vsix"
           fail_on_unmatched_files: true
