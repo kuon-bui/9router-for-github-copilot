@@ -84,6 +84,7 @@ describe('release guardrails', () => {
     });
     expect(manifest.contributes.commands).toEqual(
       expect.arrayContaining([
+        expect.objectContaining({ command: '9routerCopilot.testConnection' }),
         expect.objectContaining({ command: '9routerCopilot.configureVisionProxy' })
       ])
     );
