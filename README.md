@@ -26,6 +26,8 @@ Reload VS Code if the provider does not immediately appear in Copilot Chat.
 
 Run `9router: Set API Key` from the Command Palette. The key is stored only in VS Code `SecretStorage`. Run `9router: Clear API Key` to remove it.
 
+Run `9router: Test Connection` to validate the current base URL and API key through authenticated `GET /v1/models`. The result reports latency, available model count, and missing configured model mappings without exposing credentials.
+
 Never put API keys in `settings.json`, `.env`, logs, or documentation.
 
 ## Configuration
@@ -121,6 +123,7 @@ Run `9router: Show Diagnostics`. The output reports snapshot state, runtime sett
 Common fixes:
 
 - Missing API key: run `9router: Set API Key`.
+- Connection failure or stale model mapping: run `9router: Test Connection`.
 - Invalid base URL: use an `http` or `https` URL that ends at, or can normalize to, `/v1`.
 - Missing model: update the affected object's `modelId` to an existing 9router model.
 - Image input blocked: set that object's `visionMode` to `native` or `proxy` only when supported.

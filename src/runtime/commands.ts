@@ -1,12 +1,15 @@
 import * as vscode from 'vscode';
 import { clearApiKey, setApiKey } from '../config/secret-store';
 import { showDiagnostics, showSettingsSnapshotDiagnostics } from '../debug/output-channel';
+import { NineRouterError } from '../router/errors';
 import type { SettingsSnapshot } from '../config/settings';
 import type { VisionProxyConfigurator } from './vision-configuration';
+import type { ConnectionTester } from './test-connection';
 
 interface CommandDependencies {
   getSettingsSnapshot?: () => SettingsSnapshot | undefined;
   configureVisionProxy?: VisionProxyConfigurator;
+  testConnection?: ConnectionTester;
 }
 
 export function registerCommands(
@@ -29,6 +32,39 @@ export function registerCommands(
   context.subscriptions.push(
     vscode.commands.registerCommand('9routerCopilot.clearApiKey', async () => {
       await clearApiKey(context.secrets);
+    })
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand('9routerCopilot.testConnection', async () => {
+      const cancellation = new vscode.CancellationTokenSource();
+      try {
+        const result = await dependencies.testConnection?.(cancellation.token);
+        if (!result) {
+          return;
+        }
+
+        const mapping =
+          result.configuredModelCount === 0
+            ? 'No configured models.'
+            : `${result.matchedModelCount}/${result.configuredModelCount} configured model mappings found.`;
+        const missing =
+          result.missingDisplayModelIds.length > 0
+            ? ` Missing: ${result.missingDisplayModelIds.join(', ')}.`
+            : '';
+        await vscode.window.showInformationMessage(
+          `9router connection succeeded in ${result.durationMs} ms. ${result.modelCount} models available. ${mapping}${missing}`
+        );
+      } catch (error) {
+        const requestId = error instanceof NineRouterError ? error.requestId : undefined;
+        const message =
+          error instanceof NineRouterError ? error.message : 'Unexpected connection error';
+        await vscode.window.showErrorMessage(
+          `9router connection failed: ${message}${requestId ? ` Request ID: ${requestId}.` : ''}`
+        );
+      } finally {
+        cancellation.dispose();
+      }
     })
   );
 

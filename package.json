@@ -26,6 +26,10 @@
         "title": "9router: Clear API Key"
       },
       {
+        "command": "9routerCopilot.testConnection",
+        "title": "9router: Test Connection"
+      },
+      {
         "command": "9routerCopilot.showDiagnostics",
         "title": "9router: Show Diagnostics"
       },

@@ -115,6 +115,8 @@ const outputChannel = new OutputChannel();
 let quickPickValues: unknown[] = [];
 let selectedChatModels: unknown[] = [];
 const configurationUpdates: Array<{ key: string; value: unknown; target: unknown }> = [];
+const informationMessages: string[] = [];
+const errorMessages: string[] = [];
 
 export const ConfigurationTarget = { Global: 1 } as const;
 
@@ -158,6 +160,14 @@ export const window = {
   },
   async showQuickPick(): Promise<unknown> {
     return quickPickValues.shift();
+  },
+  async showInformationMessage(message: string): Promise<string | undefined> {
+    informationMessages.push(message);
+    return undefined;
+  },
+  async showErrorMessage(message: string): Promise<string | undefined> {
+    errorMessages.push(message);
+    return undefined;
   }
 };
 
@@ -229,6 +239,14 @@ export function __getOutputLines(): string[] {
   return [...outputChannel.lines];
 }
 
+export function __getInformationMessages(): string[] {
+  return [...informationMessages];
+}
+
+export function __getErrorMessages(): string[] {
+  return [...errorMessages];
+}
+
 export function __getRegisteredProvider(): unknown {
   return registeredProvider;
 }
@@ -267,6 +285,8 @@ export function __resetVscodeState(): void {
   quickPickValues = [];
   selectedChatModels = [];
   configurationUpdates.length = 0;
+  informationMessages.length = 0;
+  errorMessages.length = 0;
 }
 
 export {

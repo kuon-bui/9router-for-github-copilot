@@ -1,10 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { buildSettingsSnapshot } from '../../../src/config/settings';
 import { formatSettingsSnapshotDiagnostics } from '../../../src/debug/output-channel';
+import { NineRouterError } from '../../../src/router/errors';
 import { registerCommands } from '../../../src/runtime/commands';
 import {
   __createCancellationToken,
+  __getErrorMessages,
   __getCommandHandler,
+  __getInformationMessages,
   __getOutputLines,
   __resetVscodeState
 } from '../../support/vscode';
@@ -117,5 +120,62 @@ describe('9routerCopilot.showDiagnostics', () => {
     await handler?.();
 
     expect(configureVisionProxy).toHaveBeenCalledTimes(1);
+  });
+
+  it('reports successful connection details and missing mappings', async () => {
+    const testConnection = vi.fn(async () => ({
+      durationMs: 42,
+      modelCount: 7,
+      configuredModelCount: 2,
+      matchedModelCount: 1,
+      missingDisplayModelIds: ['coder']
+    }));
+
+    registerCommands(
+      {
+        subscriptions: [],
+        secrets: {
+          get: async () => undefined,
+          store: async () => undefined,
+          delete: async () => undefined
+        }
+      } as never,
+      { testConnection }
+    );
+
+    await __getCommandHandler('9routerCopilot.testConnection')?.();
+
+    expect(testConnection).toHaveBeenCalledTimes(1);
+    expect(__getInformationMessages()).toEqual([
+      '9router connection succeeded in 42 ms. 7 models available. 1/2 configured model mappings found. Missing: coder.'
+    ]);
+    expect(__getErrorMessages()).toEqual([]);
+  });
+
+  it('reports safe connection errors with request ids', async () => {
+    registerCommands(
+      {
+        subscriptions: [],
+        secrets: {
+          get: async () => undefined,
+          store: async () => undefined,
+          delete: async () => undefined
+        }
+      } as never,
+      {
+        testConnection: async () => {
+          throw new NineRouterError('AUTHENTICATION_ERROR', '9router authentication failed', {
+            requestId: 'req-safe'
+          });
+        }
+      }
+    );
+
+    await __getCommandHandler('9routerCopilot.testConnection')?.();
+
+    expect(__getErrorMessages()).toEqual([
+      '9router connection failed: 9router authentication failed Request ID: req-safe.'
+    ]);
+    expect(__getInformationMessages()).toEqual([]);
   });
 });
