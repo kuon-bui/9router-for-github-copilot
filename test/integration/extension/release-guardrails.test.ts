@@ -15,6 +15,7 @@ describe('release guardrails', () => {
         additionalProperties: boolean;
         required: string[];
         properties: {
+          service_tier: Record<string, unknown>;
           thinkingEfforts: Record<string, unknown>;
           maxInputTokens: Record<string, unknown>;
           maxOutputTokens: Record<string, unknown>;
@@ -40,6 +41,10 @@ describe('release guardrails', () => {
         additionalProperties: false,
         required: ['id', 'name', 'modelId']
       }
+    });
+    expect(models.items.properties.service_tier).toMatchObject({
+      type: 'string',
+      enum: ['fast']
     });
     expect(models.items.properties.thinkingEfforts).toMatchObject({
       type: 'array',

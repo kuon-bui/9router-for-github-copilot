@@ -42,6 +42,16 @@ describe('adaptMessagesToRouterRequest', () => {
       messages: [{ role: 'user', content: 'Say hello' }]
     });
     expect(request).not.toHaveProperty('reasoning_effort');
+    expect(request).not.toHaveProperty('service_tier');
+  });
+
+  it('forwards the configured fast service tier', () => {
+    const request = adaptMessagesToRouterRequest({
+      selectedModel: selectedModel({ service_tier: 'fast' }),
+      messages: [{ role: 1, content: 'Say hello' }]
+    });
+
+    expect(request.service_tier).toBe('fast');
   });
 
   it('keeps the model id bare and forwards thinking as reasoning_effort', () => {

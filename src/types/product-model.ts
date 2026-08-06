@@ -22,6 +22,7 @@ export interface ConfiguredModel {
   id: string;
   name: string;
   modelId: string;
+  service_tier?: 'fast';
   toolMode: ToolMode;
   visionMode: VisionMode;
   thinkingMode: ThinkingMode;

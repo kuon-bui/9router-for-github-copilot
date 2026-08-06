@@ -9,6 +9,7 @@ describe('parseModelSettings', () => {
         id: 'research-v2',
         name: 'Research',
         modelId: 'router/research',
+        service_tier: 'fast',
         toolMode: 'auto',
         visionMode: 'native',
         thinkingMode: 'high',
@@ -36,6 +37,7 @@ describe('parseModelSettings', () => {
         id: 'research-v2',
         name: 'Research',
         modelId: 'router/research',
+        service_tier: 'fast',
         toolMode: 'auto',
         visionMode: 'native',
         thinkingMode: 'high',
@@ -169,6 +171,11 @@ describe('parseModelSettings', () => {
       'INVALID_THINKING_MODE'
     ],
     [
+      'invalid service tier',
+      { id: 'agent', name: 'Agent', modelId: 'router/agent', service_tier: 'default' },
+      'INVALID_SERVICE_TIER'
+    ],
+    [
       'invalid input tokens',
       { id: 'agent', name: 'Agent', modelId: 'router/agent', maxInputTokens: 0 },
       'INVALID_MAX_INPUT_TOKENS'
@@ -203,6 +210,7 @@ describe('parseModelSettings', () => {
   });
 
   it.each([
+    ['service_tier', 'INVALID_SERVICE_TIER'],
     ['toolMode', 'INVALID_TOOL_MODE'],
     ['visionMode', 'INVALID_VISION_MODE'],
     ['thinkingMode', 'INVALID_THINKING_MODE'],

@@ -185,7 +185,7 @@ Secrets must be stored only in VS Code `SecretStorage`.
 Recommended configuration keys:
 
 - `9router-copilot.baseUrl`
-- `9router-copilot.models`: ordered objects containing `id`, `name`, `modelId`, `toolMode`, `visionMode`, `thinkingMode`, and optional `maxInputTokens` and `maxOutputTokens` compatibility fallbacks
+- `9router-copilot.models`: ordered objects containing `id`, `name`, `modelId`, `toolMode`, `visionMode`, `thinkingMode`, optional `service_tier`, and optional `maxInputTokens` and `maxOutputTokens` compatibility fallbacks
 - `9router-copilot.visionProxySource`
 - `9router-copilot.visionProxyModelId`
 - `9router-copilot.visionProxyPrompt`
@@ -266,6 +266,7 @@ Recommended request shape:
 - `model`: configured opaque `modelId`
 - `messages`
 - `stream`
+- `service_tier: fast` when configured for the selected model
 - `tools` when supported
 - `max_tokens` when a positive safe integer is configured
 - optional generation parameters that `9router` documents as compatible
