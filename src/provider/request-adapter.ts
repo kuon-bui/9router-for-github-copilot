@@ -304,6 +304,10 @@ export function adaptMessagesToRouterRequest(input: {
     request.reasoning_effort = input.selectedModel.thinkingMode;
   }
 
+  if (input.selectedModel.service_tier === 'fast') {
+    request.service_tier = input.selectedModel.service_tier;
+  }
+
   if (typeof input.maxTokens === 'number') {
     request.max_tokens = input.maxTokens;
   }

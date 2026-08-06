@@ -33,6 +33,7 @@ export interface RouterChatCompletionRequest {
   model: string;
   messages: RouterMessage[];
   stream: true;
+  service_tier?: 'fast';
   stream_options?: {
     include_usage: true;
   };

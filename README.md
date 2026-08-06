@@ -42,6 +42,7 @@ Configuration is local per user under the `9router-copilot` namespace. Array ord
       "id": "agent",
       "name": "Agent",
       "modelId": "replace-with-existing-9router-model-id",
+      "service_tier": "fast",
       "toolMode": "auto",
       "visionMode": "off",
       "thinkingMode": "medium",
@@ -68,6 +69,7 @@ Existing model objects with a non-`off` `thinkingMode` must add that value to `t
 - `id`: Stable Copilot-facing id matching `[a-z0-9][a-z0-9._-]*`.
 - `name`: Display name shown in the picker.
 - `modelId`: Opaque backend model id sent unchanged as the OpenAI-compatible `model` field. It must refer to an existing 9router model; an empty or invalid value leaves only that entry unpublished.
+- `service_tier`: Optional `fast` value sent unchanged as the OpenAI-compatible `service_tier` field. Omit it to leave service tier selection to `9router`.
 - `toolMode`: `auto` exposes supported host tools; `off` disables tools.
 - `visionMode`: `native`, `proxy`, or `off`.
 - `thinkingMode`: Default Thinking Effort: `off`, `minimal`, `low`, `medium`, `high`, `xhigh`, or `max`.

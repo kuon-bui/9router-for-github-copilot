@@ -88,6 +88,13 @@
                 "type": "string",
                 "description": "Opaque 9router model id sent in the OpenAI-compatible model field. Empty values stay unpublished."
               },
+              "service_tier": {
+                "type": "string",
+                "enum": [
+                  "fast"
+                ],
+                "description": "Optional OpenAI-compatible service tier sent for this model. Omit it to leave service tier selection to 9router."
+              },
               "toolMode": {
                 "type": "string",
                 "enum": [
