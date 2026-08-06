@@ -30,7 +30,7 @@ The feature preserves the thin-adapter architecture. 9router remains responsible
 
 ## Context
 
-The current implementation supports one shared 9router Vision model through `9router-copilot.visionProxyModelId`. It uses a fixed source-code prompt and requires users to edit the model id manually. Missing configuration disables advertised proxy image capability and causes an error if an image request reaches the provider.
+The previous implementation supported one shared 9router Vision model through `9router-copilot.visionProxyModelId`. It used a fixed source-code prompt and required users to edit the model id manually. Guided setup now keeps proxy image input available when source or model configuration is missing, allowing the request path to open VS Code Quick Pick before analysis.
 
 Current 9router model-list implementation returns OpenAI-compatible entries and may attach a `capabilities` object. Vision-capable LLM entries declare `capabilities.vision`. Entries without an explicit true value are not safe Vision choices and must be excluded. Combo entries currently may omit capabilities, so they are excluded rather than inspected or guessed locally.
 
@@ -230,15 +230,11 @@ The extension does not silently select another model. Automatic UI is not repeat
 
 ## Capability Publication
 
-Proxy image capability is advertised when all local static requirements are valid:
-
-- source resolves to `9router` or `copilot`
-- model id is non-empty
-- prompt is non-empty
+Proxy image capability is advertised when the prompt is non-empty. Missing or invalid source/model configuration remains recoverable because the provider opens guided setup before analysis.
 
 Publication does not perform network discovery. Doing so would make model publication dependent on network availability and could trigger native model access at refresh time.
 
-A missing configuration normally means the proxy display model does not advertise image input. If the host still sends image input, provider-level guided setup handles it as required.
+A missing source or model id does not hide image input. This lets the host deliver an image request so provider-level guided setup can open VS Code Quick Pick and continue the same request.
 
 ## Cancellation and Concurrency
 

@@ -71,7 +71,7 @@ describe('resolvePublishedModels', () => {
     });
   });
 
-  it('requires proxy availability before publishing image input', () => {
+  it('publishes proxy image input when guided setup is available', () => {
     const setting = {
       sourceIndex: 0,
       id: 'agent',
@@ -88,7 +88,7 @@ describe('resolvePublishedModels', () => {
     expect(createPublishedModel(setting).capabilities.imageInput).toBeUndefined();
     expect(
       createPublishedModel(setting, {
-        visionProxyConfigured: true
+        visionProxyAvailable: true
       }).capabilities.imageInput
     ).toBe(true);
   });

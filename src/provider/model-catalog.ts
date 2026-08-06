@@ -3,12 +3,12 @@ import type { RouterModelMetadata } from '../router/model-catalog';
 import type { ConfiguredModel, PublishedModel } from '../types/product-model';
 
 export interface PublishedModelOptions {
-  visionProxyConfigured?: boolean;
+  visionProxyAvailable?: boolean;
   routerModel?: RouterModelMetadata;
 }
 
 export interface ResolvePublishedModelsOptions {
-  visionProxyConfigured?: boolean;
+  visionProxyAvailable?: boolean;
   routerModels?: readonly RouterModelMetadata[];
 }
 
@@ -18,7 +18,7 @@ export function createPublishedModel(
 ): PublishedModel {
   const exposesImageInput =
     setting.visionMode === 'native' ||
-    (setting.visionMode === 'proxy' && options.visionProxyConfigured === true);
+    (setting.visionMode === 'proxy' && options.visionProxyAvailable === true);
   const capabilities: PublishedModel['capabilities'] = {
     ...(setting.toolMode === 'auto' ? { toolCalling: 32 } : {}),
     ...(exposesImageInput ? { imageInput: true } : {})
@@ -56,7 +56,7 @@ export function resolvePublishedModels(
     const routerModel = routerModelsById.get(setting.modelId);
 
     return createPublishedModel(setting, {
-      ...(options.visionProxyConfigured === true ? { visionProxyConfigured: true } : {}),
+      ...(options.visionProxyAvailable === true ? { visionProxyAvailable: true } : {}),
       ...(routerModel ? { routerModel } : {})
     });
   });

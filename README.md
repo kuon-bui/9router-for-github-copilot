@@ -98,6 +98,8 @@ Shared analyzer settings:
 
 Use `9router: Configure Vision Proxy` to configure source and model with Quick Pick, or let the extension run the same wizard automatically when a `visionMode: "proxy"` request arrives with missing source or model id.
 
+Proxy models keep image input enabled when source or model id is missing. Sending an image opens VS Code Quick Pick so the source and model can be selected, then continues the same request.
+
 When source is `9router`, the wizard uses authenticated `GET /v1/models` discovery and keeps only models where `capabilities.vision === true`, then deduplicates and sorts by `id`.
 
 When source is native `GitHub Copilot`, the wizard uses `vscode.lm.selectChatModels({ vendor: 'copilot' })`. The stable selector does not expose capability metadata, so the extension does not guess by model name and enforces compatibility at runtime.

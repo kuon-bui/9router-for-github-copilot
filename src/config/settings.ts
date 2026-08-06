@@ -144,7 +144,7 @@ export function buildSettingsSnapshot(
 
   const publishedModels = parsedModels.models.map((model) =>
     createPublishedModel(model, {
-      visionProxyConfigured: runtime ? isVisionProxyConfigured(runtime) : false
+      visionProxyAvailable: runtime ? runtime.visionProxyPrompt.length > 0 : false
     })
   );
 

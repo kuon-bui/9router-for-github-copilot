@@ -352,7 +352,7 @@ describe('NineRouterChatProvider snapshot refresh', () => {
     ).rejects.toMatchObject({ code: 'CONFIGURATION_ERROR' });
   });
 
-  it('requires source, model, and prompt before publishing proxy image capability', async () => {
+  it('publishes proxy image capability for guided setup while still requiring a prompt', async () => {
     const snapshotWithProxy = (overrides: Record<string, unknown> = {}) =>
       createSnapshot(
         [{ id: 'agent', name: 'Agent', modelId: 'router/agent', visionMode: 'proxy' }],
@@ -361,7 +361,7 @@ describe('NineRouterChatProvider snapshot refresh', () => {
     const provider = new NineRouterChatProvider(context, routerClient, snapshotWithProxy());
 
     const initialModels = await provider.provideLanguageModelChatInformation({} as never, {} as never);
-    expect(initialModels[0]?.capabilities.imageInput).toBeUndefined();
+    expect(initialModels[0]?.capabilities.imageInput).toBe(true);
 
     provider.refreshFromSnapshot(
       snapshotWithProxy({
@@ -375,7 +375,7 @@ describe('NineRouterChatProvider snapshot refresh', () => {
       {} as never,
       {} as never
     );
-    expect(invalidSourceModels[0]?.capabilities.imageInput).toBeUndefined();
+    expect(invalidSourceModels[0]?.capabilities.imageInput).toBe(true);
 
     provider.refreshFromSnapshot(
       snapshotWithProxy({
