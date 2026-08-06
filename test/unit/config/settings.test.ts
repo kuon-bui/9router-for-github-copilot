@@ -253,7 +253,7 @@ describe('buildSettingsSnapshot', () => {
     ]);
   });
 
-  it('degrades image capability without rejecting a proxy model', () => {
+  it('keeps proxy image input available for guided setup when model is missing', () => {
     const snapshot = buildSettingsSnapshot(
       configuration({
         models: [
@@ -269,7 +269,7 @@ describe('buildSettingsSnapshot', () => {
 
     expect(snapshot.state).toBe('degraded');
     expect(snapshot.publishedModels).toHaveLength(1);
-    expect(snapshot.publishedModels[0]?.capabilities.imageInput).toBeUndefined();
+    expect(snapshot.publishedModels[0]?.capabilities.imageInput).toBe(true);
     expect(snapshot.issues).toContainEqual(
       expect.objectContaining({
         scope: 'capability',
@@ -281,29 +281,32 @@ describe('buildSettingsSnapshot', () => {
     );
   });
 
-  it('does not advertise proxy image input with invalid source or blank prompt', () => {
-    for (const values of [
-      {
+  it('keeps proxy image input available so guided setup can replace an invalid source', () => {
+    const snapshot = buildSettingsSnapshot(
+      configuration({
+        models: [{ id: 'agent', name: 'Agent', modelId: 'router/agent', visionMode: 'proxy' }],
         visionProxySource: 'other',
         visionProxyModelId: 'model',
         visionProxyPrompt: 'prompt'
-      },
-      {
+      })
+    );
+
+    expect(snapshot.publishedModels[0]?.capabilities.imageInput).toBe(true);
+    expect(snapshot.state).toBe('degraded');
+  });
+
+  it('does not advertise proxy image input with a blank prompt', () => {
+    const snapshot = buildSettingsSnapshot(
+      configuration({
+        models: [{ id: 'agent', name: 'Agent', modelId: 'router/agent', visionMode: 'proxy' }],
         visionProxySource: '9router',
         visionProxyModelId: 'model',
         visionProxyPrompt: '   '
-      }
-    ]) {
-      const snapshot = buildSettingsSnapshot(
-        configuration({
-          models: [{ id: 'agent', name: 'Agent', modelId: 'router/agent', visionMode: 'proxy' }],
-          ...values
-        })
-      );
+      })
+    );
 
-      expect(snapshot.publishedModels[0]?.capabilities.imageInput).toBeUndefined();
-      expect(snapshot.state).toBe('degraded');
-    }
+    expect(snapshot.publishedModels[0]?.capabilities.imageInput).toBeUndefined();
+    expect(snapshot.state).toBe('degraded');
   });
 
   it('advertises proxy image input when the shared model is configured', () => {

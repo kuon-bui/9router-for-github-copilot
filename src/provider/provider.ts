@@ -2,8 +2,7 @@ import * as vscode from 'vscode';
 import { getApiKey } from '../config/secret-store';
 import {
   buildSettingsSnapshot,
-  getExtensionConfiguration,
-  isVisionProxyConfigured
+  getExtensionConfiguration
 } from '../config/settings';
 import { logDebugEvent } from '../debug/output-channel';
 import { NineRouterError } from '../router/errors';
@@ -108,7 +107,7 @@ export class NineRouterChatProvider
     const routerModels = await this.refreshModelCatalog(runtime, token, snapshotVersion);
 
     return resolvePublishedModels(snapshot.models, {
-      visionProxyConfigured: isVisionProxyConfigured(runtime),
+      visionProxyAvailable: runtime.visionProxyPrompt.length > 0,
       ...(routerModels ? { routerModels } : {})
     });
   }

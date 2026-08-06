@@ -337,6 +337,8 @@ The extension contributes command `9routerCopilot.configureVisionProxy` with the
 
 If setup succeeds, the current request continues immediately with the returned selection. If setup is cancelled or fails, the request stops with an actionable configuration error.
 
+Proxy models keep image input published while source or model id is missing, provided the shared prompt is valid. This allows VS Code to deliver the image request and lets the same guided Quick Pick repair configuration before analysis.
+
 ### 9router analyzer discovery
 
 For `9router` source, discovery uses authenticated `GET /v1/models` and treats the response as untrusted JSON. Candidates are retained only when:
