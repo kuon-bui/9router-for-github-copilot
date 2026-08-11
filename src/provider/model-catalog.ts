@@ -16,6 +16,10 @@ export function createPublishedModel(
   setting: ConfiguredModel,
   options: PublishedModelOptions = {}
 ): PublishedModel {
+  const maxOutputTokens = options.routerModel?.maxOutput ?? setting.maxOutputTokens;
+  const catalogMaxInputTokens = options.routerModel?.contextWindow
+    ? options.routerModel.contextWindow - maxOutputTokens
+    : undefined;
   const exposesImageInput =
     setting.visionMode === 'native' ||
     (setting.visionMode === 'proxy' && options.visionProxyAvailable === true);
@@ -30,8 +34,11 @@ export function createPublishedModel(
     vendor: '9router',
     family: setting.id,
     version: '1',
-    maxInputTokens: options.routerModel?.contextWindow ?? setting.maxInputTokens,
-    maxOutputTokens: options.routerModel?.maxOutput ?? setting.maxOutputTokens,
+    maxInputTokens:
+      catalogMaxInputTokens !== undefined && catalogMaxInputTokens > 0
+        ? catalogMaxInputTokens
+        : setting.maxInputTokens,
+    maxOutputTokens,
     capabilities,
     ...(setting.thinkingEfforts.length > 0
       ? {

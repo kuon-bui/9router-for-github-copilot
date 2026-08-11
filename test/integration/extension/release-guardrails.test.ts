@@ -168,6 +168,8 @@ describe('release guardrails', () => {
     for (const document of [readme, productionDesign]) {
       expect(document).toContain('capabilities.contextWindow');
       expect(document).toContain('capabilities.maxOutput');
+      expect(document).toContain('total context size');
+      expect(document).toContain('maxInputTokens = contextWindow - maxOutputTokens');
       expect(document).toContain('latest successful');
       expect(document).toContain('264000');
       expect(document).toContain('thinkingEfforts');

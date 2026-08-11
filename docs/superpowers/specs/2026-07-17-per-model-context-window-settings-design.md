@@ -61,6 +61,10 @@ limits.
 `DisplayModelSetting` owns validated fallback `maxInputTokens` and
 `maxOutputTokens` values for one curated model. Current primary values come from
 exact matching `GET /v1/models` metadata as defined by the newer design.
+Catalog `contextWindow` represents total context size, not input capacity.
+Publication resolves output first and calculates
+`maxInputTokens = contextWindow - maxOutputTokens`; configured input remains a
+fallback when that calculation cannot produce a positive value.
 
 The settings flow is:
 

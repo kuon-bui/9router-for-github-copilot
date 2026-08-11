@@ -197,12 +197,16 @@ Recommended configuration keys:
 
 Before returning picker models, the provider attempts one authenticated
 `GET /v1/models` refresh. Exact `modelId` matches read
-`capabilities.contextWindow` and `capabilities.maxOutput`, validate each as a
-positive safe integer, and publish them as `maxInputTokens` and
-`maxOutputTokens` through `LanguageModelChatInformation`. The latest successful
-catalog stays in RAM. A failed refresh keeps that cache; when metadata is
-missing or invalid, each field falls back independently to its optional model
-setting, then `264000`. Catalog failure never hides an otherwise valid model.
+`capabilities.contextWindow` as total context size and
+`capabilities.maxOutput` as output budget, validating each as a positive safe
+integer. The provider publishes `maxOutputTokens` from catalog output metadata
+or its configured fallback, then calculates
+`maxInputTokens = contextWindow - maxOutputTokens`. Published input and output
+limits therefore sum to `contextWindow` when the result is positive. Missing
+total context or a non-positive result uses the configured input fallback. Each
+configured fallback ends at `264000`. The latest successful catalog stays in
+RAM. A failed refresh keeps that cache. Catalog failure never hides an otherwise
+valid model.
 
 Configured context-window values are compatibility fallbacks, not the primary
 metadata source. The cache is not persisted, no refresh timer is used, and

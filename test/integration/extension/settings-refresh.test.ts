@@ -194,17 +194,17 @@ describe('NineRouterChatProvider snapshot refresh', () => {
     await expect(
       provider.provideLanguageModelChatInformation({} as never, token)
     ).resolves.toEqual([
-      expect.objectContaining({ maxInputTokens: 400_000, maxOutputTokens: 128_000 })
+      expect.objectContaining({ maxInputTokens: 272_000, maxOutputTokens: 128_000 })
     ]);
     await expect(
       provider.provideLanguageModelChatInformation({} as never, token)
     ).resolves.toEqual([
-      expect.objectContaining({ maxInputTokens: 400_000, maxOutputTokens: 128_000 })
+      expect.objectContaining({ maxInputTokens: 272_000, maxOutputTokens: 128_000 })
     ]);
     await expect(
       provider.provideLanguageModelChatInformation({} as never, token)
     ).resolves.toEqual([
-      expect.objectContaining({ maxInputTokens: 200_000, maxOutputTokens: 64_000 })
+      expect.objectContaining({ maxInputTokens: 136_000, maxOutputTokens: 64_000 })
     ]);
 
     expect(listModels).toHaveBeenCalledTimes(3);
@@ -307,7 +307,7 @@ describe('NineRouterChatProvider snapshot refresh', () => {
       { id: 'router/coder', contextWindow: 400_000, maxOutput: 128_000 }
     ]);
     await expect(newInformation).resolves.toEqual([
-      expect.objectContaining({ maxInputTokens: 400_000, maxOutputTokens: 128_000 })
+      expect.objectContaining({ maxInputTokens: 272_000, maxOutputTokens: 128_000 })
     ]);
 
     resolveFirst?.([
@@ -318,7 +318,7 @@ describe('NineRouterChatProvider snapshot refresh', () => {
     await expect(
       provider.provideLanguageModelChatInformation({} as never, token)
     ).resolves.toEqual([
-      expect.objectContaining({ maxInputTokens: 400_000, maxOutputTokens: 128_000 })
+      expect.objectContaining({ maxInputTokens: 272_000, maxOutputTokens: 128_000 })
     ]);
   });
 

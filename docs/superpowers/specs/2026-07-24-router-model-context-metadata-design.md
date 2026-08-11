@@ -11,7 +11,9 @@
 Stop requiring users to maintain context-window values manually for normal
 operation. Before returning models to VS Code, the extension will read
 `capabilities.contextWindow` and `capabilities.maxOutput` from authenticated
-`GET /v1/models` results and publish those values as native Copilot Chat model
+`GET /v1/models` results. `contextWindow` is total context size, while
+`maxOutput` is output budget. The extension publishes the output budget and
+derives input capacity from their difference as native Copilot Chat model
 metadata.
 
 Existing per-model `maxInputTokens` and `maxOutputTokens` settings remain as
@@ -49,20 +51,21 @@ Catalog entries are matched to configured models by exact
 `catalogItem.id === configuredModel.modelId` equality. The extension does not
 derive ids, inspect provider prefixes, or resolve combo routing locally.
 
-Each published field is resolved independently in this order:
+Published limits are resolved in this order:
 
-1. Valid metadata from the latest successful catalog:
-   - `capabilities.contextWindow` for `maxInputTokens`
-   - `capabilities.maxOutput` for `maxOutputTokens`
-2. Valid fallback from the configured model object:
-   - `models[].maxInputTokens`
-   - `models[].maxOutputTokens`
-3. Built-in fallback `264000`
+1. Resolve `maxOutputTokens` from valid catalog `capabilities.maxOutput`, then
+   configured `models[].maxOutputTokens`, then built-in `264000`.
+2. When valid catalog `capabilities.contextWindow` exceeds resolved
+   `maxOutputTokens`, publish
+   `maxInputTokens = contextWindow - maxOutputTokens`.
+3. Otherwise resolve `maxInputTokens` from configured
+   `models[].maxInputTokens`, then built-in `264000`.
 
-A token limit is valid only when it is a positive safe integer. Invalid or
-missing metadata affects only that field. For example, a valid
-`contextWindow` and invalid `maxOutput` use catalog input metadata plus the
-configured or built-in output fallback.
+A token limit is valid only when it is a positive safe integer. A missing or
+invalid `maxOutput` uses its configured or built-in fallback before input is
+calculated. A missing `contextWindow`, or one less than or equal to resolved
+output, cannot produce a positive input limit and therefore uses configured or
+built-in input fallback.
 
 A configured model absent from the catalog remains published using fallback
 values. Catalog data never changes `modelId`, routing, ordering, display ids,
@@ -120,8 +123,9 @@ controls model publication lifetime. It attempts refresh inside
 the newest usable catalog.
 
 `src/provider/model-catalog.ts` remains the pure publication and resolution
-boundary. It accepts validated router metadata and applies field-level
-catalog/config/default precedence without adding routing policy.
+boundary. It accepts validated router metadata, resolves output precedence,
+derives input capacity from total context, and applies input fallback without
+adding routing policy.
 
 ### Configuration boundary
 
@@ -158,6 +162,8 @@ Focused tests will cover:
 - preserving one valid token field when the other is invalid;
 - exact `modelId` matching;
 - catalog values overriding configured fallback values;
+- deriving `maxInputTokens` by subtracting resolved output from total context;
+- configured input fallback when total context does not exceed output;
 - configured fallback values when catalog metadata is absent or invalid;
 - built-in `264000` fallback when configured values are absent;
 - a successful fetch replacing the RAM cache;
@@ -193,9 +199,12 @@ Implementation will update:
 ## Acceptance Criteria
 
 - Copilot model metadata uses exact matching 9router catalog values when valid.
+- Published input and output limits sum to catalog `contextWindow` when it can
+  produce a positive input limit.
 - Users do not need to set context-window fields for normal operation.
 - Existing configured token fields remain compatible fallbacks.
-- Missing or invalid metadata falls back per field, ending at `264000`.
+- Missing or invalid metadata follows output-first resolution and ends at
+  configured or built-in `264000` fallbacks.
 - Catalog failures retain the latest successful RAM cache.
 - First-fetch failure still publishes configured models.
 - Model publication performs at most one catalog request per host information

@@ -130,19 +130,19 @@ describe('resolvePublishedModels', () => {
       {
         routerModel: {
           id: 'cx/gpt-5.6-sol',
-          contextWindow: 400_000,
+          contextWindow: 372_000,
           maxOutput: 128_000
         }
       }
     );
 
     expect(model).toMatchObject({
-      maxInputTokens: 400_000,
+      maxInputTokens: 244_000,
       maxOutputTokens: 128_000
     });
   });
 
-  it('falls back independently when catalog metadata omits one field', () => {
+  it('subtracts configured output fallback when catalog metadata omits maxOutput', () => {
     const model = createPublishedModel(
       {
         sourceIndex: 0,
@@ -165,7 +165,39 @@ describe('resolvePublishedModels', () => {
     );
 
     expect(model).toMatchObject({
-      maxInputTokens: 400_000,
+      maxInputTokens: 391_808,
+      maxOutputTokens: 8_192
+    });
+  });
+
+  it.each([
+    ['equals output limit', 8_192],
+    ['is smaller than output limit', 4_096]
+  ])('uses configured input fallback when contextWindow %s', (_case, contextWindow) => {
+    const model = createPublishedModel(
+      {
+        sourceIndex: 0,
+        id: 'agent',
+        name: 'Agent',
+        modelId: 'router/agent',
+        toolMode: 'off',
+        visionMode: 'off',
+        thinkingMode: 'off',
+        thinkingEfforts: [],
+        maxInputTokens: 64_000,
+        maxOutputTokens: 8_192
+      },
+      {
+        routerModel: {
+          id: 'router/agent',
+          contextWindow,
+          maxOutput: 8_192
+        }
+      }
+    );
+
+    expect(model).toMatchObject({
+      maxInputTokens: 64_000,
       maxOutputTokens: 8_192
     });
   });
@@ -194,7 +226,7 @@ describe('resolvePublishedModels', () => {
         ]
       })[0]
     ).toMatchObject({
-      maxInputTokens: 400_000,
+      maxInputTokens: 272_000,
       maxOutputTokens: 128_000
     });
   });
