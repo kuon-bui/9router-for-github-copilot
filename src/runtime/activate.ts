@@ -6,6 +6,7 @@ import {
 } from '../config/settings';
 import { disposeOutputChannel } from '../debug/output-channel';
 import { createRouterClient } from '../router/client';
+import { NineRouterInlineCompletionProvider } from '../provider/inline-completion-provider';
 import { NineRouterChatProvider } from '../provider/provider';
 import { registerCommands } from './commands';
 import { createVisionProxyConfigurator } from './vision-configuration';
@@ -15,7 +16,9 @@ import type { SettingsSnapshot } from '../config/settings';
 import type { VisionProxyConfigurator } from './vision-configuration';
 
 let providerRegistration: vscode.Disposable | undefined;
+let inlineProviderRegistration: vscode.Disposable | undefined;
 let provider: NineRouterChatProvider | undefined;
+let inlineProvider: NineRouterInlineCompletionProvider | undefined;
 
 interface ActivationHooks {
   createProvider?: (
@@ -36,6 +39,7 @@ export async function activateExtension(
     ((providerContext, routerClient, snapshot, options) =>
       new NineRouterChatProvider(providerContext, routerClient, snapshot, options));
   const registerRuntimeCommands = hooks.registerCommands ?? registerCommands;
+  const initialSnapshot = buildSettingsSnapshot(getExtensionConfiguration());
 
   const routerClient = createRouterClient({ fetch: globalThis.fetch });
   const configureVisionProxy = createVisionProxyConfigurator({
@@ -47,9 +51,10 @@ export async function activateExtension(
   provider = createProvider(
     context,
     routerClient,
-    buildSettingsSnapshot(getExtensionConfiguration()),
+    initialSnapshot,
     { configureVisionProxy }
   );
+  inlineProvider = new NineRouterInlineCompletionProvider(context, routerClient, initialSnapshot);
   const testConnection = createConnectionTester({
     secrets: context.secrets,
     routerClient,
@@ -62,11 +67,18 @@ export async function activateExtension(
   });
   providerRegistration = vscode.lm.registerLanguageModelChatProvider('9router', provider);
   context.subscriptions.push(providerRegistration);
+  inlineProviderRegistration = vscode.languages.registerInlineCompletionItemProvider(
+    [{ scheme: 'file' }, { scheme: 'untitled' }],
+    inlineProvider
+  );
+  context.subscriptions.push(inlineProviderRegistration);
 
   context.subscriptions.push(
     vscode.workspace.onDidChangeConfiguration((event) =>
       handleConfigurationChange(event, () => {
-        provider?.refreshFromSnapshot(buildSettingsSnapshot(getExtensionConfiguration()));
+        const snapshot = buildSettingsSnapshot(getExtensionConfiguration());
+        provider?.refreshFromSnapshot(snapshot);
+        inlineProvider?.refreshFromSnapshot(snapshot);
       })
     )
   );
@@ -87,7 +99,10 @@ export function handleConfigurationChange(
 export async function deactivateExtension(): Promise<void> {
   providerRegistration?.dispose();
   providerRegistration = undefined;
+  inlineProviderRegistration?.dispose();
+  inlineProviderRegistration = undefined;
   provider?.dispose();
   provider = undefined;
+  inlineProvider = undefined;
   disposeOutputChannel();
 }

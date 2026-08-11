@@ -1,6 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { activateExtension, deactivateExtension } from '../../../src/runtime/activate';
-import { __resetVscodeState } from '../../support/vscode';
+import {
+  __getInlineProviderDisposed,
+  __getRegisteredInlineProvider,
+  __resetVscodeState
+} from '../../support/vscode';
 import type { NineRouterChatProvider } from '../../../src/provider/provider';
 import type { VisionProxyConfigurator } from '../../../src/runtime/vision-configuration';
 
@@ -34,11 +38,34 @@ describe('activateExtension', () => {
         return providerStub;
       },
       registerCommands: (_context, dependencies) => {
-        commandConfigurator = dependencies.configureVisionProxy;
+        commandConfigurator = dependencies?.configureVisionProxy;
       }
     });
 
     expect(providerConfigurator).toBeTypeOf('function');
     expect(commandConfigurator).toBe(providerConfigurator);
+  });
+
+  it('registers and disposes the inline completion provider', async () => {
+    const context = {
+      secrets: { get: async () => undefined },
+      subscriptions: []
+    } as never;
+
+    await activateExtension(context, {
+      createProvider: () =>
+        ({
+          getSnapshot: () => undefined,
+          refreshFromSnapshot: () => undefined,
+          dispose: vi.fn()
+        }) as unknown as NineRouterChatProvider,
+      registerCommands: () => undefined
+    });
+
+    expect(__getRegisteredInlineProvider()).toBeDefined();
+
+    await deactivateExtension();
+
+    expect(__getInlineProviderDisposed()).toBe(true);
   });
 });

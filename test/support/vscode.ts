@@ -71,6 +71,31 @@ class LanguageModelDataPart {
   }
 }
 
+class Position {
+  public constructor(
+    public readonly line: number,
+    public readonly character: number
+  ) {}
+}
+
+class Range {
+  public constructor(
+    public readonly start: Position,
+    public readonly end: Position
+  ) {}
+}
+
+class InlineCompletionItem {
+  public constructor(
+    public readonly insertText: string,
+    public readonly range?: Range
+  ) {}
+}
+
+class InlineCompletionList {
+  public constructor(public readonly items: InlineCompletionItem[]) {}
+}
+
 class LanguageModelError extends Error {
   public readonly code: string;
 
@@ -110,6 +135,8 @@ class OutputChannel {
 const configurationValues = new Map<string, unknown>();
 const commandHandlers = new Map<string, (...args: unknown[]) => unknown>();
 let registeredProvider: unknown;
+let registeredInlineProvider: unknown;
+let inlineProviderDisposed = false;
 let inputBoxValue: string | undefined;
 const outputChannel = new OutputChannel();
 let quickPickValues: unknown[] = [];
@@ -208,6 +235,16 @@ export const lm = {
   }
 };
 
+export const languages = {
+  registerInlineCompletionItemProvider(_selector: unknown, provider: unknown): Disposable {
+    registeredInlineProvider = provider;
+    inlineProviderDisposed = false;
+    return new Disposable(() => {
+      inlineProviderDisposed = true;
+    });
+  }
+};
+
 export function __setConfigurationValues(values: Record<string, unknown>): void {
   configurationValues.clear();
   for (const [key, value] of Object.entries(values)) {
@@ -251,6 +288,14 @@ export function __getRegisteredProvider(): unknown {
   return registeredProvider;
 }
 
+export function __getRegisteredInlineProvider(): unknown {
+  return registeredInlineProvider;
+}
+
+export function __getInlineProviderDisposed(): boolean {
+  return inlineProviderDisposed;
+}
+
 export function __getCommandHandler(command: string): ((...args: unknown[]) => unknown) | undefined {
   return commandHandlers.get(command);
 }
@@ -280,6 +325,8 @@ export function __resetVscodeState(): void {
   configurationValues.clear();
   commandHandlers.clear();
   registeredProvider = undefined;
+  registeredInlineProvider = undefined;
+  inlineProviderDisposed = false;
   inputBoxValue = undefined;
   outputChannel.lines.length = 0;
   quickPickValues = [];
@@ -296,5 +343,9 @@ export {
   LanguageModelTextPart,
   LanguageModelDataPart,
   LanguageModelToolCallPart,
-  LanguageModelToolResultPart
+  LanguageModelToolResultPart,
+  Position,
+  Range,
+  InlineCompletionItem,
+  InlineCompletionList
 };

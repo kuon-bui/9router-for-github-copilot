@@ -28,6 +28,63 @@ describe('runtime settings', () => {
     expect(isVisionProxyConfigured(runtime)).toBe(false);
   });
 
+  it('loads default inline settings disabled', () => {
+    const runtime = loadRuntimeSettings(configuration({}));
+
+    expect(runtime.inline).toMatchObject({
+      enabled: false,
+      modelId: '',
+      maxTokens: 128,
+      prefixChars: 12_000,
+      suffixChars: 4_000
+    });
+    expect(runtime.inline.languages).toContain('typescript');
+  });
+
+  it('trims inline model id and language allowlist', () => {
+    const runtime = loadRuntimeSettings(
+      configuration({
+        'inline.enabled': true,
+        'inline.modelId': '  combo/inline  ',
+        'inline.maxTokens': 64,
+        'inline.languages': [' typescript ', 'python', 'typescript', '', 42],
+        'inline.prefixChars': 1000,
+        'inline.suffixChars': 200
+      })
+    );
+
+    expect(runtime.inline).toEqual({
+      enabled: true,
+      modelId: 'combo/inline',
+      maxTokens: 64,
+      languages: ['typescript', 'python'],
+      prefixChars: 1000,
+      suffixChars: 200
+    });
+  });
+
+  it('allows an empty inline language allowlist', () => {
+    const runtime = loadRuntimeSettings(
+      configuration({
+        'inline.languages': []
+      })
+    );
+
+    expect(runtime.inline.languages).toEqual([]);
+  });
+
+  it('fails closed for malformed inline enabled and model settings', () => {
+    const runtime = loadRuntimeSettings(
+      configuration({
+        'inline.enabled': 'true',
+        'inline.modelId': { value: 'combo/inline' }
+      })
+    );
+
+    expect(runtime.inline.enabled).toBe(false);
+    expect(runtime.inline.modelId).toBe('');
+  });
+
   it('loads explicit source, model, and custom prompt', () => {
     const runtime = loadRuntimeSettings(
       configuration({
@@ -211,6 +268,24 @@ describe('buildSettingsSnapshot', () => {
         expect.objectContaining({ code: 'INVALID_BASE_URL', scope: 'runtime' }),
         expect.objectContaining({ code: 'INVALID_REQUEST_TIMEOUT', scope: 'runtime' })
       ])
+    );
+  });
+
+  it('degrades settings when inline is enabled without a model id', () => {
+    const snapshot = buildSettingsSnapshot(
+      configuration({
+        models: [{ id: 'coder', name: 'Coder', modelId: 'router/coder' }],
+        'inline.enabled': true
+      })
+    );
+
+    expect(snapshot.state).toBe('degraded');
+    expect(snapshot.issues).toContainEqual(
+      expect.objectContaining({
+        scope: 'inline',
+        code: 'MISSING_INLINE_MODEL',
+        path: '9router-copilot.inline.modelId'
+      })
     );
   });
 

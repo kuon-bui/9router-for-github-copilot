@@ -190,6 +190,56 @@
           "default": 0,
           "description": "Maximum response tokens requested from 9router. Use 0 to omit max_tokens and apply no extension-level limit."
         },
+        "9router-copilot.inline.enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable VS Code native inline suggestions backed by 9router. Inline prompts send bounded code prefix and suffix context to 9router."
+        },
+        "9router-copilot.inline.modelId": {
+          "type": "string",
+          "default": "",
+          "description": "Opaque 9router model id used for inline suggestions. Empty disables inline requests even when inline suggestions are enabled."
+        },
+        "9router-copilot.inline.maxTokens": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 128,
+          "description": "Maximum response tokens requested for inline suggestions."
+        },
+        "9router-copilot.inline.languages": {
+          "type": "array",
+          "default": [
+            "typescript",
+            "javascript",
+            "python",
+            "go",
+            "rust",
+            "java",
+            "csharp",
+            "cpp",
+            "php",
+            "ruby",
+            "markdown"
+          ],
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": "VS Code language ids where 9router inline suggestions are enabled."
+        },
+        "9router-copilot.inline.prefixChars": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 12000,
+          "description": "Maximum number of document characters before the cursor sent as inline completion prefix context."
+        },
+        "9router-copilot.inline.suffixChars": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 4000,
+          "description": "Maximum number of document characters after the cursor sent as inline completion suffix context."
+        },
         "9router-copilot.requestTimeoutMs": {
           "type": "number",
           "minimum": 1000,

@@ -32,6 +32,7 @@ This repository must preserve the approved thin provider adapter architecture.
 The extension is allowed to:
 
 - register the `9router` language model provider
+- register optional VS Code native inline completion providers backed by `9router`
 - expose user-defined curated display models in Copilot Chat
 - map display models to opaque `9router` `modelId` values
 - adapt host requests into the `9router` API format
@@ -148,6 +149,7 @@ User-defined curated model names are allowed and must remain separate from backe
 - Keep the native Copilot Chat experience intact.
 - Do not create a separate chat UI for the main product path.
 - Use `vscode.LanguageModelChatProvider` as the primary integration surface.
+- Use `vscode.languages.registerInlineCompletionItemProvider` only for optional native VS Code inline suggestions; do not patch GitHub Copilot inline internals.
 - Keep model publication, host request handling, and capability signaling explicit and testable.
 - Refresh model availability on settings changes when possible.
 

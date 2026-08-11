@@ -11,6 +11,24 @@ export const DEFAULT_VISION_PROXY_SOURCE = '' as const;
 export const DEFAULT_VISION_PROXY_MODEL_ID = '';
 export const DEFAULT_VISION_PROXY_PROMPT =
   'Describe the supplied images faithfully for another language model. Include visible text, code, tables, diagrams, layout, and uncertainty. Do not answer the user request; provide only image context.';
+export const DEFAULT_INLINE_ENABLED = false;
+export const DEFAULT_INLINE_MODEL_ID = '';
+export const DEFAULT_INLINE_MAX_TOKENS = 128;
+export const DEFAULT_INLINE_PREFIX_CHARS = 12_000;
+export const DEFAULT_INLINE_SUFFIX_CHARS = 4_000;
+export const DEFAULT_INLINE_LANGUAGES = [
+  'typescript',
+  'javascript',
+  'python',
+  'go',
+  'rust',
+  'java',
+  'csharp',
+  'cpp',
+  'php',
+  'ruby',
+  'markdown'
+] as const;
 
 export const DEFAULT_MODELS = [
   {
