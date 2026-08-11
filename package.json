@@ -3,7 +3,7 @@
   "displayName": "9router Copilot Chat Provider",
   "description": "Expose 9router as a custom provider inside GitHub Copilot Chat.",
   "publisher": "local",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "license": "UNLICENSED",
   "engines": {
     "vscode": "^1.125.0"
