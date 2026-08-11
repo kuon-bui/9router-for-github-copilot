@@ -1,6 +1,15 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createRouterClient } from '../../../src/router/client';
 
+function responseBody(text: string): ReadableStream<Uint8Array> {
+  return new ReadableStream<Uint8Array>({
+    start(controller) {
+      controller.enqueue(new TextEncoder().encode(text));
+      controller.close();
+    }
+  });
+}
+
 describe('createRouterClient', () => {
   it('posts to /v1/chat/completions with bearer auth', async () => {
     const fetchMock = vi.fn().mockResolvedValue({
@@ -45,7 +54,7 @@ describe('createRouterClient', () => {
         ok: false,
         status: 404,
         headers: new Headers({ 'x-request-id': 'req-missing-model' }),
-        text: async () => '{"error":{"message":"Model router/missing not found"}}'
+        body: responseBody('{"error":{"message":"Model router/missing not found"}}')
       }) as never
     });
 
@@ -73,7 +82,7 @@ describe('createRouterClient', () => {
         ok: false,
         status: 404,
         headers: new Headers(),
-        text: async () => '{"error":{"message":"No active credentials for provider: openai"}}'
+        body: responseBody('{"error":{"message":"No active credentials for provider: openai"}}')
       }) as never
     });
 
@@ -101,7 +110,7 @@ describe('createRouterClient', () => {
         ok: false,
         status: 404,
         headers: new Headers(),
-        text: async () => '{"error":{"message":"Invalid model response from provider"}}'
+        body: responseBody('{"error":{"message":"Invalid model response from provider"}}')
       }) as never
     });
 
@@ -191,6 +200,34 @@ describe('createRouterClient', () => {
         signal: new AbortController().signal
       })
     ).rejects.toMatchObject({ code: 'AUTHENTICATION_ERROR' });
+  });
+
+  it('does not expose raw chat-completion error bodies', async () => {
+    const secret = 'prompt-secret';
+    const client = createRouterClient({
+      fetch: vi.fn().mockResolvedValue({
+        ok: false,
+        status: 500,
+        headers: new Headers(),
+        body: responseBody(`${secret} ${'x'.repeat(20_000)}`)
+      }) as never
+    });
+    const consume = async (): Promise<void> => {
+      for await (const event of client.streamChatCompletion({
+        baseUrl: 'https://router.example.com/v1',
+        apiKey: 'secret-token',
+        request: { model: 'combo/daily', messages: [], stream: true },
+        timeoutMs: 1000,
+        signal: new AbortController().signal
+      })) {
+        void event;
+      }
+    };
+
+    const error = await consume().catch((caught: unknown) => caught as { details?: Record<string, unknown> });
+
+    expect(error.details).toEqual({ status: 500 });
+    expect(JSON.stringify(error)).not.toContain(secret);
   });
 
   it('maps discovery JSON parsing failures to UPSTREAM_UNAVAILABLE without raw body details', async () => {

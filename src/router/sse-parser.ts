@@ -1,6 +1,9 @@
 import { NineRouterError } from './errors';
 import type { RouterStreamEvent } from '../types/router-contract';
 
+// ponytail: 1 MiB SSE frame ceiling; raise if 9router formalizes larger tool-call delta frames.
+const MAX_SSE_FRAME_BYTES = 1024 * 1024;
+
 interface RouterSsePayload {
   id?: string;
   usage?: {
@@ -29,7 +32,7 @@ interface RouterSsePayload {
 
 export function parseSseChunk(chunk: string): RouterStreamEvent[] {
   const frames = chunk
-    .split('\n\n')
+    .split(/\r?\n\r?\n/)
     .map((frame) => frame.trim())
     .filter((frame) => frame.length > 0);
 
@@ -38,7 +41,7 @@ export function parseSseChunk(chunk: string): RouterStreamEvent[] {
 
 function parseSseFrame(frame: string): RouterStreamEvent[] {
   const lines = frame
-    .split('\n')
+    .split(/\r?\n/)
     .map((line) => line.trim())
     .filter((line) => line.startsWith('data:'));
 
@@ -58,7 +61,7 @@ function parseSseFrame(frame: string): RouterStreamEvent[] {
   } catch (error) {
     throw new NineRouterError('MALFORMED_STREAM_ERROR', '9router returned malformed SSE JSON', {
       details: {
-        frame,
+        frameLength: frame.length,
         cause: error instanceof Error ? error.message : 'Unknown parse error'
       }
     });
@@ -149,6 +152,21 @@ function isNonNegativeInteger(value: unknown): value is number {
   return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
 }
 
+function findFrameBoundary(buffer: string): { index: number; length: number } | undefined {
+  const lf = buffer.indexOf('\n\n');
+  const crlf = buffer.indexOf('\r\n\r\n');
+
+  if (lf < 0 && crlf < 0) {
+    return undefined;
+  }
+
+  if (lf >= 0 && (crlf < 0 || lf < crlf)) {
+    return { index: lf, length: 2 };
+  }
+
+  return { index: crlf, length: 4 };
+}
+
 export async function* parseRouterEventStream(
   stream: ReadableStream<Uint8Array>
 ): AsyncIterable<RouterStreamEvent> {
@@ -156,32 +174,57 @@ export async function* parseRouterEventStream(
   const decoder = new TextDecoder();
   let buffer = '';
 
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) {
-      break;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) {
+        break;
+      }
+
+      buffer += decoder.decode(value, { stream: true });
+      let boundary = findFrameBoundary(buffer);
+      while (boundary) {
+        const frame = buffer.slice(0, boundary.index);
+        buffer = buffer.slice(boundary.index + boundary.length);
+        assertSseFrameWithinLimit(frame);
+        for (const event of parseSseChunk(frame)) {
+          yield event;
+        }
+        boundary = findFrameBoundary(buffer);
+      }
+
+      assertSseFrameWithinLimit(buffer);
     }
 
-    buffer += decoder.decode(value, { stream: true });
-    let boundaryIndex = buffer.indexOf('\n\n');
-    while (boundaryIndex >= 0) {
-      const frame = buffer.slice(0, boundaryIndex + 2);
-      buffer = buffer.slice(boundaryIndex + 2);
-      for (const event of parseSseChunk(frame)) {
+    const trailing = decoder.decode();
+    if (trailing) {
+      buffer += trailing;
+    }
+
+    if (buffer.trim().length > 0) {
+      assertSseFrameWithinLimit(buffer);
+      for (const event of parseSseChunk(buffer)) {
         yield event;
       }
-      boundaryIndex = buffer.indexOf('\n\n');
     }
+  } finally {
+    reader.releaseLock();
+  }
+}
+
+function assertSseFrameWithinLimit(frame: string): void {
+  if (frame.length <= MAX_SSE_FRAME_BYTES) {
+    return;
   }
 
-  const trailing = decoder.decode();
-  if (trailing) {
-    buffer += trailing;
-  }
-
-  if (buffer.trim().length > 0) {
-    for (const event of parseSseChunk(buffer)) {
-      yield event;
+  throw new NineRouterError(
+    'MALFORMED_STREAM_ERROR',
+    '9router SSE frame exceeded maximum supported size',
+    {
+      details: {
+        frameLength: frame.length,
+        maxFrameLength: MAX_SSE_FRAME_BYTES
+      }
     }
-  }
+  );
 }

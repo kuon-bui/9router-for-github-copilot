@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import * as vscode from 'vscode';
 import { createRouterEventEmitter } from '../../../src/provider/stream-adapter';
+import { NineRouterError } from '../../../src/router/errors';
 
 describe('createRouterEventEmitter', () => {
   it('emits text parts for streamed text deltas', () => {
@@ -37,11 +38,71 @@ describe('createRouterEventEmitter', () => {
       toolCallIndex: 0,
       delta: ':"42"}'
     });
+    emitter.emit({ type: 'response-complete' });
 
     expect(parts[0]).toBeInstanceOf(vscode.LanguageModelToolCallPart);
     expect((parts[0] as vscode.LanguageModelToolCallPart).callId).toBe('call-1');
     expect((parts[0] as vscode.LanguageModelToolCallPart).name).toBe('lookupUser');
     expect((parts[0] as vscode.LanguageModelToolCallPart).input).toEqual({ id: '42' });
+  });
+
+  it('waits for response completion before parsing tool arguments', () => {
+    const parts: unknown[] = [];
+    const emitter = createRouterEventEmitter({
+      report(part) {
+        parts.push(part);
+      }
+    } as vscode.Progress<vscode.LanguageModelResponsePart>);
+
+    emitter.emit({
+      type: 'tool-call-delta',
+      toolCallIndex: 0,
+      toolCallId: 'call-1',
+      toolName: 'lookupUser',
+      delta: '{"id":"42"}'
+    });
+
+    expect(parts).toEqual([]);
+
+    emitter.emit({ type: 'response-complete' });
+
+    expect(parts[0]).toBeInstanceOf(vscode.LanguageModelToolCallPart);
+  });
+
+  it('rejects non-object tool call arguments on completion', () => {
+    const emitter = createRouterEventEmitter({
+      report() {
+        throw new Error('unexpected report');
+      }
+    } as vscode.Progress<vscode.LanguageModelResponsePart>);
+
+    emitter.emit({
+      type: 'tool-call-delta',
+      toolCallIndex: 0,
+      toolCallId: 'call-1',
+      toolName: 'lookupUser',
+      delta: '12'
+    });
+
+    expect(() => emitter.emit({ type: 'response-complete' })).toThrowError(NineRouterError);
+  });
+
+  it('rejects malformed tool call arguments on completion', () => {
+    const emitter = createRouterEventEmitter({
+      report() {
+        throw new Error('unexpected report');
+      }
+    } as vscode.Progress<vscode.LanguageModelResponsePart>);
+
+    emitter.emit({
+      type: 'tool-call-delta',
+      toolCallIndex: 0,
+      toolCallId: 'call-1',
+      toolName: 'lookupUser',
+      delta: '{"id"'
+    });
+
+    expect(() => emitter.emit({ type: 'response-complete' })).toThrowError(NineRouterError);
   });
 
   it('emits OpenAI token usage through the Copilot usage data part', () => {

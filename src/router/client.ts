@@ -5,6 +5,9 @@ import { buildChatCompletionsUrl, buildModelsUrl } from './url';
 import type { RouterModelMetadata } from './model-catalog';
 import type { RouterChatCompletionRequest, RouterStreamEvent } from '../types/router-contract';
 
+// ponytail: 16 KiB error prefix is enough for router error classification; raise if 9router wraps model ids deeper.
+const MAX_ERROR_BODY_BYTES = 16 * 1024;
+
 export interface RouterClient {
   streamChatCompletion(input: {
     baseUrl: string;
@@ -19,6 +22,10 @@ export interface RouterClient {
     timeoutMs: number;
     signal: AbortSignal;
   }): Promise<RouterModelMetadata[]>;
+}
+
+interface ResponseBodySource {
+  body: ReadableStream<Uint8Array> | null;
 }
 
 function createCompositeAbortSignal(signal: AbortSignal, timeoutMs: number): {
@@ -80,7 +87,7 @@ export function createRouterClient(deps: { fetch: typeof globalThis.fetch }): Ro
 
         const requestId = response.headers.get('x-request-id') ?? undefined;
         if (!response.ok) {
-          const errorBody = await response.text().catch(() => '');
+          const errorBody = await readResponsePrefix(response);
           throw classifyStatusError(response.status, requestId, errorBody);
         }
 
@@ -185,6 +192,36 @@ export function createRouterClient(deps: { fetch: typeof globalThis.fetch }): Ro
   };
 }
 
+async function readResponsePrefix(response: ResponseBodySource): Promise<string> {
+  if (!response.body) {
+    return '';
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let body = '';
+  let bytesRead = 0;
+
+  try {
+    while (bytesRead < MAX_ERROR_BODY_BYTES) {
+      const { done, value } = await reader.read();
+      if (done) {
+        break;
+      }
+
+      bytesRead += value.byteLength;
+      body += decoder.decode(value, { stream: true });
+    }
+
+    body += decoder.decode();
+    return body.slice(0, MAX_ERROR_BODY_BYTES);
+  } catch {
+    return '';
+  } finally {
+    reader.releaseLock();
+  }
+}
+
 function createMalformedCatalogError(requestId: string | undefined): NineRouterError {
   return new NineRouterError(
     'UPSTREAM_UNAVAILABLE',
@@ -245,8 +282,7 @@ function isExplicitMissingModelError(responseText: string): boolean {
 
 function classifyStatusError(status: number, requestId: string | undefined, responseText: string): NineRouterError {
   const details = {
-    status,
-    responseText
+    status
   };
 
   if (status === 401 || status === 403) {

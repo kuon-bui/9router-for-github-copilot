@@ -27,6 +27,16 @@ interface NineRouterChatProviderOptions {
   configureVisionProxy?: VisionProxyConfigurator;
 }
 
+interface ModelCatalogCache {
+  baseUrl: string;
+  models: readonly RouterModelMetadata[];
+}
+
+interface ModelCatalogRefreshFlight {
+  key: string;
+  promise: Promise<readonly RouterModelMetadata[] | undefined>;
+}
+
 function getRequestTools(options: unknown): readonly HostToolDefinition[] | undefined {
   if (typeof options !== 'object' || options === null || !('tools' in options)) {
     return undefined;
@@ -56,13 +66,62 @@ function getRequestToolMode(options: unknown): unknown {
   return options.toolMode;
 }
 
+function waitForCatalogRefresh(
+  promise: Promise<readonly RouterModelMetadata[] | undefined>,
+  token: vscode.CancellationToken,
+  fallbackCatalog: readonly RouterModelMetadata[] | undefined
+): Promise<readonly RouterModelMetadata[] | undefined> {
+  if (token.isCancellationRequested) {
+    return Promise.resolve(fallbackCatalog);
+  }
+
+  if (typeof token.onCancellationRequested !== 'function') {
+    return promise;
+  }
+
+  return new Promise<readonly RouterModelMetadata[] | undefined>((resolve, reject) => {
+    let settled = false;
+    const subscription = token.onCancellationRequested(() => {
+      if (settled) {
+        return;
+      }
+
+      settled = true;
+      subscription.dispose();
+      resolve(fallbackCatalog);
+    });
+
+    promise.then(
+      (catalog) => {
+        if (settled) {
+          return;
+        }
+
+        settled = true;
+        subscription.dispose();
+        resolve(catalog);
+      },
+      (error) => {
+        if (settled) {
+          return;
+        }
+
+        settled = true;
+        subscription.dispose();
+        reject(error);
+      }
+    );
+  });
+}
+
 export class NineRouterChatProvider
   implements vscode.LanguageModelChatProvider<PublishedModel>
 {
   private readonly onDidChangeEmitter = new vscode.EventEmitter<void>();
   private readonly visionProxyService: VisionProxyService;
   private readonly options: NineRouterChatProviderOptions;
-  private latestModelCatalog: readonly RouterModelMetadata[] | undefined;
+  private latestModelCatalog: ModelCatalogCache | undefined;
+  private modelCatalogRefresh: ModelCatalogRefreshFlight | undefined;
   private snapshotVersion = 0;
 
   public readonly onDidChangeLanguageModelChatInformation = this.onDidChangeEmitter.event;
@@ -118,7 +177,10 @@ export class NineRouterChatProvider
     snapshotVersion: number
   ): Promise<readonly RouterModelMetadata[] | undefined> {
     const startedAt = Date.now();
-    const fallbackCatalog = this.latestModelCatalog;
+    const fallbackCatalog =
+      this.latestModelCatalog?.baseUrl === runtime.baseUrl
+        ? this.latestModelCatalog.models
+        : undefined;
 
     try {
       const apiKey = await getApiKey(this.context.secrets);
@@ -126,35 +188,77 @@ export class NineRouterChatProvider
         return fallbackCatalog;
       }
 
-      const requestCancellation = createAbortSignalFromToken(token);
-      try {
-        const catalog = await this.routerClient.listModels({
-          baseUrl: runtime.baseUrl,
-          apiKey,
-          timeoutMs: runtime.requestTimeoutMs,
-          signal: requestCancellation.signal
-        });
-
-        if (snapshotVersion === this.snapshotVersion) {
-          this.latestModelCatalog = catalog;
-        }
-
-        logDebugEvent(runtime.debugMode, '9router model catalog refreshed', {
-          modelCount: catalog.length,
-          durationMs: Date.now() - startedAt
-        });
-        return catalog;
-      } finally {
-        requestCancellation.cleanup();
+      if (token.isCancellationRequested) {
+        return fallbackCatalog;
       }
+
+      const key = `${snapshotVersion}:${runtime.baseUrl}`;
+      const existingRefresh = this.modelCatalogRefresh;
+      if (existingRefresh?.key === key) {
+        return waitForCatalogRefresh(existingRefresh.promise, token, fallbackCatalog);
+      }
+
+      let refreshPromise!: Promise<readonly RouterModelMetadata[] | undefined>;
+      refreshPromise = this.fetchModelCatalog({
+        runtime,
+        apiKey,
+        snapshotVersion,
+        fallbackCatalog,
+        startedAt
+      }).finally(() => {
+        if (this.modelCatalogRefresh?.promise === refreshPromise) {
+          this.modelCatalogRefresh = undefined;
+        }
+      });
+      this.modelCatalogRefresh = { key, promise: refreshPromise };
+
+      return waitForCatalogRefresh(refreshPromise, token, fallbackCatalog);
     } catch (error) {
       logDebugEvent(runtime.debugMode, '9router model catalog refresh failed', {
         errorCode: error instanceof NineRouterError ? error.code : 'UNKNOWN',
         requestId: error instanceof NineRouterError ? error.requestId : undefined,
-        cached: this.latestModelCatalog !== undefined,
+        cached: fallbackCatalog !== undefined,
         durationMs: Date.now() - startedAt
       });
       return fallbackCatalog;
+    }
+  }
+
+  private async fetchModelCatalog(input: {
+    runtime: RuntimeSettings;
+    apiKey: string;
+    snapshotVersion: number;
+    fallbackCatalog: readonly RouterModelMetadata[] | undefined;
+    startedAt: number;
+  }): Promise<readonly RouterModelMetadata[] | undefined> {
+    try {
+      const catalog = await this.routerClient.listModels({
+        baseUrl: input.runtime.baseUrl,
+        apiKey: input.apiKey,
+        timeoutMs: input.runtime.requestTimeoutMs,
+        signal: new AbortController().signal
+      });
+
+      if (input.snapshotVersion === this.snapshotVersion) {
+        this.latestModelCatalog = {
+          baseUrl: input.runtime.baseUrl,
+          models: catalog
+        };
+      }
+
+      logDebugEvent(input.runtime.debugMode, '9router model catalog refreshed', {
+        modelCount: catalog.length,
+        durationMs: Date.now() - input.startedAt
+      });
+      return catalog;
+    } catch (error) {
+      logDebugEvent(input.runtime.debugMode, '9router model catalog refresh failed', {
+        errorCode: error instanceof NineRouterError ? error.code : 'UNKNOWN',
+        requestId: error instanceof NineRouterError ? error.requestId : undefined,
+        cached: input.fallbackCatalog !== undefined,
+        durationMs: Date.now() - input.startedAt
+      });
+      return input.fallbackCatalog;
     }
   }
 
@@ -165,19 +269,20 @@ export class NineRouterChatProvider
     progress: vscode.Progress<vscode.LanguageModelResponsePart>,
     token: vscode.CancellationToken
   ): Promise<void> {
+    const snapshot = this.snapshot;
     const apiKey = await getApiKey(this.context.secrets);
     if (!apiKey) {
       throw new NineRouterError('AUTHENTICATION_ERROR', '9router API key is not configured');
     }
 
-    if (!this.snapshot.runtime) {
+    if (!snapshot.runtime) {
       throw new NineRouterError(
         'CONFIGURATION_ERROR',
         '9router runtime settings are invalid. Check diagnostics for details.'
       );
     }
 
-    const selectedModel = this.snapshot.models.find((setting) => setting.id === model.id);
+    const selectedModel = snapshot.models.find((setting) => setting.id === model.id);
     if (!selectedModel) {
       throw new NineRouterError(
         'CONFIGURATION_ERROR',
@@ -195,8 +300,8 @@ export class NineRouterChatProvider
       thinkingMode: effectiveThinking.thinkingMode
     };
     const hasVisionInput = messages.some((message) => hasImageParts(message.content));
-    let visionProxySource = this.snapshot.runtime.visionProxySource;
-    let visionProxyModelId = this.snapshot.runtime.visionProxyModelId;
+    let visionProxySource = snapshot.runtime.visionProxySource;
+    let visionProxyModelId = snapshot.runtime.visionProxyModelId;
     const needsVisionSetup =
       requestSelectedModel.visionMode === 'proxy' &&
       hasVisionInput &&
@@ -224,18 +329,18 @@ export class NineRouterChatProvider
         messages: messages as readonly HostChatRequestMessage[],
         visionProxySource,
         visionProxyModelId,
-        visionProxyPrompt: this.snapshot.runtime.visionProxyPrompt,
-        baseUrl: this.snapshot.runtime.baseUrl,
+        visionProxyPrompt: snapshot.runtime.visionProxyPrompt,
+        baseUrl: snapshot.runtime.baseUrl,
         apiKey,
-        ...(typeof this.snapshot.runtime.maxTokens === 'number'
-          ? { maxTokens: this.snapshot.runtime.maxTokens }
+        ...(typeof snapshot.runtime.maxTokens === 'number'
+          ? { maxTokens: snapshot.runtime.maxTokens }
           : {}),
-        requestTimeoutMs: this.snapshot.runtime.requestTimeoutMs,
+        requestTimeoutMs: snapshot.runtime.requestTimeoutMs,
         signal: requestCancellation.signal,
         cancellationToken: token
       });
 
-      logDebugEvent(this.snapshot.runtime.debugMode, 'Vision compatibility resolved', {
+      logDebugEvent(snapshot.runtime.debugMode, 'Vision compatibility resolved', {
         displayModel: selectedModel.id,
         visionMode: selectedModel.visionMode,
         visionOutcome: visionResult.outcome,
@@ -278,7 +383,7 @@ export class NineRouterChatProvider
         });
 
         if (toolOptions.rejectedTools.length > 0) {
-          logDebugEvent(this.snapshot.runtime.debugMode, 'Some tools were not exposed to 9router', {
+          logDebugEvent(snapshot.runtime.debugMode, 'Some tools were not exposed to 9router', {
             rejectedTools: toolOptions.rejectedTools
               .map((tool) => `${tool.name}:${tool.code}`)
               .join(', ')
@@ -286,21 +391,21 @@ export class NineRouterChatProvider
         }
       }
 
-      if (typeof this.snapshot.runtime.maxTokens === 'number') {
-        requestInput.maxTokens = this.snapshot.runtime.maxTokens;
+      if (typeof snapshot.runtime.maxTokens === 'number') {
+        requestInput.maxTokens = snapshot.runtime.maxTokens;
       }
 
       const request = adaptMessagesToRouterRequest(requestInput);
 
-      logDebugEvent(this.snapshot.runtime.debugMode, 'Submitting request to 9router', {
+      logDebugEvent(snapshot.runtime.debugMode, 'Submitting request to 9router', {
         displayModel: selectedModel.id,
         modelId: selectedModel.modelId,
         configuredThinkingMode: selectedModel.thinkingMode,
         effectiveThinkingMode: effectiveThinking.thinkingMode,
         thinkingModeSource: effectiveThinking.source,
-        baseUrl: this.snapshot.runtime.baseUrl,
-        snapshotState: this.snapshot.state,
-        issueCount: this.snapshot.issues.length
+        baseUrl: snapshot.runtime.baseUrl,
+        snapshotState: snapshot.state,
+        issueCount: snapshot.issues.length
       });
 
       if (requestCancellation.signal.aborted) {
@@ -309,15 +414,39 @@ export class NineRouterChatProvider
 
       const emitter = createRouterEventEmitter(progress);
       const stream = this.routerClient.streamChatCompletion({
-        baseUrl: this.snapshot.runtime.baseUrl,
+        baseUrl: snapshot.runtime.baseUrl,
         apiKey,
         request,
-        timeoutMs: this.snapshot.runtime.requestTimeoutMs,
+        timeoutMs: snapshot.runtime.requestTimeoutMs,
         signal: requestCancellation.signal
       });
 
+      let responseCompleted = false;
       for await (const event of stream) {
+        if (event.type === 'router-error') {
+          throw new NineRouterError(
+            'UPSTREAM_UNAVAILABLE',
+            '9router upstream execution failed',
+            {
+              ...(event.requestId ? { requestId: event.requestId } : {}),
+              details: { phase: 'chat-completion' }
+            }
+          );
+        }
+
+        if (event.type === 'response-complete') {
+          responseCompleted = true;
+        }
+
         emitter.emit(event);
+      }
+
+      if (!responseCompleted) {
+        throw new NineRouterError(
+          'MALFORMED_STREAM_ERROR',
+          '9router response stream ended before response completion',
+          { details: { phase: 'chat-completion' } }
+        );
       }
     } catch (error) {
       throw mapProviderError(error, selectedModel);

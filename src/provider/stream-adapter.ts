@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import { NineRouterError } from '../router/errors';
 import type { RouterStreamEvent } from '../types/router-contract';
 
 interface ToolAccumulator {
@@ -53,21 +54,50 @@ export function createRouterEventEmitter(
         }
         previous.buffer += event.delta;
         toolCalls.set(key, previous);
+        return;
+      }
 
-        try {
-          const parsedInput = JSON.parse(previous.buffer) as object;
-          if (!previous.id || !previous.name) {
-            return;
-          }
-
-          progress.report(new vscode.LanguageModelToolCallPart(previous.id, previous.name, parsedInput));
-          toolCalls.delete(key);
-        } catch {
-          return;
+      if (event.type === 'response-complete') {
+        for (const toolCall of toolCalls.values()) {
+          emitToolCall(progress, toolCall);
         }
+
+        toolCalls.clear();
       }
     }
   };
+}
+
+function emitToolCall(
+  progress: vscode.Progress<vscode.LanguageModelResponsePart>,
+  toolCall: ToolAccumulator
+): void {
+  if (!toolCall.id || !toolCall.name) {
+    throw createMalformedToolCallError('9router streamed a tool call without id or name');
+  }
+
+  let parsedInput: unknown;
+  try {
+    parsedInput = JSON.parse(toolCall.buffer);
+  } catch {
+    throw createMalformedToolCallError('9router streamed malformed tool call arguments');
+  }
+
+  if (!isPlainObject(parsedInput)) {
+    throw createMalformedToolCallError('9router streamed non-object tool call arguments');
+  }
+
+  progress.report(new vscode.LanguageModelToolCallPart(toolCall.id, toolCall.name, parsedInput));
+}
+
+function createMalformedToolCallError(message: string): NineRouterError {
+  return new NineRouterError('MALFORMED_STREAM_ERROR', message, {
+    details: { phase: 'tool-call-streaming' }
+  });
+}
+
+function isPlainObject(value: unknown): value is object {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 function getToolAccumulatorKey(event: Extract<RouterStreamEvent, { type: 'tool-call-delta' }>): string {
