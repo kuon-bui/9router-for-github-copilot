@@ -100,7 +100,7 @@ Settings:
 - `9router-copilot.inline.languages`: VS Code language ids where inline suggestions run.
 - `9router-copilot.inline.prefixChars` and `9router-copilot.inline.suffixChars`: bounded code context sent before and after the cursor.
 
-Privacy note: when inline suggestions are enabled, bounded prefix and suffix code context around the cursor is sent to `9router`. Diagnostics log metadata only by default, not prompt text or source code.
+Privacy note: `9router-copilot.baseUrl` and `9router-copilot.inline.enabled` are application-scoped user settings, so workspace configuration cannot redirect or enable automatic inline requests. When inline suggestions are enabled, bounded prefix and suffix code context around the cursor is sent to `9router`. Diagnostics log metadata only by default, not prompt text or source code.
 
 ### Tools
 

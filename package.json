@@ -49,6 +49,7 @@
       "properties": {
         "9router-copilot.baseUrl": {
           "type": "string",
+          "scope": "application",
           "default": "http://127.0.0.1:20128/v1",
           "description": "Base URL for the 9router OpenAI-compatible API."
         },
@@ -192,6 +193,7 @@
         },
         "9router-copilot.inline.enabled": {
           "type": "boolean",
+          "scope": "application",
           "default": false,
           "description": "Enable VS Code native inline suggestions backed by 9router. Inline prompts send bounded code prefix and suffix context to 9router."
         },

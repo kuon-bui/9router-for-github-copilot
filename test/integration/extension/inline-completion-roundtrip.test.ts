@@ -166,6 +166,33 @@ describe('NineRouterInlineCompletionProvider', () => {
     expect(streamChatCompletion).not.toHaveBeenCalled();
   });
 
+  it('rejects partial text from a truncated stream', async () => {
+    const provider = new NineRouterInlineCompletionProvider(
+      { secrets: { get: async () => 'token' } } as never,
+      {
+        async *streamChatCompletion() {
+          yield { type: 'text-delta', text: '.partial()' };
+        }
+      } as never,
+      snapshot({
+        models: [{ id: 'chat', name: 'Chat', modelId: 'combo/chat' }],
+        debugMode: 'metadata',
+        'inline.enabled': true,
+        'inline.modelId': 'combo/inline'
+      })
+    );
+
+    await expect(
+      provider.provideInlineCompletionItems(
+        document('value') as never,
+        new vscode.Position(0, 5),
+        {} as never,
+        __createCancellationToken().value as never
+      )
+    ).resolves.toBeUndefined();
+    expect(__getOutputLines().at(-1)).toContain('"errorCode":"MALFORMED_STREAM_ERROR"');
+  });
+
   it('swallows cancellation as empty inline result', async () => {
     const cancellation = __createCancellationToken();
     const provider = new NineRouterInlineCompletionProvider(

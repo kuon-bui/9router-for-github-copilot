@@ -57,6 +57,7 @@ export class NineRouterInlineCompletionProvider implements vscode.InlineCompleti
       const chunks: string[] = [];
       let finishReason: string | undefined;
       let requestId: string | undefined;
+      let completed = false;
 
       const stream = this.routerClient.streamChatCompletion({
         baseUrl: runtime.baseUrl,
@@ -73,6 +74,7 @@ export class NineRouterInlineCompletionProvider implements vscode.InlineCompleti
         }
 
         if (event.type === 'response-complete') {
+          completed = true;
           finishReason = event.finishReason ?? finishReason;
           requestId = event.requestId ?? requestId;
           continue;
@@ -83,6 +85,13 @@ export class NineRouterInlineCompletionProvider implements vscode.InlineCompleti
             ...(event.requestId ? { requestId: event.requestId } : {})
           });
         }
+      }
+
+      if (!completed) {
+        throw new NineRouterError(
+          'MALFORMED_STREAM_ERROR',
+          '9router inline suggestion stream ended before completion'
+        );
       }
 
       const suggestion = normalizeInlineSuggestion(chunks.join(''));
