@@ -73,8 +73,8 @@ export class NineRouterInlineCompletionProvider implements vscode.InlineCompleti
         }
 
         if (event.type === 'response-complete') {
-          finishReason = event.finishReason;
-          requestId = event.requestId;
+          finishReason = event.finishReason ?? finishReason;
+          requestId = event.requestId ?? requestId;
           continue;
         }
 

@@ -6,6 +6,7 @@ interface InlineDocumentLike {
   readonly languageId: string;
   getText(range?: vscode.Range): string;
   offsetAt(position: vscode.Position): number;
+  positionAt(offset: number): vscode.Position;
 }
 
 export function buildInlineCompletionRequest(input: {
@@ -47,12 +48,13 @@ function extractInlineContext(
   position: vscode.Position,
   settings: Pick<InlineSettings, 'prefixChars' | 'suffixChars'>
 ): { prefix: string; suffix: string } {
-  const text = document.getText();
   const offset = document.offsetAt(position);
+  const prefixStart = document.positionAt(Math.max(0, offset - settings.prefixChars));
+  const suffixEnd = document.positionAt(offset + settings.suffixChars);
 
   return {
-    prefix: text.slice(Math.max(0, offset - settings.prefixChars), offset),
-    suffix: text.slice(offset, offset + settings.suffixChars)
+    prefix: document.getText({ start: prefixStart, end: position } as vscode.Range),
+    suffix: document.getText({ start: position, end: suffixEnd } as vscode.Range)
   };
 }
 

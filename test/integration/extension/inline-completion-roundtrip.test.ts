@@ -4,7 +4,11 @@ import { buildSettingsSnapshot } from '../../../src/config/settings';
 import { NineRouterInlineCompletionProvider } from '../../../src/provider/inline-completion-provider';
 import { NineRouterError } from '../../../src/router/errors';
 import type { RouterChatCompletionRequest } from '../../../src/types/router-contract';
-import { __createCancellationToken, __resetVscodeState } from '../../support/vscode';
+import {
+  __createCancellationToken,
+  __getOutputLines,
+  __resetVscodeState
+} from '../../support/vscode';
 
 function snapshot(values: Record<string, unknown> = {}) {
   return buildSettingsSnapshot({
@@ -13,17 +17,30 @@ function snapshot(values: Record<string, unknown> = {}) {
 }
 
 function document(text: string, languageId = 'typescript') {
+  const offsetAt = (position: { line: number; character: number }) => {
+    const lines = text.split('\n');
+    return lines.slice(0, position.line).reduce((total, line) => total + line.length + 1, 0) +
+      position.character;
+  };
+
   return {
     languageId,
     fileName: 'src/example.ts',
     uri: { scheme: 'file' },
-    getText: () => text,
-    offsetAt: (position: { line: number; character: number }) => {
+    getText: (range?: vscode.Range) =>
+      range ? text.slice(offsetAt(range.start), offsetAt(range.end)) : text,
+    offsetAt,
+    positionAt: (offset: number) => {
       const lines = text.split('\n');
-      return lines.slice(0, position.line).reduce((total, line) => total + line.length + 1, 0) +
-        position.character;
+      let remaining = Math.min(text.length, offset);
+      for (let line = 0; line < lines.length; line += 1) {
+        const length = lines[line]?.length ?? 0;
+        if (remaining <= length) return new vscode.Position(line, remaining);
+        remaining -= length + 1;
+      }
+      return new vscode.Position(lines.length - 1, lines.at(-1)?.length ?? 0);
     }
-  } as never;
+  };
 }
 
 describe('NineRouterInlineCompletionProvider', () => {
@@ -38,15 +55,16 @@ describe('NineRouterInlineCompletionProvider', () => {
       {
         async *streamChatCompletion(input: { request: RouterChatCompletionRequest }) {
           submittedRequest = input.request;
-          yield { type: 'text-delta', text: 'value' };
           yield { type: 'text-delta', text: '.map(Boolean)' };
           yield { type: 'response-complete', finishReason: 'stop', requestId: 'req-1' };
+          yield { type: 'response-complete' };
         }
       } as never,
       snapshot({
         models: [{ id: 'chat', name: 'Chat', modelId: 'combo/chat' }],
         baseUrl: 'https://router.example.com/v1',
         requestTimeoutMs: 5000,
+        debugMode: 'metadata',
         'inline.enabled': true,
         'inline.modelId': 'combo/inline',
         'inline.maxTokens': 64,
@@ -54,9 +72,12 @@ describe('NineRouterInlineCompletionProvider', () => {
       })
     );
 
+    const source = 'const value = items\nvalue';
+    const completionDocument = document(source);
+    const position = new vscode.Position(1, 5);
     const result = await provider.provideInlineCompletionItems(
-      document('const value = items\nvalue'),
-      new vscode.Position(1, 5),
+      completionDocument as never,
+      position,
       {} as never,
       __createCancellationToken().value as never
     );
@@ -66,7 +87,14 @@ describe('NineRouterInlineCompletionProvider', () => {
       max_tokens: 64
     });
     expect(result?.items).toHaveLength(1);
-    expect(result?.items[0]?.insertText).toBe('value.map(Boolean)');
+    expect(result?.items[0]?.insertText).toBe('.map(Boolean)');
+    const insertion = String(result?.items[0]?.insertText);
+    const offset = completionDocument.offsetAt(position);
+    expect(`${source.slice(0, offset)}${insertion}${source.slice(offset)}`).toBe(
+      'const value = items\nvalue.map(Boolean)'
+    );
+    expect(__getOutputLines().at(-1)).toContain('"finishReason":"stop"');
+    expect(__getOutputLines().at(-1)).toContain('"requestId":"req-1"');
   });
 
   it('returns nothing when inline suggestions are disabled', async () => {
@@ -83,7 +111,7 @@ describe('NineRouterInlineCompletionProvider', () => {
 
     await expect(
       provider.provideInlineCompletionItems(
-        document('const value = '),
+        document('const value = ') as never,
         new vscode.Position(0, 14),
         {} as never,
         __createCancellationToken().value as never
@@ -106,7 +134,7 @@ describe('NineRouterInlineCompletionProvider', () => {
 
     await expect(
       provider.provideInlineCompletionItems(
-        document('console.'),
+        document('console.') as never,
         new vscode.Position(0, 8),
         { selectedCompletionInfo: { text: 'log', range: {} } } as never,
         __createCancellationToken().value as never
@@ -129,7 +157,7 @@ describe('NineRouterInlineCompletionProvider', () => {
 
     await expect(
       provider.provideInlineCompletionItems(
-        document('const value = '),
+        document('const value = ') as never,
         new vscode.Position(0, 14),
         {} as never,
         __createCancellationToken().value as never
@@ -161,7 +189,7 @@ describe('NineRouterInlineCompletionProvider', () => {
 
     await expect(
       provider.provideInlineCompletionItems(
-        document('const value = '),
+        document('const value = ') as never,
         new vscode.Position(0, 14),
         {} as never,
         cancellation.value as never

@@ -3,14 +3,18 @@ import * as vscode from 'vscode';
 import { buildInlineCompletionRequest, normalizeInlineSuggestion } from '../../../src/provider/inline-request-adapter';
 
 function document(text: string, languageId = 'typescript') {
+  const offsetAt = (position: { line: number; character: number }) => {
+    const lines = text.split('\n');
+    return lines.slice(0, position.line).reduce((total, line) => total + line.length + 1, 0) +
+      position.character;
+  };
+
   return {
     languageId,
-    getText: () => text,
-    offsetAt: (position: { line: number; character: number }) => {
-      const lines = text.split('\n');
-      return lines.slice(0, position.line).reduce((total, line) => total + line.length + 1, 0) +
-        position.character;
-    }
+    getText: (range?: vscode.Range) =>
+      range ? text.slice(offsetAt(range.start), offsetAt(range.end)) : text,
+    offsetAt,
+    positionAt: (offset: number) => new vscode.Position(0, Math.min(text.length, offset))
   };
 }
 
@@ -48,9 +52,10 @@ describe('buildInlineCompletionRequest', () => {
   });
 
   it('bounds prefix and suffix context', () => {
+    const source = document('0123456789abcdefghijklmnopqrstuvwxyz');
     const request = buildInlineCompletionRequest({
       modelId: 'combo/inline',
-      document: document('0123456789abcdefghijklmnopqrstuvwxyz'),
+      document: source,
       position: new vscode.Position(0, 20),
       settings
     });
