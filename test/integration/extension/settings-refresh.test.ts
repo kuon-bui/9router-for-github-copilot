@@ -320,6 +320,42 @@ describe('NineRouterChatProvider snapshot refresh', () => {
     ]);
   });
 
+  it('keeps a shared catalog refresh until its last waiter cancels', async () => {
+    let requestSignal: AbortSignal | undefined;
+    const listModels = vi.fn().mockImplementation(
+      ({ signal }: { signal: AbortSignal }) =>
+        new Promise<unknown[]>((_resolve, reject) => {
+          requestSignal = signal;
+          signal.addEventListener('abort', () => reject(new Error('aborted')), { once: true });
+        })
+    );
+    const provider = new NineRouterChatProvider(
+      context,
+      { listModels, streamChatCompletion } as never,
+      createSnapshot([{ id: 'coder', name: 'Coder', modelId: 'router/coder' }])
+    );
+    const firstToken = __createCancellationToken();
+    const secondToken = __createCancellationToken();
+
+    const first = provider.provideLanguageModelChatInformation(
+      {} as never,
+      firstToken.value as never
+    );
+    const second = provider.provideLanguageModelChatInformation(
+      {} as never,
+      secondToken.value as never
+    );
+    await vi.waitFor(() => expect(listModels).toHaveBeenCalledTimes(1));
+
+    firstToken.cancel();
+    await first;
+    expect(requestSignal?.aborted).toBe(false);
+
+    secondToken.cancel();
+    await second;
+    expect(requestSignal?.aborted).toBe(true);
+  });
+
   it('skips discovery without an API key and uses built-in fallback metadata', async () => {
     const listModels = vi.fn();
     const provider = new NineRouterChatProvider(

@@ -34,6 +34,9 @@ interface ModelCatalogCache {
 
 interface ModelCatalogRefreshFlight {
   key: string;
+  controller: AbortController;
+  waiters: number;
+  settled: boolean;
   promise: Promise<readonly RouterModelMetadata[] | undefined>;
 }
 
@@ -67,38 +70,49 @@ function getRequestToolMode(options: unknown): unknown {
 }
 
 function waitForCatalogRefresh(
-  promise: Promise<readonly RouterModelMetadata[] | undefined>,
+  flight: ModelCatalogRefreshFlight,
   token: vscode.CancellationToken,
   fallbackCatalog: readonly RouterModelMetadata[] | undefined
 ): Promise<readonly RouterModelMetadata[] | undefined> {
   if (token.isCancellationRequested) {
+    if (flight.waiters === 0 && !flight.settled) {
+      flight.controller.abort();
+    }
     return Promise.resolve(fallbackCatalog);
   }
 
-  if (typeof token.onCancellationRequested !== 'function') {
-    return promise;
-  }
+  flight.waiters += 1;
 
   return new Promise<readonly RouterModelMetadata[] | undefined>((resolve, reject) => {
     let settled = false;
-    const subscription = token.onCancellationRequested(() => {
+    const releaseWaiter = (): void => {
       if (settled) {
         return;
       }
 
       settled = true;
-      subscription.dispose();
-      resolve(fallbackCatalog);
-    });
+      flight.waiters -= 1;
+      if (flight.waiters === 0 && !flight.settled) {
+        flight.controller.abort();
+      }
+    };
+    const subscription =
+      typeof token.onCancellationRequested === 'function'
+        ? token.onCancellationRequested(() => {
+            releaseWaiter();
+            subscription?.dispose();
+            resolve(fallbackCatalog);
+          })
+        : undefined;
 
-    promise.then(
+    flight.promise.then(
       (catalog) => {
         if (settled) {
           return;
         }
 
-        settled = true;
-        subscription.dispose();
+        releaseWaiter();
+        subscription?.dispose();
         resolve(catalog);
       },
       (error) => {
@@ -106,8 +120,8 @@ function waitForCatalogRefresh(
           return;
         }
 
-        settled = true;
-        subscription.dispose();
+        releaseWaiter();
+        subscription?.dispose();
         reject(error);
       }
     );
@@ -194,25 +208,34 @@ export class NineRouterChatProvider
 
       const key = `${snapshotVersion}:${runtime.baseUrl}`;
       const existingRefresh = this.modelCatalogRefresh;
-      if (existingRefresh?.key === key) {
-        return waitForCatalogRefresh(existingRefresh.promise, token, fallbackCatalog);
+      if (existingRefresh?.key === key && !existingRefresh.controller.signal.aborted) {
+        return waitForCatalogRefresh(existingRefresh, token, fallbackCatalog);
       }
 
-      let refreshPromise!: Promise<readonly RouterModelMetadata[] | undefined>;
-      refreshPromise = this.fetchModelCatalog({
+      const controller = new AbortController();
+      const refresh: ModelCatalogRefreshFlight = {
+        key,
+        controller,
+        waiters: 0,
+        settled: false,
+        promise: Promise.resolve(undefined)
+      };
+      refresh.promise = this.fetchModelCatalog({
         runtime,
         apiKey,
         snapshotVersion,
         fallbackCatalog,
-        startedAt
+        startedAt,
+        signal: controller.signal
       }).finally(() => {
-        if (this.modelCatalogRefresh?.promise === refreshPromise) {
+        refresh.settled = true;
+        if (this.modelCatalogRefresh === refresh) {
           this.modelCatalogRefresh = undefined;
         }
       });
-      this.modelCatalogRefresh = { key, promise: refreshPromise };
+      this.modelCatalogRefresh = refresh;
 
-      return waitForCatalogRefresh(refreshPromise, token, fallbackCatalog);
+      return waitForCatalogRefresh(refresh, token, fallbackCatalog);
     } catch (error) {
       logDebugEvent(runtime.debugMode, '9router model catalog refresh failed', {
         errorCode: error instanceof NineRouterError ? error.code : 'UNKNOWN',
@@ -230,13 +253,14 @@ export class NineRouterChatProvider
     snapshotVersion: number;
     fallbackCatalog: readonly RouterModelMetadata[] | undefined;
     startedAt: number;
+    signal: AbortSignal;
   }): Promise<readonly RouterModelMetadata[] | undefined> {
     try {
       const catalog = await this.routerClient.listModels({
         baseUrl: input.runtime.baseUrl,
         apiKey: input.apiKey,
         timeoutMs: input.runtime.requestTimeoutMs,
-        signal: new AbortController().signal
+        signal: input.signal
       });
 
       if (input.snapshotVersion === this.snapshotVersion) {

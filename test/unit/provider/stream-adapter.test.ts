@@ -105,6 +105,35 @@ describe('createRouterEventEmitter', () => {
     expect(() => emitter.emit({ type: 'response-complete' })).toThrowError(NineRouterError);
   });
 
+  it('rejects oversized tool call arguments across deltas', () => {
+    const emitter = createRouterEventEmitter({
+      report() {
+        throw new Error('unexpected report');
+      }
+    } as vscode.Progress<vscode.LanguageModelResponsePart>);
+
+    emitter.emit({
+      type: 'tool-call-delta',
+      toolCallIndex: 0,
+      toolCallId: 'call-1',
+      toolName: 'lookupUser',
+      delta: `{"value":"${'x'.repeat(600_000)}`
+    });
+
+    expect(() =>
+      emitter.emit({
+        type: 'tool-call-delta',
+        toolCallIndex: 0,
+        delta: `${'x'.repeat(500_000)}"}`
+      })
+    ).toThrow(
+      expect.objectContaining({
+        code: 'MALFORMED_STREAM_ERROR',
+        details: { phase: 'tool-call-streaming' }
+      })
+    );
+  });
+
   it('emits OpenAI token usage through the Copilot usage data part', () => {
     const parts: unknown[] = [];
     const emitter = createRouterEventEmitter({

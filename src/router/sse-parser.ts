@@ -58,11 +58,10 @@ function parseSseFrame(frame: string): RouterStreamEvent[] {
   let parsed: RouterSsePayload;
   try {
     parsed = JSON.parse(payload) as RouterSsePayload;
-  } catch (error) {
+  } catch {
     throw new NineRouterError('MALFORMED_STREAM_ERROR', '9router returned malformed SSE JSON', {
       details: {
-        frameLength: frame.length,
-        cause: error instanceof Error ? error.message : 'Unknown parse error'
+        frameBytes: getUtf8ByteLength(frame)
       }
     });
   }
@@ -173,11 +172,13 @@ export async function* parseRouterEventStream(
   const reader = stream.getReader();
   const decoder = new TextDecoder();
   let buffer = '';
+  let completed = false;
 
   try {
     while (true) {
       const { done, value } = await reader.read();
       if (done) {
+        completed = true;
         break;
       }
 
@@ -208,12 +209,16 @@ export async function* parseRouterEventStream(
       }
     }
   } finally {
+    if (!completed) {
+      await reader.cancel().catch(() => undefined);
+    }
     reader.releaseLock();
   }
 }
 
 function assertSseFrameWithinLimit(frame: string): void {
-  if (frame.length <= MAX_SSE_FRAME_BYTES) {
+  const frameBytes = getUtf8ByteLength(frame);
+  if (frameBytes <= MAX_SSE_FRAME_BYTES) {
     return;
   }
 
@@ -222,9 +227,13 @@ function assertSseFrameWithinLimit(frame: string): void {
     '9router SSE frame exceeded maximum supported size',
     {
       details: {
-        frameLength: frame.length,
-        maxFrameLength: MAX_SSE_FRAME_BYTES
+        frameBytes,
+        maxFrameBytes: MAX_SSE_FRAME_BYTES
       }
     }
   );
+}
+
+function getUtf8ByteLength(value: string): number {
+  return new TextEncoder().encode(value).byteLength;
 }

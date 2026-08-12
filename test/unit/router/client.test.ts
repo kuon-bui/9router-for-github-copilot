@@ -230,6 +230,43 @@ describe('createRouterClient', () => {
     expect(JSON.stringify(error)).not.toContain(secret);
   });
 
+  it('decodes only the bounded error prefix and cancels the remaining body', async () => {
+    let cancelled = false;
+    const client = createRouterClient({
+      fetch: vi.fn().mockResolvedValue({
+        ok: false,
+        status: 404,
+        headers: new Headers(),
+        body: new ReadableStream<Uint8Array>({
+          pull(controller) {
+            controller.enqueue(
+              new TextEncoder().encode(
+                `{"error":{"message":"Model router/missing not found"}}${'x'.repeat(100_000)}`
+              )
+            );
+          },
+          cancel() {
+            cancelled = true;
+          }
+        })
+      }) as never
+    });
+    const consume = async (): Promise<void> => {
+      for await (const event of client.streamChatCompletion({
+        baseUrl: 'https://router.example.com/v1',
+        apiKey: 'secret-token',
+        request: { model: 'router/missing', messages: [], stream: true },
+        timeoutMs: 1000,
+        signal: new AbortController().signal
+      })) {
+        void event;
+      }
+    };
+
+    await expect(consume()).rejects.toMatchObject({ code: 'MODEL_MAPPING_ERROR' });
+    expect(cancelled).toBe(true);
+  });
+
   it('maps discovery JSON parsing failures to UPSTREAM_UNAVAILABLE without raw body details', async () => {
     const client = createRouterClient({
       fetch: vi.fn().mockResolvedValue({

@@ -201,23 +201,30 @@ async function readResponsePrefix(response: ResponseBodySource): Promise<string>
   const decoder = new TextDecoder();
   let body = '';
   let bytesRead = 0;
+  let completed = false;
 
   try {
     while (bytesRead < MAX_ERROR_BODY_BYTES) {
       const { done, value } = await reader.read();
       if (done) {
+        completed = true;
         break;
       }
 
-      bytesRead += value.byteLength;
-      body += decoder.decode(value, { stream: true });
+      const remaining = MAX_ERROR_BODY_BYTES - bytesRead;
+      const prefix = value.subarray(0, remaining);
+      bytesRead += prefix.byteLength;
+      body += decoder.decode(prefix, { stream: true });
     }
 
     body += decoder.decode();
-    return body.slice(0, MAX_ERROR_BODY_BYTES);
+    return body;
   } catch {
     return '';
   } finally {
+    if (!completed) {
+      await reader.cancel().catch(() => undefined);
+    }
     reader.releaseLock();
   }
 }

@@ -94,7 +94,7 @@ describe('parseSseChunk', () => {
     expect(() => parseSseChunk(`data: {"secret":"${secret}"\n\n`)).toThrow(
       expect.objectContaining({
         code: 'MALFORMED_STREAM_ERROR',
-        details: expect.objectContaining({ frameLength: expect.any(Number) })
+        details: expect.objectContaining({ frameBytes: expect.any(Number) })
       })
     );
 
@@ -131,7 +131,43 @@ describe('parseSseChunk', () => {
 
     await expect(collectEvents(stream)).rejects.toMatchObject({
       code: 'MALFORMED_STREAM_ERROR',
-      details: expect.objectContaining({ maxFrameLength: 1024 * 1024 })
+      details: expect.objectContaining({ maxFrameBytes: 1024 * 1024 })
     });
+  });
+
+  it('measures SSE limits in UTF-8 bytes', async () => {
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode(`data: ${'€'.repeat(400_000)}\n\n`));
+        controller.close();
+      }
+    });
+
+    await expect(collectEvents(stream)).rejects.toMatchObject({
+      code: 'MALFORMED_STREAM_ERROR',
+      details: expect.objectContaining({
+        frameBytes: expect.any(Number),
+        maxFrameBytes: 1024 * 1024
+      })
+    });
+  });
+
+  it('cancels the reader when stream consumption exits early', async () => {
+    let cancelled = false;
+    const stream = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        controller.enqueue(new TextEncoder().encode('data: [DONE]\n\n'));
+      },
+      cancel() {
+        cancelled = true;
+      }
+    });
+
+    for await (const event of parseRouterEventStream(stream)) {
+      void event;
+      break;
+    }
+
+    expect(cancelled).toBe(true);
   });
 });
