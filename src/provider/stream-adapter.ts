@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
-import { NineRouterError } from '../router/errors';
-import type { RouterStreamEvent } from '../types/router-contract';
+import { NineRouterError } from '@/router/errors';
+import type { RouterStreamEvent } from '@/types/router-contract';
 
 // ponytail: 1 MiB per call and 4 MiB total cover normal tool JSON; raise if 9router supports larger tool payloads.
 const MAX_TOOL_CALL_ARGUMENT_BYTES = 1024 * 1024;

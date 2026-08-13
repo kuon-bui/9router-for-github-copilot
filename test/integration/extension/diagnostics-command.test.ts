@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { buildSettingsSnapshot } from '../../../src/config/settings';
-import { formatSettingsSnapshotDiagnostics } from '../../../src/debug/output-channel';
-import { NineRouterError } from '../../../src/router/errors';
-import { registerCommands } from '../../../src/runtime/commands';
+import { buildSettingsSnapshot } from '@/config/settings';
+import { formatSettingsSnapshotDiagnostics } from '@/debug/output-channel';
+import { NineRouterError } from '@/router/errors';
+import { registerCommands } from '@/runtime/commands';
 import {
   __createCancellationToken,
   __getErrorMessages,
@@ -10,7 +10,7 @@ import {
   __getInformationMessages,
   __getOutputLines,
   __resetVscodeState
-} from '../../support/vscode';
+} from '@test/support/vscode';
 
 describe('9routerCopilot.showDiagnostics', () => {
   beforeEach(() => {
@@ -100,6 +100,7 @@ describe('9routerCopilot.showDiagnostics', () => {
       expect(_token).toMatchObject({
         isCancellationRequested: cancellation.isCancellationRequested
       });
+      return undefined;
     });
 
     registerCommands(

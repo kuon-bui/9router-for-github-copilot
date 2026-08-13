@@ -1,6 +1,6 @@
-import { ENABLED_THINKING_MODES } from '../types/product-model';
-import type { EnabledThinkingMode, ThinkingMode } from '../types/product-model';
-import type { LanguageModelConfigurationSchema } from '../types/vscode-chat-compat';
+import { ENABLED_THINKING_MODES } from '@/types/product-model';
+import type { EnabledThinkingMode, ThinkingMode } from '@/types/product-model';
+import type { LanguageModelConfigurationSchema } from '@/types/vscode-chat-compat';
 
 export const THINKING_EFFORTS = ['none', ...ENABLED_THINKING_MODES] as const;
 

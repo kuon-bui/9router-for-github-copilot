@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { NineRouterError } from '../../../src/router/errors';
-import type { RouterChatCompletionRequest } from '../../../src/types/router-contract';
+import { NineRouterError } from '@/router/errors';
+import type { RouterChatCompletionRequest } from '@/types/router-contract';
 import {
   buildVisionProxyRequest,
   VisionProxyService
-} from '../../../src/provider/vision-proxy';
-import { __createCancellationToken } from '../../support/vscode';
+} from '@/provider/vision-proxy';
+import { __createCancellationToken } from '@test/support/vscode';
 
 const proxyModel = {
   sourceIndex: 0,

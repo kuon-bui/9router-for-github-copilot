@@ -1,5 +1,5 @@
 import { NineRouterError } from './errors';
-import type { RouterStreamEvent } from '../types/router-contract';
+import type { RouterStreamEvent } from '@/types/router-contract';
 
 // ponytail: 1 MiB SSE frame ceiling; raise if 9router formalizes larger tool-call delta frames.
 const MAX_SSE_FRAME_BYTES = 1024 * 1024;

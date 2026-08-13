@@ -1,12 +1,12 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { NineRouterError } from '../../../src/router/errors';
-import { NineRouterChatProvider } from '../../../src/provider/provider';
-import type { RouterChatCompletionRequest } from '../../../src/types/router-contract';
+import { NineRouterError } from '@/router/errors';
+import { NineRouterChatProvider } from '@/provider/provider';
+import type { RouterChatCompletionRequest } from '@/types/router-contract';
 import {
   __createCancellationToken,
   __resetVscodeState,
   __setConfigurationValues
-} from '../../support/vscode';
+} from '@test/support/vscode';
 
 describe('NineRouterChatProvider cancellation flow', () => {
   beforeEach(() => {

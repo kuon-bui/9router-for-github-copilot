@@ -1,4 +1,4 @@
-import type { ExtensionError, ExtensionErrorCode } from '../types/error';
+import type { ExtensionError, ExtensionErrorCode } from '@/types/error';
 
 export class NineRouterError extends Error implements ExtensionError {
   public readonly code: ExtensionErrorCode;

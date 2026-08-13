@@ -1,5 +1,5 @@
 import type * as vscode from 'vscode';
-import { NineRouterError } from '../router/errors';
+import { NineRouterError } from '@/router/errors';
 import {
   countImageParts,
   createRouterImagePart,
@@ -7,12 +7,12 @@ import {
   isHostImageDataPart
 } from './image-input-adapter';
 import { CopilotVisionAnalyzer } from './copilot-vision-analyzer';
-import type { RouterClient } from '../router/client';
-import type { ConfiguredModel } from '../types/product-model';
+import type { RouterClient } from '@/router/client';
+import type { ConfiguredModel } from '@/types/product-model';
 import type {
   RouterChatCompletionRequest,
   RouterContentPart
-} from '../types/router-contract';
+} from '@/types/router-contract';
 
 export interface HostChatRequestMessage {
   role: unknown;

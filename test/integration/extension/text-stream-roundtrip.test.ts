@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import * as vscode from 'vscode';
-import { NineRouterChatProvider } from '../../../src/provider/provider';
-import { NineRouterError } from '../../../src/router/errors';
-import { createVisionProxyConfigurator } from '../../../src/runtime/vision-configuration';
-import type { RouterChatCompletionRequest } from '../../../src/types/router-contract';
+import { NineRouterChatProvider } from '@/provider/provider';
+import { NineRouterError } from '@/router/errors';
+import { createVisionProxyConfigurator } from '@/runtime/vision-configuration';
+import type { RouterChatCompletionRequest } from '@/types/router-contract';
 import {
   __createCancellationToken,
   __getOutputLines,
@@ -11,7 +11,7 @@ import {
   __setConfigurationValues,
   __setQuickPickValues,
   __setSelectedChatModels
-} from '../../support/vscode';
+} from '@test/support/vscode';
 
 describe('NineRouterChatProvider', () => {
   beforeEach(() => {

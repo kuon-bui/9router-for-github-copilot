@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_VISION_PROXY_PROMPT } from '../../../src/config/defaults';
+import { DEFAULT_VISION_PROXY_PROMPT } from '@/config/defaults';
 import {
   buildSettingsSnapshot,
   isVisionProxyConfigured,
   loadRuntimeSettings,
   normalizeBaseUrl,
   normalizeMaxTokens
-} from '../../../src/config/settings';
+} from '@/config/settings';
 
 function configuration(values: Record<string, unknown>) {
   return {

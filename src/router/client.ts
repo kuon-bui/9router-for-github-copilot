@@ -3,7 +3,7 @@ import { parseRouterModels } from './model-catalog';
 import { parseRouterEventStream } from './sse-parser';
 import { buildChatCompletionsUrl, buildModelsUrl } from './url';
 import type { RouterModelMetadata } from './model-catalog';
-import type { RouterChatCompletionRequest, RouterStreamEvent } from '../types/router-contract';
+import type { RouterChatCompletionRequest, RouterStreamEvent } from '@/types/router-contract';
 
 // ponytail: 16 KiB error prefix is enough for router error classification; raise if 9router wraps model ids deeper.
 const MAX_ERROR_BODY_BYTES = 16 * 1024;

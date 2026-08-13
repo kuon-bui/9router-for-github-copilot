@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import * as vscode from 'vscode';
-import { createRouterEventEmitter } from '../../../src/provider/stream-adapter';
-import { NineRouterError } from '../../../src/router/errors';
+import { NineRouterError } from '@/router/errors';
+import { createRouterEventEmitter } from '@/provider/stream-adapter';
 
 describe('createRouterEventEmitter', () => {
   it('emits text parts for streamed text deltas', () => {
