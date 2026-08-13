@@ -33,7 +33,6 @@ export class NineRouterInlineCompletionProvider implements vscode.InlineCompleti
       inline.modelId.length === 0 ||
       !inline.languages.includes(document.languageId) ||
       !isSupportedDocumentScheme(document.uri.scheme) ||
-      context.selectedCompletionInfo !== undefined ||
       token.isCancellationRequested
     ) {
       return undefined;
@@ -52,12 +51,25 @@ export class NineRouterInlineCompletionProvider implements vscode.InlineCompleti
         modelId: inline.modelId,
         document,
         position,
+        ...(context.selectedCompletionInfo
+          ? { selectedCompletionInfo: context.selectedCompletionInfo }
+          : {}),
         settings: inline
       });
       const chunks: string[] = [];
       let finishReason: string | undefined;
       let requestId: string | undefined;
       let completed = false;
+
+      logDebugEvent(
+        runtime.debugMode,
+        'Inline suggestion started',
+        {
+          languageId: document.languageId,
+          modelId: inline.modelId
+        },
+        'minimal'
+      );
 
       const stream = this.routerClient.streamChatCompletion({
         baseUrl: runtime.baseUrl,
@@ -95,29 +107,45 @@ export class NineRouterInlineCompletionProvider implements vscode.InlineCompleti
       }
 
       const suggestion = normalizeInlineSuggestion(chunks.join(''));
-      logDebugEvent(runtime.debugMode, 'Inline suggestion completed', {
-        languageId: document.languageId,
-        modelId: inline.modelId,
-        durationMs: Date.now() - startedAt,
-        finishReason,
-        requestId,
-        hasSuggestion: suggestion !== undefined
-      });
+      logDebugEvent(
+        runtime.debugMode,
+        'Inline suggestion completed',
+        {
+          languageId: document.languageId,
+          modelId: inline.modelId,
+          durationMs: Date.now() - startedAt,
+          finishReason,
+          requestId,
+          hasSuggestion: suggestion !== undefined
+        },
+        'minimal'
+      );
 
-      return suggestion
-        ? new vscode.InlineCompletionList([
-            // ponytail: One insertion-only candidate; add replacement/ranking when autocomplete coexistence is required.
-            new vscode.InlineCompletionItem(suggestion, new vscode.Range(position, position))
-          ])
-        : undefined;
+      if (!suggestion) {
+        return undefined;
+      }
+
+      const selectedCompletion = context.selectedCompletionInfo;
+      return new vscode.InlineCompletionList([
+        new vscode.InlineCompletionItem(
+          selectedCompletion ? `${selectedCompletion.text}${suggestion}` : suggestion,
+          selectedCompletion?.range ?? new vscode.Range(position, position)
+        )
+      ]);
     } catch (error) {
-      logDebugEvent(runtime.debugMode, 'Inline suggestion failed', {
-        languageId: document.languageId,
-        modelId: inline.modelId,
-        durationMs: Date.now() - startedAt,
-        errorCode: error instanceof NineRouterError ? error.code : 'UNKNOWN',
-        requestId: error instanceof NineRouterError ? error.requestId : undefined
-      });
+      logDebugEvent(
+        runtime.debugMode,
+        'Inline suggestion failed',
+        {
+          languageId: document.languageId,
+          modelId: inline.modelId,
+          durationMs: Date.now() - startedAt,
+          errorCode: error instanceof NineRouterError ? error.code : 'UNKNOWN',
+          requestId: error instanceof NineRouterError ? error.requestId : undefined,
+          errorMessage: error instanceof Error ? error.message : 'Unknown error'
+        },
+        'minimal'
+      );
       return undefined;
     } finally {
       requestCancellation.cleanup();

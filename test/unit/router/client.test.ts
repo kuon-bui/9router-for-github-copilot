@@ -218,9 +218,10 @@ describe('createRouterClient', () => {
       details: { phase: 'model-catalog-discovery' }
     });
 
-    const error = await result.catch(
-      (caught: unknown) => caught as { details?: Record<string, unknown> }
-    );
+    const error = (await result.catch((caught: unknown) => caught)) as {
+      details?: Record<string, unknown>;
+    };
+    
     expect(error.details).not.toHaveProperty('responseText');
     expect(error.details).not.toHaveProperty('rawBody');
   });
@@ -247,9 +248,9 @@ describe('createRouterClient', () => {
       details: { phase: 'model-catalog-discovery' }
     });
 
-    const error = await result.catch(
-      (caught: unknown) => caught as { details?: Record<string, unknown> }
-    );
+    const error =  (await result.catch((caught: unknown) => caught)) as {
+      details?: Record<string, unknown>;
+    };
     expect(error.details).not.toHaveProperty('responseText');
     expect(error.details).not.toHaveProperty('rawBody');
   });

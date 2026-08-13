@@ -64,7 +64,7 @@ describe('NineRouterInlineCompletionProvider', () => {
         models: [{ id: 'chat', name: 'Chat', modelId: 'combo/chat' }],
         baseUrl: 'https://router.example.com/v1',
         requestTimeoutMs: 5000,
-        debugMode: 'metadata',
+        debugMode: 'minimal',
         'inline.enabled': true,
         'inline.modelId': 'combo/inline',
         'inline.maxTokens': 64,
@@ -93,6 +93,8 @@ describe('NineRouterInlineCompletionProvider', () => {
     expect(`${source.slice(0, offset)}${insertion}${source.slice(offset)}`).toBe(
       'const value = items\nvalue.map(Boolean)'
     );
+    expect(__getOutputLines()[0]).toContain('Inline suggestion started');
+    expect(__getOutputLines().at(-1)).toContain('Inline suggestion completed');
     expect(__getOutputLines().at(-1)).toContain('"finishReason":"stop"');
     expect(__getOutputLines().at(-1)).toContain('"requestId":"req-1"');
   });
@@ -120,11 +122,21 @@ describe('NineRouterInlineCompletionProvider', () => {
     expect(streamChatCompletion).not.toHaveBeenCalled();
   });
 
-  it('does not compete with a selected autocomplete item', async () => {
-    const streamChatCompletion = vi.fn();
+  it('extends a selected autocomplete item', async () => {
+    let submittedRequest: RouterChatCompletionRequest | undefined;
+    const selectedRange = new vscode.Range(
+      new vscode.Position(0, 8),
+      new vscode.Position(0, 10)
+    );
     const provider = new NineRouterInlineCompletionProvider(
       { secrets: { get: async () => 'token' } } as never,
-      { streamChatCompletion } as never,
+      {
+        async *streamChatCompletion(input: { request: RouterChatCompletionRequest }) {
+          submittedRequest = input.request;
+          yield { type: 'text-delta', text: '()' };
+          yield { type: 'response-complete', finishReason: 'stop' };
+        }
+      } as never,
       snapshot({
         models: [{ id: 'chat', name: 'Chat', modelId: 'combo/chat' }],
         'inline.enabled': true,
@@ -132,15 +144,16 @@ describe('NineRouterInlineCompletionProvider', () => {
       })
     );
 
-    await expect(
-      provider.provideInlineCompletionItems(
-        document('console.') as never,
-        new vscode.Position(0, 8),
-        { selectedCompletionInfo: { text: 'log', range: {} } } as never,
-        __createCancellationToken().value as never
-      )
-    ).resolves.toBeUndefined();
-    expect(streamChatCompletion).not.toHaveBeenCalled();
+    const result = await provider.provideInlineCompletionItems(
+      document('console.lo') as never,
+      new vscode.Position(0, 10),
+      { selectedCompletionInfo: { text: 'log', range: selectedRange } } as never,
+      __createCancellationToken().value as never
+    );
+
+    expect(submittedRequest?.messages[1]?.content).toContain('console.log');
+    expect(result?.items[0]?.insertText).toBe('log()');
+    expect(result?.items[0]?.range).toBe(selectedRange);
   });
 
   it('returns nothing without API key', async () => {

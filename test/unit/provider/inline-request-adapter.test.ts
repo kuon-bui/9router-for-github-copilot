@@ -49,6 +49,15 @@ describe('buildInlineCompletionRequest', () => {
     expect(request).not.toHaveProperty('tool_choice');
     expect(request).not.toHaveProperty('reasoning_effort');
     expect(request).not.toHaveProperty('stream_options');
+    expect(request.messages[0]?.content).toContain(
+      'You are an elite inline code completion engine embedded inside a code editor.'
+    );
+    expect(request.messages[0]?.content).toContain(
+      'Return ONLY the text that should be inserted at the cursor.'
+    );
+    expect(request.messages[0]?.content).toContain(
+      'Think like autocomplete, not like an autonomous coding agent.'
+    );
   });
 
   it('bounds prefix and suffix context', () => {
@@ -64,6 +73,41 @@ describe('buildInlineCompletionRequest', () => {
     expect(request.messages[1]?.content).toContain('klmnopqr');
     expect(request.messages[1]?.content).not.toContain('01234567');
     expect(request.messages[1]?.content).not.toContain('klmnopqrs');
+  });
+
+  it('uses selected autocomplete text as cursor context', () => {
+    const request = buildInlineCompletionRequest({
+      modelId: 'combo/inline',
+      document: document('console.lo; next()'),
+      position: new vscode.Position(0, 10),
+      selectedCompletionInfo: {
+        text: 'log',
+        range: new vscode.Range(new vscode.Position(0, 8), new vscode.Position(0, 10))
+      },
+      settings
+    });
+
+    expect(request.messages[1]?.content).toContain('console.log');
+    expect(request.messages[1]?.content).toContain('<suffix>\n; next()');
+    expect(request.messages[1]?.content).not.toContain('<prefix>\nconsole.lo\n</prefix>');
+  });
+
+  it('does not pass a synthetic range to TextDocument.getText', () => {
+    const request = buildInlineCompletionRequest({
+      modelId: 'combo/inline',
+      document: {
+        languageId: 'go',
+        getText: (range?: vscode.Range) => {
+          if (range) throw new Error('Invalid argument');
+          return 'package main\nfunc main() {}';
+        },
+        offsetAt: () => 12
+      },
+      position: new vscode.Position(1, 0),
+      settings
+    });
+
+    expect(request.messages[1]?.content).toContain('package main\n');
   });
 });
 
