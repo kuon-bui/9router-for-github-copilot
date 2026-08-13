@@ -2,6 +2,12 @@ import * as vscode from 'vscode';
 import {
   DEFAULT_BASE_URL,
   DEFAULT_DEBUG_MODE,
+  DEFAULT_INLINE_ENABLED,
+  DEFAULT_INLINE_LANGUAGES,
+  DEFAULT_INLINE_MAX_TOKENS,
+  DEFAULT_INLINE_MODEL_ID,
+  DEFAULT_INLINE_PREFIX_CHARS,
+  DEFAULT_INLINE_SUFFIX_CHARS,
   DEFAULT_MAX_TOKENS,
   DEFAULT_MODELS,
   DEFAULT_REQUEST_TIMEOUT_MS,
@@ -21,6 +27,15 @@ const SECTION = '9router-copilot';
 
 export type VisionProxySource = '9router' | 'copilot';
 
+export interface InlineSettings {
+  enabled: boolean;
+  modelId: string;
+  maxTokens: number;
+  languages: string[];
+  prefixChars: number;
+  suffixChars: number;
+}
+
 export interface RuntimeSettings {
   baseUrl: string;
   maxTokens?: number;
@@ -29,6 +44,7 @@ export interface RuntimeSettings {
   visionProxySource: VisionProxySource | undefined;
   visionProxyModelId: string;
   visionProxyPrompt: string;
+  inline: InlineSettings;
 }
 
 interface RuntimeSettingsIssue {
@@ -48,10 +64,18 @@ interface CapabilitySettingsIssue {
   path: string;
 }
 
+interface InlineSettingsIssue {
+  scope: 'inline';
+  code: 'MISSING_INLINE_MODEL';
+  message: string;
+  path: string;
+}
+
 export type SettingsIssue =
   | ModelSettingsIssue
   | RuntimeSettingsIssue
-  | CapabilitySettingsIssue;
+  | CapabilitySettingsIssue
+  | InlineSettingsIssue;
 
 export interface SettingsSnapshot {
   state: 'valid' | 'degraded' | 'empty' | 'invalid-runtime';
@@ -71,6 +95,25 @@ export function normalizeMaxTokens(input: unknown): number | undefined {
   return typeof input === 'number' && Number.isSafeInteger(input) && input > 0
     ? input
     : undefined;
+}
+
+function normalizePositiveInteger(input: unknown, fallback: number): number {
+  return typeof input === 'number' && Number.isSafeInteger(input) && input > 0
+    ? input
+    : fallback;
+}
+
+function normalizeInlineLanguages(input: unknown): string[] {
+  if (!Array.isArray(input)) {
+    return [...DEFAULT_INLINE_LANGUAGES];
+  }
+
+  const languages = input
+    .filter((language): language is string => typeof language === 'string')
+    .map((language) => language.trim())
+    .filter((language, index, all) => language.length > 0 && all.indexOf(language) === index);
+
+  return languages;
 }
 
 export function normalizeVisionProxySource(
@@ -114,6 +157,25 @@ export function loadRuntimeSettings(
   );
   const visionProxyPrompt =
     configuration.get<string>('visionProxyPrompt')?.trim() ?? DEFAULT_VISION_PROXY_PROMPT;
+  const inlineEnabled = configuration.get<unknown>('inline.enabled');
+  const inlineModelId = configuration.get<unknown>('inline.modelId');
+  const inline: InlineSettings = {
+    enabled: inlineEnabled === undefined ? DEFAULT_INLINE_ENABLED : inlineEnabled === true,
+    modelId: typeof inlineModelId === 'string' ? inlineModelId.trim() : DEFAULT_INLINE_MODEL_ID,
+    maxTokens: normalizePositiveInteger(
+      configuration.get<unknown>('inline.maxTokens'),
+      DEFAULT_INLINE_MAX_TOKENS
+    ),
+    languages: normalizeInlineLanguages(configuration.get<unknown>('inline.languages')),
+    prefixChars: normalizePositiveInteger(
+      configuration.get<unknown>('inline.prefixChars'),
+      DEFAULT_INLINE_PREFIX_CHARS
+    ),
+    suffixChars: normalizePositiveInteger(
+      configuration.get<unknown>('inline.suffixChars'),
+      DEFAULT_INLINE_SUFFIX_CHARS
+    )
+  };
 
   return {
     baseUrl,
@@ -122,7 +184,8 @@ export function loadRuntimeSettings(
     debugMode,
     visionProxySource,
     visionProxyModelId,
-    visionProxyPrompt
+    visionProxyPrompt,
+    inline
   };
 }
 
@@ -183,6 +246,16 @@ export function buildSettingsSnapshot(
         path: '9router-copilot.visionProxyPrompt'
       });
     }
+  }
+
+  if (runtime?.inline.enabled === true && runtime.inline.modelId.length === 0) {
+    issues.push({
+      scope: 'inline',
+      code: 'MISSING_INLINE_MODEL',
+      message:
+        'Inline suggestions are disabled until 9router-copilot.inline.modelId references an existing 9router model id.',
+      path: '9router-copilot.inline.modelId'
+    });
   }
 
   if (!runtime) {

@@ -29,6 +29,7 @@ Documented `9router` behavior that influences this design:
 
 - Keep the native Copilot Chat user experience intact.
 - Expose `9router` models directly in the Copilot Chat model picker.
+- Optionally expose `9router` through VS Code native inline completions without patching GitHub Copilot inline internals.
 - Use `9router` as the single routing and execution backend.
 - Support local per-user configuration of which display models appear in the picker.
 - Allow each local display model to map to an opaque `9router` `modelId`.
@@ -39,6 +40,7 @@ Documented `9router` behavior that influences this design:
 
 - Replacing the official GitHub Copilot extension
 - Intercepting or modifying internal Copilot network traffic
+- Replacing or patching GitHub Copilot inline suggestions
 - Reimplementing `9router` routing logic in the extension
 - Building a standalone chat UI for the initial product direction
 
@@ -67,6 +69,7 @@ Each presentation object defines a stable Copilot-facing `id`, a user-facing `na
 - map display models to opaque backend `modelId` values
 - adapt Copilot Chat requests into the `9router` API format
 - stream responses back into the host
+- provide optional VS Code native inline suggestions from bounded editor context
 - expose safe diagnostics and configuration state
 
 This boundary is intentional. The extension should not duplicate business routing logic that already belongs in `9router`.

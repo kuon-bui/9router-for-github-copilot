@@ -53,6 +53,12 @@ Configuration is local per user under the `9router-copilot` namespace. Array ord
   "9router-copilot.visionProxyModelId": "provider/vision-model",
   "9router-copilot.visionProxyPrompt": "Describe the supplied images faithfully for another language model. Include visible text, code, tables, diagrams, layout, and uncertainty. Do not answer the user request; provide only image context.",
   "9router-copilot.maxTokens": 0,
+  "9router-copilot.inline.enabled": false,
+  "9router-copilot.inline.modelId": "replace-with-low-latency-9router-model-id",
+  "9router-copilot.inline.maxTokens": 128,
+  "9router-copilot.inline.languages": ["typescript", "javascript", "python"],
+  "9router-copilot.inline.prefixChars": 12000,
+  "9router-copilot.inline.suffixChars": 4000,
   "9router-copilot.requestTimeoutMs": 60000,
   "9router-copilot.debugMode": "minimal"
 }
@@ -81,6 +87,20 @@ Unknown fields, duplicate ids, invalid values, and empty mappings are rejected p
 Before returning picker models, the provider attempts one authenticated `GET /v1/models` refresh. For an exact `modelId` match, `capabilities.contextWindow` is the total context size and `capabilities.maxOutput` is the output budget. The provider publishes `maxInputTokens = contextWindow - maxOutputTokens`; therefore, published input and output limits sum to `contextWindow` when the catalog values produce a positive input limit. `maxOutputTokens` falls back to the model object's compatibility value when catalog output metadata is missing. If total context is missing or does not exceed the resolved output limit, `maxInputTokens` falls back to its configured value. Built-in fallback for either configured field is `264000`. The latest successful catalog stays in RAM; a failed refresh keeps that cache.
 
 `9router-copilot.maxTokens` remains independent of Context Window metadata. Its default is `0`. A positive safe integer is sent as `max_tokens`; `0` or a malformed value omits `max_tokens`, applying no extension-level response limit. `9router` or an upstream provider may still enforce its own limit. Streaming requests continue to set `stream_options.include_usage`.
+
+### Inline Suggestions
+
+Inline suggestions use VS Code native inline completions. They do not replace or patch GitHub Copilot inline suggestions and do not appear in the Copilot model picker.
+
+Settings:
+
+- `9router-copilot.inline.enabled`: enable inline suggestions. Default is `false`.
+- `9router-copilot.inline.modelId`: opaque 9router model id used for inline suggestions. Empty disables inline requests.
+- `9router-copilot.inline.maxTokens`: response-token limit for each inline suggestion.
+- `9router-copilot.inline.languages`: VS Code language ids where inline suggestions run.
+- `9router-copilot.inline.prefixChars` and `9router-copilot.inline.suffixChars`: bounded code context sent before and after the cursor.
+
+Privacy note: `9router-copilot.baseUrl` and `9router-copilot.inline.enabled` are application-scoped user settings, so workspace configuration cannot redirect or enable automatic inline requests. When inline suggestions are enabled, bounded prefix and suffix code context around the cursor is sent to `9router`. Diagnostics log metadata only by default, not prompt text or source code.
 
 ### Tools
 
