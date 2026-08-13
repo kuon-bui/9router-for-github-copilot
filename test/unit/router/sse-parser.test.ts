@@ -1,11 +1,30 @@
 import { describe, expect, it } from 'vitest';
-import { parseSseChunk } from '../../../src/router/sse-parser';
+import { parseRouterEventStream, parseSseChunk } from '../../../src/router/sse-parser';
+
+async function collectEvents(stream: ReadableStream<Uint8Array>): Promise<unknown[]> {
+  const events: unknown[] = [];
+  for await (const event of parseRouterEventStream(stream)) {
+    events.push(event);
+  }
+  return events;
+}
 
 describe('parseSseChunk', () => {
   it('extracts text deltas from OpenAI-style data lines', () => {
     const events = parseSseChunk('data: {"choices":[{"delta":{"content":"Hel"}}]}\n\n');
 
     expect(events).toEqual([{ type: 'text-delta', text: 'Hel' }]);
+  });
+
+  it('extracts events from CRLF-delimited frames', () => {
+    const events = parseSseChunk(
+      'data: {"choices":[{"delta":{"content":"Hel"}}]}\r\n\r\ndata: [DONE]\r\n\r\n'
+    );
+
+    expect(events).toEqual([
+      { type: 'text-delta', text: 'Hel' },
+      { type: 'response-complete' }
+    ]);
   });
 
   it('marks the stream complete when the router sends [DONE]', () => {
@@ -67,5 +86,88 @@ describe('parseSseChunk', () => {
     );
 
     expect(events).toEqual([{ type: 'text-delta', text: 'Visible' }]);
+  });
+
+  it('does not include raw malformed frame content in parser errors', () => {
+    const secret = 'prompt-secret';
+
+    expect(() => parseSseChunk(`data: {"secret":"${secret}"\n\n`)).toThrow(
+      expect.objectContaining({
+        code: 'MALFORMED_STREAM_ERROR',
+        details: expect.objectContaining({ frameBytes: expect.any(Number) })
+      })
+    );
+
+    try {
+      parseSseChunk(`data: {"secret":"${secret}"\n\n`);
+    } catch (error) {
+      expect(JSON.stringify(error)).not.toContain(secret);
+    }
+  });
+
+  it('extracts CRLF events split across network chunks', async () => {
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode('data: {"choices":[{"delta":{"content":"A"}}]}\r'));
+        controller.enqueue(new TextEncoder().encode('\n\r'));
+        controller.enqueue(new TextEncoder().encode('\ndata: [DONE]\r\n\r\n'));
+        controller.close();
+      }
+    });
+
+    await expect(collectEvents(stream)).resolves.toEqual([
+      { type: 'text-delta', text: 'A' },
+      { type: 'response-complete' }
+    ]);
+  });
+
+  it('rejects oversized SSE frames', async () => {
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode(`data: ${'x'.repeat(1024 * 1024 + 1)}\n\n`));
+        controller.close();
+      }
+    });
+
+    await expect(collectEvents(stream)).rejects.toMatchObject({
+      code: 'MALFORMED_STREAM_ERROR',
+      details: expect.objectContaining({ maxFrameBytes: 1024 * 1024 })
+    });
+  });
+
+  it('measures SSE limits in UTF-8 bytes', async () => {
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode(`data: ${'€'.repeat(400_000)}\n\n`));
+        controller.close();
+      }
+    });
+
+    await expect(collectEvents(stream)).rejects.toMatchObject({
+      code: 'MALFORMED_STREAM_ERROR',
+      details: expect.objectContaining({
+        frameBytes: expect.any(Number),
+        maxFrameBytes: 1024 * 1024
+      })
+    });
+  });
+
+  it('cancels the reader when stream consumption exits early', async () => {
+    let cancelled = false;
+    const stream = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        controller.enqueue(new TextEncoder().encode('data: [DONE]\n\n'));
+      },
+      cancel() {
+        cancelled = true;
+      }
+    });
+
+    for await (const event of parseRouterEventStream(stream)) {
+      void event;
+      break;
+    }
+
+    expect(cancelled).toBe(true);
   });
 });

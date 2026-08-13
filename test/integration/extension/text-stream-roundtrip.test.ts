@@ -68,6 +68,133 @@ describe('NineRouterChatProvider', () => {
     expect(progressCalls.join('')).toBe('Hello world');
   });
 
+  it('surfaces primary router-error stream events as upstream failures', async () => {
+    const provider = new NineRouterChatProvider(
+      {
+        secrets: {
+          get: async () => 'token'
+        }
+      } as never,
+      {
+        async *streamChatCompletion() {
+          yield { type: 'router-error', error: 'upstream failed', requestId: 'req-up' };
+        }
+      } as never
+    );
+
+    await expect(
+      provider.provideLanguageModelChatResponse(
+        {
+          id: 'daily',
+          name: 'Daily',
+          vendor: '9router',
+          family: 'daily',
+          version: '1',
+          maxInputTokens: 128000,
+          maxOutputTokens: 8192,
+          capabilities: {}
+        },
+        [{ role: 1, content: 'Say hello' }] as never,
+        {} as never,
+        { report: () => undefined } as never,
+        __createCancellationToken().value as never
+      )
+    ).rejects.toMatchObject({
+      code: 'UPSTREAM_UNAVAILABLE',
+      requestId: 'req-up',
+      details: { phase: 'chat-completion' }
+    });
+  });
+
+  it('fails when the primary response stream ends before completion', async () => {
+    const progressCalls: string[] = [];
+    const provider = new NineRouterChatProvider(
+      {
+        secrets: {
+          get: async () => 'token'
+        }
+      } as never,
+      {
+        async *streamChatCompletion() {
+          yield { type: 'text-delta', text: 'partial' };
+        }
+      } as never
+    );
+
+    await expect(
+      provider.provideLanguageModelChatResponse(
+        {
+          id: 'daily',
+          name: 'Daily',
+          vendor: '9router',
+          family: 'daily',
+          version: '1',
+          maxInputTokens: 128000,
+          maxOutputTokens: 8192,
+          capabilities: {}
+        },
+        [{ role: 1, content: 'Say hello' }] as never,
+        {} as never,
+        {
+          report: (part: vscode.LanguageModelResponsePart) => {
+            if (part instanceof vscode.LanguageModelTextPart) {
+              progressCalls.push(part.value);
+            }
+          }
+        } as vscode.Progress<vscode.LanguageModelResponsePart>,
+        __createCancellationToken().value as never
+      )
+    ).rejects.toMatchObject({
+      code: 'MALFORMED_STREAM_ERROR',
+      details: { phase: 'chat-completion' }
+    });
+    expect(progressCalls).toEqual(['partial']);
+  });
+
+  it('surfaces malformed primary tool-call arguments as stream failures', async () => {
+    const provider = new NineRouterChatProvider(
+      {
+        secrets: {
+          get: async () => 'token'
+        }
+      } as never,
+      {
+        async *streamChatCompletion() {
+          yield {
+            type: 'tool-call-delta',
+            toolCallIndex: 0,
+            toolCallId: 'call-1',
+            toolName: 'lookupUser',
+            delta: '12'
+          };
+          yield { type: 'response-complete' };
+        }
+      } as never
+    );
+
+    await expect(
+      provider.provideLanguageModelChatResponse(
+        {
+          id: 'daily',
+          name: 'Daily',
+          vendor: '9router',
+          family: 'daily',
+          version: '1',
+          maxInputTokens: 128000,
+          maxOutputTokens: 8192,
+          capabilities: {}
+        },
+        [{ role: 1, content: 'Call tool' }] as never,
+        {} as never,
+        { report: () => undefined } as never,
+        __createCancellationToken().value as never
+      )
+    ).rejects.toMatchObject({
+      code: 'MALFORMED_STREAM_ERROR',
+      details: { phase: 'tool-call-streaming' }
+    });
+  });
+
   it('lets the Copilot picker override the selected model thinking default', async () => {
     __setConfigurationValues({
       models: [

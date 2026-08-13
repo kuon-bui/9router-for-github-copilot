@@ -17,3 +17,5 @@ dist/vitest.config.js
 vitest.config.ts
 eslint.config.js
 pnpm-workspace.yaml
+pnpm-lock.yaml
+tsconfig.json
