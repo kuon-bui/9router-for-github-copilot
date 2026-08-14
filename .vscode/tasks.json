@@ -10,16 +10,18 @@
     {
       "label": "watch",
       "type": "shell",
-      "command": "pnpm exec tsc -p tsconfig.json --watch",
+      "command": "pnpm run watch",
       "isBackground": true,
       "problemMatcher": {
-        "owner": "typescript",
-        "fileLocation": "relative",
-        "pattern": "$tsc",
+        "owner": "esbuild",
+        "pattern": {
+          "regexp": "^✘ \\[ERROR\\] (.*)$",
+          "message": 1
+        },
         "background": {
           "activeOnStart": true,
-          "beginsPattern": "Starting compilation in watch mode",
-          "endsPattern": "Watching for file changes\\."
+          "beginsPattern": "^\\[watch\\] build started",
+          "endsPattern": "^\\[watch\\] build finished"
         }
       },
       "presentation": {

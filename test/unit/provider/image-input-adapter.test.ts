@@ -4,7 +4,7 @@ import {
   createRouterImagePart,
   hasImageParts,
   isHostImageDataPart
-} from '../../../src/provider/image-input-adapter';
+} from '@/provider/image-input-adapter';
 
 describe('image-input-adapter', () => {
   const png = { mimeType: 'image/png', data: new Uint8Array([0, 1, 2, 255]) };

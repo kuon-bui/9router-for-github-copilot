@@ -1,8 +1,8 @@
 import * as vscode from 'vscode';
-import { clearApiKey, setApiKey } from '../config/secret-store';
-import { showDiagnostics, showSettingsSnapshotDiagnostics } from '../debug/output-channel';
-import { NineRouterError } from '../router/errors';
-import type { SettingsSnapshot } from '../config/settings';
+import { clearApiKey, setApiKey } from '@/config/secret-store';
+import { showDiagnostics, showSettingsSnapshotDiagnostics } from '@/debug/output-channel';
+import { NineRouterError } from '@/router/errors';
+import type { SettingsSnapshot } from '@/config/settings';
 import type { VisionProxyConfigurator } from './vision-configuration';
 import type { ConnectionTester } from './test-connection';
 

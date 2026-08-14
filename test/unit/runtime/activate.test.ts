@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { activateExtension, deactivateExtension } from '../../../src/runtime/activate';
-import { __resetVscodeState } from '../../support/vscode';
-import type { NineRouterChatProvider } from '../../../src/provider/provider';
-import type { VisionProxyConfigurator } from '../../../src/runtime/vision-configuration';
+import { activateExtension, deactivateExtension } from '@/runtime/activate';
+import { __resetVscodeState } from '@test/support/vscode';
+import type { NineRouterChatProvider } from '@/provider/provider';
+import type { VisionProxyConfigurator } from '@/runtime/vision-configuration';
 
 describe('activateExtension', () => {
   beforeEach(() => {

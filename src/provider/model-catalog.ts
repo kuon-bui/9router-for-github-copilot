@@ -1,6 +1,6 @@
 import { createThinkingEffortConfigurationSchema } from './thinking-effort';
-import type { RouterModelMetadata } from '../router/model-catalog';
-import type { ConfiguredModel, PublishedModel } from '../types/product-model';
+import type { RouterModelMetadata } from '@/router/model-catalog';
+import type { ConfiguredModel, PublishedModel } from '@/types/product-model';
 
 export interface PublishedModelOptions {
   visionProxyAvailable?: boolean;

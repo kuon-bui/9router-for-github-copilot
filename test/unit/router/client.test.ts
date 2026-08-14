@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createRouterClient } from '../../../src/router/client';
+import { createRouterClient } from '@/router/client';
 
 function responseBody(text: string): ReadableStream<Uint8Array> {
   return new ReadableStream<Uint8Array>({

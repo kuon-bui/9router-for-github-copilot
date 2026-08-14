@@ -1,5 +1,5 @@
-import type { ConfiguredModel } from '../types/product-model';
-import type { RouterToolDefinition } from '../types/router-contract';
+import type { ConfiguredModel } from '@/types/product-model';
+import type { RouterToolDefinition } from '@/types/router-contract';
 import { canonicalizeJsonObject } from './canonical-json';
 
 export interface HostToolDefinition {

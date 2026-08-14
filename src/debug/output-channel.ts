@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import { redactObject } from './redaction';
-import { isVisionProxyConfigured } from '../config/settings';
-import type { SettingsSnapshot } from '../config/settings';
+import { isVisionProxyConfigured } from '@/config/settings';
+import type { SettingsSnapshot } from '@/config/settings';
 
 export type DebugMode = 'minimal' | 'metadata' | 'verbose';
 

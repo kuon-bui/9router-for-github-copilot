@@ -3,15 +3,15 @@ import {
   buildSettingsSnapshot,
   getExtensionConfiguration,
   loadRuntimeSettings
-} from '../config/settings';
-import { disposeOutputChannel } from '../debug/output-channel';
-import { createRouterClient } from '../router/client';
-import { NineRouterChatProvider } from '../provider/provider';
+} from '@/config/settings';
+import { disposeOutputChannel } from '@/debug/output-channel';
+import { createRouterClient } from '@/router/client';
+import { NineRouterChatProvider } from '@/provider/provider';
 import { registerCommands } from './commands';
 import { createVisionProxyConfigurator } from './vision-configuration';
 import { createConnectionTester } from './test-connection';
-import type { RouterClient } from '../router/client';
-import type { SettingsSnapshot } from '../config/settings';
+import type { RouterClient } from '@/router/client';
+import type { SettingsSnapshot } from '@/config/settings';
 import type { VisionProxyConfigurator } from './vision-configuration';
 
 let providerRegistration: vscode.Disposable | undefined;

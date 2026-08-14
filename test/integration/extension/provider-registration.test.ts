@@ -1,4 +1,4 @@
-import manifest from '../../../package.json';
+import manifest from '@root/package.json';
 import { describe, expect, it } from 'vitest';
 
 describe('extension manifest', () => {

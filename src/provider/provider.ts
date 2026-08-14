@@ -1,11 +1,11 @@
 import * as vscode from 'vscode';
-import { getApiKey } from '../config/secret-store';
+import { getApiKey } from '@/config/secret-store';
 import {
   buildSettingsSnapshot,
   getExtensionConfiguration
-} from '../config/settings';
-import { logDebugEvent } from '../debug/output-channel';
-import { NineRouterError } from '../router/errors';
+} from '@/config/settings';
+import { logDebugEvent } from '@/debug/output-channel';
+import { NineRouterError } from '@/router/errors';
 import { adaptToolOptionsForRouter } from './tool-adapter';
 import { adaptMessagesToRouterRequest } from './request-adapter';
 import { createRouterEventEmitter } from './stream-adapter';
@@ -14,14 +14,14 @@ import { resolveEffectiveThinkingMode } from './thinking-effort';
 import { VisionProxyService } from './vision-proxy';
 import { hasImageParts } from './image-input-adapter';
 import { resolvePublishedModels } from './model-catalog';
-import type { RouterClient } from '../router/client';
-import type { RuntimeSettings, SettingsSnapshot } from '../config/settings';
-import type { RouterModelMetadata } from '../router/model-catalog';
-import type { ConfiguredModel, PublishedModel } from '../types/product-model';
-import type { ModelConfigurationResponseOptions } from '../types/vscode-chat-compat';
+import type { RouterClient } from '@/router/client';
+import type { RuntimeSettings, SettingsSnapshot } from '@/config/settings';
+import type { RouterModelMetadata } from '@/router/model-catalog';
+import type { ConfiguredModel, PublishedModel } from '@/types/product-model';
+import type { ModelConfigurationResponseOptions } from '@/types/vscode-chat-compat';
 import type { HostToolDefinition } from './tool-adapter';
 import type { HostChatRequestMessage } from './vision-proxy';
-import type { VisionProxyConfigurator } from '../runtime/vision-configuration';
+import type { VisionProxyConfigurator } from '@/runtime/vision-configuration';
 
 interface NineRouterChatProviderOptions {
   configureVisionProxy?: VisionProxyConfigurator;

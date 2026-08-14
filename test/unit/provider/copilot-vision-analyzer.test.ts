@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { CopilotVisionAnalyzer } from '../../../src/provider/copilot-vision-analyzer';
-import type { HostChatRequestMessage } from '../../../src/provider/vision-proxy';
-import { __createCancellationToken } from '../../support/vscode';
+import { CopilotVisionAnalyzer } from '@/provider/copilot-vision-analyzer';
+import type { HostChatRequestMessage } from '@/provider/vision-proxy';
+import { __createCancellationToken } from '@test/support/vscode';
 
 const image = (mimeType: string, byte: number): { mimeType: string; data: Uint8Array } => ({
   mimeType,

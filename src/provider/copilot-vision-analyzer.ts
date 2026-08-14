@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { NineRouterError } from '../router/errors';
+import { NineRouterError } from '@/router/errors';
 import { isHostImageDataPart } from './image-input-adapter';
 import type { HostChatRequestMessage } from './vision-proxy';
 

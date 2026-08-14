@@ -3,7 +3,7 @@ import {
   parseRouterModels,
   parseVisionModels,
   toVisionModels
-} from '../../../src/router/model-catalog';
+} from '@/router/model-catalog';
 
 describe('parseRouterModels', () => {
   it('validates context metadata while retaining catalog models without capabilities', () => {

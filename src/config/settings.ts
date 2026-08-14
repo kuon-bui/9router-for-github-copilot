@@ -10,12 +10,12 @@ import {
   DEFAULT_VISION_PROXY_SOURCE
 } from './defaults';
 import { parseModelSettings } from './model-settings';
-import { createPublishedModel } from '../provider/model-catalog';
+import { createPublishedModel } from '@/provider/model-catalog';
 import type {
   ModelSettingsIssue,
   RejectedModelSetting
 } from './model-settings';
-import type { ConfiguredModel, PublishedModel } from '../types/product-model';
+import type { ConfiguredModel, PublishedModel } from '@/types/product-model';
 
 const SECTION = '9router-copilot';
 

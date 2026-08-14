@@ -1,12 +1,12 @@
 import { adaptToolOptionsForRouter } from './tool-adapter';
-import type { ConfiguredModel } from '../types/product-model';
+import type { ConfiguredModel } from '@/types/product-model';
 import type {
   RouterChatCompletionRequest,
   RouterContentPart,
   RouterMessage,
   RouterMessageContent,
   RouterToolCall
-} from '../types/router-contract';
+} from '@/types/router-contract';
 import type { HostToolDefinition } from './tool-adapter';
 import type { HostChatRequestMessage } from './vision-proxy';
 import { createRouterImagePart, isHostImageDataPart } from './image-input-adapter';

@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { buildSettingsSnapshot } from '../../../src/config/settings';
-import { NineRouterChatProvider } from '../../../src/provider/provider';
-import { NineRouterError } from '../../../src/router/errors';
-import { handleConfigurationChange } from '../../../src/runtime/activate';
-import type { RouterChatCompletionRequest } from '../../../src/types/router-contract';
-import type { PublishedModel } from '../../../src/types/product-model';
-import { __createCancellationToken } from '../../support/vscode';
+import { buildSettingsSnapshot } from '@/config/settings';
+import { NineRouterChatProvider } from '@/provider/provider';
+import { NineRouterError } from '@/router/errors';
+import type { RouterChatCompletionRequest } from '@/types/router-contract';
+import { handleConfigurationChange } from '@/runtime/activate';
+import type { PublishedModel } from '@/types/product-model';
+import { __createCancellationToken } from '@test/support/vscode';
 
 const createSnapshot = (models: unknown[], values: Record<string, unknown> = {}) =>
   buildSettingsSnapshot({
