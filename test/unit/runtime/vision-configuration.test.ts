@@ -1,15 +1,15 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import * as vscode from 'vscode';
-import { loadRuntimeSettings } from '../../../src/config/settings';
-import { NineRouterError } from '../../../src/router/errors';
-import { createVisionProxyConfigurator } from '../../../src/runtime/vision-configuration';
+import { loadRuntimeSettings } from '@/config/settings';
+import { NineRouterError } from '@/router/errors';
+import { createVisionProxyConfigurator } from '@/runtime/vision-configuration';
 import {
   __createCancellationToken,
   __getConfigurationUpdates,
   __resetVscodeState,
   __setQuickPickValues,
   __setSelectedChatModels
-} from '../../support/vscode';
+} from '@test/support/vscode';
 
 const defaultSelectChatModels = vscode.lm.selectChatModels;
 

@@ -1,5 +1,5 @@
 import { Buffer } from 'node:buffer';
-import type { RouterContentPart } from '../types/router-contract';
+import type { RouterContentPart } from '@/types/router-contract';
 
 export interface HostImageDataPart {
   mimeType: string;

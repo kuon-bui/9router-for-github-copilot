@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   createThinkingEffortConfigurationSchema,
   resolveEffectiveThinkingMode
-} from '../../../src/provider/thinking-effort';
+} from '@/provider/thinking-effort';
 
 describe('createThinkingEffortConfigurationSchema', () => {
   it('publishes None followed by configured efforts in configured order', () => {

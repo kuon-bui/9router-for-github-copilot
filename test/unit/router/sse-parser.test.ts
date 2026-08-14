@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseRouterEventStream, parseSseChunk } from '../../../src/router/sse-parser';
+import { parseRouterEventStream, parseSseChunk } from '@/router/sse-parser';
 
 async function collectEvents(stream: ReadableStream<Uint8Array>): Promise<unknown[]> {
   const events: unknown[] = [];

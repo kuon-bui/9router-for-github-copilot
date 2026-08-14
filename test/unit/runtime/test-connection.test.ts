@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
-import { buildSettingsSnapshot } from '../../../src/config/settings';
-import { createConnectionTester } from '../../../src/runtime/test-connection';
-import { __createCancellationToken } from '../../support/vscode';
-import type { NineRouterError } from '../../../src/router/errors';
+import { buildSettingsSnapshot } from '@/config/settings';
+import { createConnectionTester } from '@/runtime/test-connection';
+import { __createCancellationToken } from '@test/support/vscode';
+import type { NineRouterError } from '@/router/errors';
 
 function snapshot(models: unknown, baseUrl = 'https://router.example.com/v1') {
   return buildSettingsSnapshot({

@@ -1,9 +1,9 @@
 import type * as vscode from 'vscode';
-import { getApiKey } from '../config/secret-store';
-import { NineRouterError } from '../router/errors';
-import { createAbortSignalFromToken } from '../provider/cancellation';
-import type { SettingsSnapshot } from '../config/settings';
-import type { RouterClient } from '../router/client';
+import { getApiKey } from '@/config/secret-store';
+import { NineRouterError } from '@/router/errors';
+import { createAbortSignalFromToken } from '@/provider/cancellation';
+import type { SettingsSnapshot } from '@/config/settings';
+import type { RouterClient } from '@/router/client';
 
 export interface ConnectionTestResult {
   durationMs: number;

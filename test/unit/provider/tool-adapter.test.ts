@@ -3,8 +3,8 @@ import {
   adaptToolOptionsForRouter,
   adaptToolsToRouterDefinitions,
   shouldExposeTools
-} from '../../../src/provider/tool-adapter';
-import type { ConfiguredModel } from '../../../src/types/product-model';
+} from '@/provider/tool-adapter';
+import type { ConfiguredModel } from '@/types/product-model';
 
 function selectedModel(overrides: Partial<ConfiguredModel> = {}): ConfiguredModel {
   return {

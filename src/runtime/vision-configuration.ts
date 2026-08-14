@@ -1,10 +1,10 @@
 import * as vscode from 'vscode';
-import { getApiKey } from '../config/secret-store';
-import { NineRouterError } from '../router/errors';
-import { toVisionModels } from '../router/model-catalog';
-import { createAbortSignalFromToken } from '../provider/cancellation';
-import type { RuntimeSettings, VisionProxySource } from '../config/settings';
-import type { RouterClient } from '../router/client';
+import { getApiKey } from '@/config/secret-store';
+import { NineRouterError } from '@/router/errors';
+import { toVisionModels } from '@/router/model-catalog';
+import { createAbortSignalFromToken } from '@/provider/cancellation';
+import type { RuntimeSettings, VisionProxySource } from '@/config/settings';
+import type { RouterClient } from '@/router/client';
 
 export interface VisionProxySelection {
   source: VisionProxySource;

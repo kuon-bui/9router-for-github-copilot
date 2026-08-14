@@ -5,14 +5,14 @@ import {
   DEFAULT_MODEL_TOOL_MODE,
   DEFAULT_MODEL_VISION_MODE
 } from './defaults';
-import { ENABLED_THINKING_MODES, THINKING_MODES } from '../types/product-model';
+import { ENABLED_THINKING_MODES, THINKING_MODES } from '@/types/product-model';
 import type {
   ConfiguredModel,
   EnabledThinkingMode,
   ThinkingMode,
   ToolMode,
   VisionMode
-} from '../types/product-model';
+} from '@/types/product-model';
 
 const MODEL_ID_PATTERN = /^[a-z0-9][a-z0-9._-]*$/;
 const THINKING_SUFFIX_PATTERN = new RegExp(

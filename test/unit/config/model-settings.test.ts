@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseModelSettings } from '../../../src/config/model-settings';
+import { parseModelSettings } from '@/config/model-settings';
 
 describe('parseModelSettings', () => {
   it('parses arbitrary model ids in array order and applies conservative defaults', () => {

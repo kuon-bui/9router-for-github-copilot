@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { formatSettingsSnapshotDiagnostics } from '../../../src/debug/output-channel';
-import { buildSettingsSnapshot } from '../../../src/config/settings';
+import { formatSettingsSnapshotDiagnostics } from '@/debug/output-channel';
+import { buildSettingsSnapshot } from '@/config/settings';
 
 describe('formatSettingsSnapshotDiagnostics', () => {
   it('includes snapshot state, published models, rejected models, and validation issues', () => {

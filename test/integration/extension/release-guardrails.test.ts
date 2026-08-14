@@ -2,7 +2,7 @@ import { access, readFile } from 'node:fs/promises';
 import { constants } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import manifest from '../../../package.json';
+import manifest from '@root/package.json';
 
 describe('release guardrails', () => {
   it('contributes one ordered dynamic model setting with a safe agent default', () => {
@@ -207,6 +207,13 @@ describe('release guardrails', () => {
     expect(packageCommand).toContain('vsce package');
     expect(packageCommand).toContain('--no-dependencies');
     expect(hasRepositoryMetadata || packageCommand.includes('--allow-missing-repository')).toBe(true);
+  });
+
+  it('bundles source aliases before packaging', () => {
+    expect(manifest.main).toBe('./dist/src/extension.js');
+    expect(manifest.scripts.build).toContain('tsc -p tsconfig.json');
+    expect(manifest.scripts.build).toContain('esbuild src/extension.ts --bundle');
+    expect(manifest.scripts['vscode:prepublish']).toBe('pnpm run build');
   });
 
   it('ships an explicit license artifact matching the private package policy', async () => {

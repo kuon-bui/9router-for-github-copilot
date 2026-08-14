@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createPublishedModel, resolvePublishedModels } from '../../../src/provider/model-catalog';
+import { createPublishedModel, resolvePublishedModels } from '@/provider/model-catalog';
 
 describe('resolvePublishedModels', () => {
   it('publishes arbitrary configured models in input order', () => {

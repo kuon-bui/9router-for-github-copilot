@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { redactBearerToken } from '../../../src/debug/redaction';
+import { redactBearerToken } from '@/debug/redaction';
 
 describe('redactBearerToken', () => {
   it('replaces sensitive token content before logging', () => {
