@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.1](https://github.com/kuon-bui/9router-for-github-copilot/compare/v0.6.0...v0.6.1) (2026-08-14)
+
+
+### Bug Fixes
+
+* **provider:** harden streaming and catalog refresh ([b20b7fa](https://github.com/kuon-bui/9router-for-github-copilot/commit/b20b7fae33d30ea4e521df763492b2cc99b3dbc0))
+
 ## [0.6.0](https://github.com/kuon-bui/9router-for-github-copilot/compare/v0.5.0...v0.6.0) (2026-08-11)
 
 
