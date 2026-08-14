@@ -227,6 +227,8 @@ describe('release guardrails', () => {
     expect(vscodeIgnore).toContain('docs/**');
     expect(vscodeIgnore).toContain('AGENTS.md');
     expect(vscodeIgnore).toContain('CODE_CONVENTION.md');
+    expect(vscodeIgnore).toContain('pnpm-lock.yaml');
+    expect(vscodeIgnore).toContain('tsconfig.json');
     expect(vscodeIgnore).not.toContain('dist/src/**');
   });
 
