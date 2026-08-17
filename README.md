@@ -28,6 +28,9 @@ Run `9router: Set API Key` from the Command Palette. The key is stored only in V
 
 Run `9router: Test Connection` to validate the current base URL and API key through authenticated `GET /v1/models`. The result reports latency, available model count, and missing configured model mappings without exposing credentials.
 
+Run `9router: Toggle Model Fast Tier` to select a curated model and add or remove its `serviceTier: "fast"` setting.
+Fast-tier models appear in the picker as `⚡ Name`.
+
 Never put API keys in `settings.json`, `.env`, logs, or documentation.
 
 ## Configuration
@@ -42,7 +45,7 @@ Configuration is local per user under the `9router-copilot` namespace. Array ord
       "id": "agent",
       "name": "Agent",
       "modelId": "replace-with-existing-9router-model-id",
-      "service_tier": "fast",
+      "serviceTier": "fast",
       "toolMode": "auto",
       "visionMode": "off",
       "thinkingMode": "medium",
@@ -69,7 +72,7 @@ Existing model objects with a non-`off` `thinkingMode` must add that value to `t
 - `id`: Stable Copilot-facing id matching `[a-z0-9][a-z0-9._-]*`.
 - `name`: Display name shown in the picker.
 - `modelId`: Opaque backend model id sent unchanged as the OpenAI-compatible `model` field. It must refer to an existing 9router model; an empty or invalid value leaves only that entry unpublished.
-- `service_tier`: Optional `fast` value sent unchanged as the OpenAI-compatible `service_tier` field. Omit it to leave service tier selection to `9router`.
+- `serviceTier`: Optional `fast` value sent unchanged as the OpenAI-compatible `serviceTier` field. Omit it to leave service tier selection to `9router`.
 - `toolMode`: `auto` exposes supported host tools; `off` disables tools.
 - `visionMode`: `native`, `proxy`, or `off`.
 - `thinkingMode`: Default Thinking Effort: `off`, `minimal`, `low`, `medium`, `high`, `xhigh`, or `max`.
@@ -81,6 +84,8 @@ Unknown fields, duplicate ids, invalid values, and empty mappings are rejected p
 Before returning picker models, the provider attempts one authenticated `GET /v1/models` refresh. For an exact `modelId` match, `capabilities.contextWindow` is the total context size and `capabilities.maxOutput` is the output budget. The provider publishes `maxInputTokens = contextWindow - maxOutputTokens`; therefore, published input and output limits sum to `contextWindow` when the catalog values produce a positive input limit. `maxOutputTokens` falls back to the model object's compatibility value when catalog output metadata is missing. If total context is missing or does not exceed the resolved output limit, `maxInputTokens` falls back to its configured value. Built-in fallback for either configured field is `264000`. The latest successful catalog stays in RAM; a failed refresh keeps that cache.
 
 `9router-copilot.maxTokens` remains independent of Context Window metadata. Its default is `0`. A positive safe integer is sent as `max_tokens`; `0` or a malformed value omits `max_tokens`, applying no extension-level response limit. `9router` or an upstream provider may still enforce its own limit. Streaming requests continue to set `stream_options.include_usage`.
+
+`9router-copilot.requestTimeoutMs` defaults to `60000`. A positive value limits each HTTP request sent to `9router`; `0` disables extension-level timeouts. VS Code cancellation still stops active requests.
 
 ### Tools
 

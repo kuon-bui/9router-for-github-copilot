@@ -36,6 +36,24 @@ describe('resolvePublishedModels', () => {
     ]);
   });
 
+  it('marks fast-tier models in the picker display name', () => {
+    const model = createPublishedModel({
+      sourceIndex: 0,
+      id: 'agent',
+      name: 'Agent',
+      modelId: 'router/agent',
+      serviceTier: 'fast',
+      toolMode: 'off',
+      visionMode: 'off',
+      thinkingMode: 'off',
+      thinkingEfforts: [],
+      maxInputTokens: 128_000,
+      maxOutputTokens: 8_192
+    });
+
+    expect(model.name).toBe('⚡ Agent');
+  });
+
   it('publishes an independent allowlisted thinking schema for each model', () => {
     const models = resolvePublishedModels([
       {

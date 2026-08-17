@@ -23,7 +23,7 @@ const ALLOWED_FIELDS = new Set([
   'id',
   'name',
   'modelId',
-  'service_tier',
+  'serviceTier',
   'toolMode',
   'visionMode',
   'thinkingMode',
@@ -201,14 +201,14 @@ export function parseModelSettings(input: unknown): ParsedModelSettings {
       return;
     }
 
-    const serviceTier = item.service_tier;
+    const serviceTier = item.serviceTier;
     if (serviceTier !== undefined && serviceTier !== 'fast') {
       reject(
         sourceIndex,
         id,
         'INVALID_SERVICE_TIER',
-        'service_tier',
-        'service_tier must be fast when configured.'
+        'serviceTier',
+        'serviceTier must be fast when configured.'
       );
       return;
     }
@@ -308,7 +308,7 @@ export function parseModelSettings(input: unknown): ParsedModelSettings {
       id,
       name,
       modelId,
-      ...(serviceTier === 'fast' ? { service_tier: serviceTier } : {}),
+      ...(serviceTier === 'fast' ? { serviceTier: serviceTier } : {}),
       toolMode: toolMode as ToolMode,
       visionMode: visionMode as VisionMode,
       thinkingMode: thinkingMode as ThinkingMode,

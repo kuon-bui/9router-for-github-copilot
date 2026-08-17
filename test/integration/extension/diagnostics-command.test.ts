@@ -9,7 +9,11 @@ import {
   __getCommandHandler,
   __getInformationMessages,
   __getOutputLines,
-  __resetVscodeState
+  __resetVscodeState,
+  __getConfigurationUpdates,
+  __setConfigurationValues,
+  __setQuickPickValues,
+  ConfigurationTarget
 } from '@test/support/vscode';
 
 describe('9routerCopilot.showDiagnostics', () => {
@@ -178,5 +182,89 @@ describe('9routerCopilot.showDiagnostics', () => {
       '9router connection failed: 9router authentication failed Request ID: req-safe.'
     ]);
     expect(__getInformationMessages()).toEqual([]);
+  });
+
+  it('enables fast tier for the selected model', async () => {
+    const models = [
+      { id: 'daily', name: 'Daily', modelId: 'combo/daily' },
+      { id: 'agent', name: 'Agent', modelId: 'combo/agent' }
+    ];
+    __setConfigurationValues({ models });
+    __setQuickPickValues([
+      {
+        label: 'Agent',
+        description: 'agent',
+        detail: 'Router default tier',
+        sourceIndex: 1,
+        enabled: false
+      }
+    ]);
+
+    registerCommands(
+      {
+        subscriptions: [],
+        secrets: {
+          get: async () => undefined,
+          store: async () => undefined,
+          delete: async () => undefined
+        }
+      } as never,
+      {
+        getSettingsSnapshot: () =>
+          buildSettingsSnapshot({ get: (key: string) => (key === 'models' ? models : undefined) } as never)
+      }
+    );
+
+    await __getCommandHandler('9routerCopilot.toggleModelFastTier')?.();
+
+    expect(__getConfigurationUpdates()).toEqual([
+      {
+        key: 'models',
+        value: [
+          { id: 'daily', name: 'Daily', modelId: 'combo/daily' },
+          { id: 'agent', name: 'Agent', modelId: 'combo/agent', serviceTier: 'fast' }
+        ],
+        target: ConfigurationTarget.Global
+      }
+    ]);
+  });
+
+  it('disables fast tier for the selected model', async () => {
+    const models = [{ id: 'agent', name: 'Agent', modelId: 'combo/agent', serviceTier: 'fast' }];
+    __setConfigurationValues({ models });
+    __setQuickPickValues([
+      {
+        label: 'Agent',
+        description: 'agent',
+        detail: 'Fast tier enabled',
+        sourceIndex: 0,
+        enabled: true
+      }
+    ]);
+
+    registerCommands(
+      {
+        subscriptions: [],
+        secrets: {
+          get: async () => undefined,
+          store: async () => undefined,
+          delete: async () => undefined
+        }
+      } as never,
+      {
+        getSettingsSnapshot: () =>
+          buildSettingsSnapshot({ get: (key: string) => (key === 'models' ? models : undefined) } as never)
+      }
+    );
+
+    await __getCommandHandler('9routerCopilot.toggleModelFastTier')?.();
+
+    expect(__getConfigurationUpdates()).toEqual([
+      {
+        key: 'models',
+        value: [{ id: 'agent', name: 'Agent', modelId: 'combo/agent' }],
+        target: ConfigurationTarget.Global
+      }
+    ]);
   });
 });

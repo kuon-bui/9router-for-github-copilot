@@ -199,7 +199,7 @@ describe('buildSettingsSnapshot', () => {
       configuration({
         models: [{ id: 'coder', name: 'Coder', modelId: 'router/coder' }],
         baseUrl: 'not-a-url',
-        requestTimeoutMs: 0
+        requestTimeoutMs: -1
       })
     );
 
@@ -212,6 +212,18 @@ describe('buildSettingsSnapshot', () => {
         expect.objectContaining({ code: 'INVALID_REQUEST_TIMEOUT', scope: 'runtime' })
       ])
     );
+  });
+
+  it('accepts zero requestTimeoutMs to disable extension-level timeouts', () => {
+    const snapshot = buildSettingsSnapshot(
+      configuration({
+        models: [{ id: 'coder', name: 'Coder', modelId: 'router/coder' }],
+        requestTimeoutMs: 0
+      })
+    );
+
+    expect(snapshot.state).toBe('valid');
+    expect(snapshot.runtime?.requestTimeoutMs).toBe(0);
   });
 
   it.each([-1, 1.5, Number.NaN, Number.POSITIVE_INFINITY, 'invalid', null])(

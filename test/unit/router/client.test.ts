@@ -374,6 +374,35 @@ describe('createRouterClient', () => {
     }
   });
 
+  it('does not install a timeout when timeoutMs is zero', async () => {
+    vi.useFakeTimers();
+
+    try {
+      let requestSignal: AbortSignal | undefined;
+      const client = createRouterClient({
+        fetch: vi.fn().mockImplementation(
+          (_url: string, options: { signal?: AbortSignal } | undefined) => {
+            requestSignal = options?.signal;
+            return new Promise(() => undefined);
+          }
+        ) as never
+      });
+
+      void client.listModels({
+        baseUrl: 'https://router.example.com',
+        apiKey: 'secret-token',
+        timeoutMs: 0,
+        signal: new AbortController().signal
+      });
+
+      await vi.runAllTimersAsync();
+      expect(requestSignal?.aborted).toBe(false);
+    } finally {
+      vi.clearAllTimers();
+      vi.useRealTimers();
+    }
+  });
+
   it('maps caller cancellation during discovery to CANCELLATION_ERROR', async () => {
     const controller = new AbortController();
     controller.abort(new Error('cancelled by caller'));
