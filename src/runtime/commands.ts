@@ -6,10 +6,19 @@ import type { SettingsSnapshot } from '@/config/settings';
 import type { VisionProxyConfigurator } from './vision-configuration';
 import type { ConnectionTester } from './test-connection';
 
+interface FastTierQuickPickItem extends vscode.QuickPickItem {
+  sourceIndex: number;
+  enabled: boolean;
+}
+
 interface CommandDependencies {
   getSettingsSnapshot?: () => SettingsSnapshot | undefined;
   configureVisionProxy?: VisionProxyConfigurator;
   testConnection?: ConnectionTester;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 export function registerCommands(
@@ -65,6 +74,54 @@ export function registerCommands(
       } finally {
         cancellation.dispose();
       }
+    })
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand('9routerCopilot.toggleModelFastTier', async () => {
+      const models = dependencies.getSettingsSnapshot?.()?.models ?? [];
+      if (models.length === 0) {
+        await vscode.window.showErrorMessage('9router fast-tier update failed: no valid models found.');
+        return;
+      }
+
+      const selection = await vscode.window.showQuickPick<FastTierQuickPickItem>(
+        models.map((model) => ({
+          label: model.name,
+          description: model.id,
+          detail: model.serviceTier === 'fast' ? 'Fast tier enabled' : 'Router default tier',
+          sourceIndex: model.sourceIndex,
+          enabled: model.serviceTier === 'fast'
+        })),
+        {
+          title: '9router: Toggle Model Fast Tier',
+          placeHolder: 'Select a model to toggle fast tier'
+        }
+      );
+      if (!selection) {
+        return;
+      }
+
+      const settings = vscode.workspace.getConfiguration('9router-copilot');
+      const configuredModels = settings.get<unknown>('models');
+      if (!Array.isArray(configuredModels) || !isRecord(configuredModels[selection.sourceIndex])) {
+        await vscode.window.showErrorMessage(
+          '9router fast-tier update failed: selected model configuration is invalid.'
+        );
+        return;
+      }
+
+      const configuredModel = configuredModels[selection.sourceIndex];
+      const updatedModels = [...configuredModels];
+      if (selection.enabled) {
+        const modelWithoutFastTier = { ...configuredModel };
+        delete modelWithoutFastTier.serviceTier;
+        updatedModels[selection.sourceIndex] = modelWithoutFastTier;
+      } else {
+        updatedModels[selection.sourceIndex] = { ...configuredModel, serviceTier: 'fast' };
+      }
+
+      await settings.update('models', updatedModels, vscode.ConfigurationTarget.Global);
     })
   );
 

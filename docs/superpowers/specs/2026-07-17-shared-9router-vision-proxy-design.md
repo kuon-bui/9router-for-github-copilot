@@ -228,6 +228,9 @@ multiple image-bearing messages, total wall-clock time can therefore exceed one
 timeout interval. This behavior avoids silently changing the existing router
 client contract.
 
+Set `requestTimeoutMs` to `0` to disable extension-level timeouts for both
+request kinds. Host cancellation remains active.
+
 Before beginning each secondary request and before beginning the primary
 request, orchestration checks for cancellation.
 

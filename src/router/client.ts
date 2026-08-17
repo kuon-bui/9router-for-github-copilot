@@ -50,19 +50,24 @@ function createCompositeAbortSignal(signal: AbortSignal, timeoutMs: number): {
     signal.addEventListener('abort', forwardAbort, { once: true });
   }
 
-  const timeoutHandle = setTimeout(() => {
-    if (controller.signal.aborted) {
-      return;
-    }
+  const timeoutHandle =
+    timeoutMs === 0
+      ? undefined
+      : setTimeout(() => {
+          if (controller.signal.aborted) {
+            return;
+          }
 
-    timedOut = true;
-    controller.abort(new Error('Timed out'));
-  }, timeoutMs);
+          timedOut = true;
+          controller.abort(new Error('Timed out'));
+        }, timeoutMs);
 
   return {
     signal: controller.signal,
     cleanup: () => {
-      clearTimeout(timeoutHandle);
+      if (timeoutHandle !== undefined) {
+        clearTimeout(timeoutHandle);
+      }
       signal.removeEventListener('abort', forwardAbort);
     },
     didTimeout: () => timedOut

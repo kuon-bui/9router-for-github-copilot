@@ -185,7 +185,7 @@ Secrets must be stored only in VS Code `SecretStorage`.
 Recommended configuration keys:
 
 - `9router-copilot.baseUrl`
-- `9router-copilot.models`: ordered objects containing `id`, `name`, `modelId`, `toolMode`, `visionMode`, `thinkingMode`, optional `service_tier`, and optional `maxInputTokens` and `maxOutputTokens` compatibility fallbacks
+- `9router-copilot.models`: ordered objects containing `id`, `name`, `modelId`, `toolMode`, `visionMode`, `thinkingMode`, optional `serviceTier`, and optional `maxInputTokens` and `maxOutputTokens` compatibility fallbacks
 - `9router-copilot.visionProxySource`
 - `9router-copilot.visionProxyModelId`
 - `9router-copilot.visionProxyPrompt`
@@ -270,7 +270,7 @@ Recommended request shape:
 - `model`: configured opaque `modelId`
 - `messages`
 - `stream`
-- `service_tier: fast` when configured for the selected model
+- `serviceTier: fast` when configured for the selected model
 - `tools` when supported
 - `max_tokens` when a positive safe integer is configured
 - optional generation parameters that `9router` documents as compatible
@@ -463,7 +463,7 @@ Secrets must always be redacted from every logging path.
 - Keep activation lightweight.
 - Avoid blocking picker availability on remote model discovery for the first production release.
 - Prefer streaming-first delivery over buffered response handling.
-- Bound request timeout defaults to avoid hanging the Copilot UX.
+- Request timeout defaults to 60 seconds to avoid hanging the Copilot UX. Users may set `requestTimeoutMs` to `0` to disable extension-level timeouts; host cancellation still applies.
 - Isolate token estimation from the critical request path when possible.
 
 ## Testing Strategy

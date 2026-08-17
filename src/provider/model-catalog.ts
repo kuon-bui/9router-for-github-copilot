@@ -30,7 +30,7 @@ export function createPublishedModel(
 
   return {
     id: setting.id,
-    name: setting.name,
+    name: setting.serviceTier === 'fast' ? `⚡ ${setting.name}` : setting.name,
     vendor: '9router',
     family: setting.id,
     version: '1',
