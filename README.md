@@ -119,6 +119,18 @@ Proxy mode is fail-closed: discovery errors, missing/stale analyzer ids, consent
 
 Each model with at least one configured `thinkingEfforts` value gets the native Copilot Chat Thinking Effort picker. `None` is always first, then configured values in array order. `None` omits `reasoning_effort`; allowed values send the selected value while keeping `modelId` unchanged. Missing, malformed, unsupported, or stale host selections fall back to that model's validated `thinkingMode`. An empty list omits `configurationSchema` and hides the picker. `9router` owns provider-specific reasoning translation.
 
+### Reasoning display
+
+Reasoning returned by `9router` as `reasoning_content` (or `reasoning`) is forwarded to Copilot Chat as thinking content. This uses the `languageModelThinkingPart` proposed API, so VS Code must be started with the proposal enabled:
+
+```bash
+code --enable-proposed-api local.9router-copilot-chat-provider
+```
+
+Without that flag the request still succeeds and the answer streams normally; only the reasoning is dropped. Run `9router: Show Diagnostics` with `debugMode` at `metadata` to confirm — the `9router response stream completed` line reports `thinkingDeltaCount` and `thinkingPartSupported`.
+
+Reasoning is forwarded exactly as it arrives and is never buffered or re-chunked. If `9router` emits a model's reasoning in one burst, Copilot Chat shows it in one burst; pacing is a router-side concern.
+
 ### Debug Mode
 
 - `minimal`: Safe default.

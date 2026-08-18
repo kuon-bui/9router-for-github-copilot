@@ -8,7 +8,7 @@ import { logDebugEvent } from '@/debug/output-channel';
 import { NineRouterError } from '@/router/errors';
 import { adaptToolOptionsForRouter } from './tool-adapter';
 import { adaptMessagesToRouterRequest } from './request-adapter';
-import { createRouterEventEmitter } from './stream-adapter';
+import { createRouterEventEmitter, isThinkingPartSupported } from './stream-adapter';
 import { createAbortSignalFromToken } from './cancellation';
 import { resolveEffectiveThinkingMode } from './thinking-effort';
 import { VisionProxyService } from './vision-proxy';
@@ -446,6 +446,7 @@ export class NineRouterChatProvider
       });
 
       let responseCompleted = false;
+      let thinkingDeltaCount = 0;
       for await (const event of stream) {
         if (event.type === 'router-error') {
           throw new NineRouterError(
@@ -462,8 +463,19 @@ export class NineRouterChatProvider
           responseCompleted = true;
         }
 
+        if (event.type === 'thinking-delta') {
+          thinkingDeltaCount += 1;
+        }
+
         emitter.emit(event);
       }
+
+      logDebugEvent(snapshot.runtime.debugMode, '9router response stream completed', {
+        displayModel: selectedModel.id,
+        responseCompleted,
+        thinkingDeltaCount,
+        thinkingPartSupported: isThinkingPartSupported()
+      });
 
       if (!responseCompleted) {
         throw new NineRouterError(

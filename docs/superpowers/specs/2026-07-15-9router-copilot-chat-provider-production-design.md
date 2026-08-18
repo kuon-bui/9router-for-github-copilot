@@ -235,7 +235,9 @@ Each valid model configures ordered non-`off` choices through `thinkingEfforts`;
 
 A non-`off` `thinkingMode` must appear in that model's `thinkingEfforts`; invalid or duplicate lists reject only the affected model. A valid host selection overrides the default for the request. `none` maps to internal `off`; enabled values are accepted only when selected model allowlist contains them. Missing, malformed, unsupported, or stale host values fall back to validated `thinkingMode`.
 
-Extension keeps configured `modelId` unchanged. Non-`off` effective levels set OpenAI-compatible `reasoning_effort`; `off` omits it. `9router` owns provider-specific reasoning translation and compatibility policy. Reasoning deltas remain hidden.
+Extension keeps configured `modelId` unchanged. Non-`off` effective levels set OpenAI-compatible `reasoning_effort`; `off` omits it. `9router` owns provider-specific reasoning translation and compatibility policy.
+
+Reasoning deltas are surfaced. The parser normalizes `delta.reasoning_content`, or `delta.reasoning` when the upstream uses that name, into `thinking-delta` events and forwards them in arrival order ahead of the sibling text delta. The provider renders them through `LanguageModelThinkingPart`, which is the `languageModelThinkingPart` proposed API declared in `enabledApiProposals`; hosts running without that proposal drop thinking deltas instead of failing the request. Delivery cadence stays a `9router` concern: the extension never buffers or re-chunks reasoning, so a router that emits reasoning in one burst renders as one burst. Diagnostics record `thinkingDeltaCount` and `thinkingPartSupported` only, never reasoning text.
 
 ### Recommended behavior
 

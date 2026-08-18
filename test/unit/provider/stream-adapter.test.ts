@@ -159,3 +159,40 @@ describe('createRouterEventEmitter', () => {
     });
   });
 });
+
+describe('createRouterEventEmitter thinking parts', () => {
+  it('reports a thinking part when the host runtime provides one', () => {
+    const parts: unknown[] = [];
+    const emitter = createRouterEventEmitter(
+      {
+        report(part) {
+          parts.push(part);
+        }
+      } as vscode.Progress<vscode.LanguageModelResponsePart>,
+      vscode
+    );
+
+    emitter.emit({ type: 'thinking-delta', text: 'step one' });
+
+    expect(parts[0]).toBeInstanceOf(vscode.LanguageModelThinkingPart);
+    expect((parts[0] as vscode.LanguageModelThinkingPart).value).toBe('step one');
+  });
+
+  it('drops thinking deltas when the host runtime has no thinking part', () => {
+    const parts: unknown[] = [];
+    const emitter = createRouterEventEmitter(
+      {
+        report(part) {
+          parts.push(part);
+        }
+      } as vscode.Progress<vscode.LanguageModelResponsePart>,
+      {}
+    );
+
+    emitter.emit({ type: 'thinking-delta', text: 'step one' });
+    emitter.emit({ type: 'text-delta', text: 'Visible' });
+
+    expect(parts).toHaveLength(1);
+    expect(parts[0]).toBeInstanceOf(vscode.LanguageModelTextPart);
+  });
+});

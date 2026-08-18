@@ -72,17 +72,42 @@ describe('parseSseChunk', () => {
     ]);
   });
 
-  it('does not expose reasoning-only deltas as response events', () => {
+  it('extracts thinking deltas from reasoning-only frames', () => {
     const events = parseSseChunk(
-      'data: {"choices":[{"delta":{"reasoning_content":"private reasoning"}}]}\n\n'
+      'data: {"choices":[{"delta":{"reasoning_content":"step one"}}]}\n\n'
     );
 
-    expect(events).toEqual([]);
+    expect(events).toEqual([{ type: 'thinking-delta', text: 'step one' }]);
   });
 
-  it('emits visible content without exposing a sibling reasoning delta', () => {
+  it('emits the thinking delta before a sibling text delta', () => {
     const events = parseSseChunk(
-      'data: {"choices":[{"delta":{"content":"Visible","reasoning_content":"private reasoning"}}]}\n\n'
+      'data: {"choices":[{"delta":{"content":"Visible","reasoning_content":"step one"}}]}\n\n'
+    );
+
+    expect(events).toEqual([
+      { type: 'thinking-delta', text: 'step one' },
+      { type: 'text-delta', text: 'Visible' }
+    ]);
+  });
+
+  it('accepts reasoning as an alias for reasoning_content', () => {
+    const events = parseSseChunk('data: {"choices":[{"delta":{"reasoning":"step one"}}]}\n\n');
+
+    expect(events).toEqual([{ type: 'thinking-delta', text: 'step one' }]);
+  });
+
+  it('emits a single thinking delta when both reasoning fields carry the same text', () => {
+    const events = parseSseChunk(
+      'data: {"choices":[{"delta":{"reasoning_content":"step one","reasoning":"step one"}}]}\n\n'
+    );
+
+    expect(events).toEqual([{ type: 'thinking-delta', text: 'step one' }]);
+  });
+
+  it('ignores reasoning fields that are empty or not strings', () => {
+    const events = parseSseChunk(
+      'data: {"choices":[{"delta":{"reasoning_content":"","reasoning":42,"content":"Visible"}}]}\n\n'
     );
 
     expect(events).toEqual([{ type: 'text-delta', text: 'Visible' }]);
@@ -184,5 +209,43 @@ describe('parseSseChunk', () => {
 
     await expect(collectEvents(stream)).resolves.toEqual([{ type: 'response-complete' }]);
     expect(cancelled).toBe(true);
+  });
+});
+
+describe('parseRouterEventStream incremental delivery', () => {
+  it('yields each frame before the next one is enqueued', async () => {
+    const frames = [
+      'data: {"choices":[{"delta":{"reasoning_content":"think"}}]}\n\n',
+      'data: {"choices":[{"delta":{"content":"He"}}]}\n\n',
+      'data: {"choices":[{"delta":{"content":"llo"}}]}\n\n'
+    ];
+    const trace: string[] = [];
+    let next = 0;
+    const stream = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        const frame = frames[next];
+        if (frame === undefined) {
+          controller.close();
+          return;
+        }
+
+        next += 1;
+        trace.push(`sent#${next}`);
+        controller.enqueue(new TextEncoder().encode(frame));
+      }
+    });
+
+    for await (const event of parseRouterEventStream(stream)) {
+      trace.push(`got:${event.type}`);
+    }
+
+    expect(trace).toEqual([
+      'sent#1',
+      'sent#2',
+      'got:thinking-delta',
+      'sent#3',
+      'got:text-delta',
+      'got:text-delta'
+    ]);
   });
 });

@@ -18,6 +18,8 @@ interface RouterSsePayload {
     finish_reason?: string | null;
     delta?: {
       content?: string;
+      reasoning_content?: string;
+      reasoning?: string;
       tool_calls?: Array<{
         index?: number;
         id?: string;
@@ -98,6 +100,11 @@ function parseSseFrame(frame: string): RouterStreamEvent[] {
     return events;
   }
 
+  const thinking = extractThinkingText(choice.delta);
+  if (thinking !== undefined) {
+    events.push({ type: 'thinking-delta', text: thinking });
+  }
+
   const text = choice.delta?.content;
   if (typeof text === 'string' && text.length > 0) {
     events.push({ type: 'text-delta', text });
@@ -145,6 +152,19 @@ function parseSseFrame(frame: string): RouterStreamEvent[] {
   }
 
   return events;
+}
+
+// 9router forwards reasoning under `reasoning_content`; some upstreams use `reasoning` instead.
+type RouterSseDelta = NonNullable<RouterSsePayload['choices']>[number]['delta'];
+
+function extractThinkingText(delta: RouterSseDelta): string | undefined {
+  for (const candidate of [delta?.reasoning_content, delta?.reasoning]) {
+    if (typeof candidate === 'string' && candidate.length > 0) {
+      return candidate;
+    }
+  }
+
+  return undefined;
 }
 
 function isNonNegativeInteger(value: unknown): value is number {

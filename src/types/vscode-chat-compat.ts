@@ -21,3 +21,12 @@ export interface ModelConfigurationResponseOptions
   readonly modelConfiguration?: Readonly<Record<string, unknown>>;
   readonly configuration?: Readonly<Record<string, unknown>>;
 }
+
+/**
+ * `LanguageModelThinkingPart` ships as the `languageModelThinkingPart` proposed API, so it is absent
+ * on hosts that run the extension without that proposal enabled. Treating the host namespace as an
+ * explicit dependency keeps the capability check testable and lets the emitter degrade safely.
+ */
+export interface ThinkingPartHost {
+  readonly LanguageModelThinkingPart?: typeof vscode.LanguageModelThinkingPart;
+}
