@@ -71,6 +71,22 @@ class LanguageModelDataPart {
   }
 }
 
+class LanguageModelThinkingPart {
+  public readonly value: string | string[];
+  public readonly id: string | undefined;
+  public readonly metadata: Readonly<Record<string, unknown>> | undefined;
+
+  public constructor(
+    value: string | string[],
+    id?: string,
+    metadata?: Readonly<Record<string, unknown>>
+  ) {
+    this.value = value;
+    this.id = id;
+    this.metadata = metadata;
+  }
+}
+
 class LanguageModelError extends Error {
   public readonly code: string;
 
@@ -294,6 +310,7 @@ export {
   EventEmitter,
   LanguageModelError,
   LanguageModelTextPart,
+  LanguageModelThinkingPart,
   LanguageModelDataPart,
   LanguageModelToolCallPart,
   LanguageModelToolResultPart

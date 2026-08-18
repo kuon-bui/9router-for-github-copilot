@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { NineRouterError } from '@/router/errors';
 import type { RouterStreamEvent } from '@/types/router-contract';
+import type { ThinkingPartHost } from '@/types/vscode-chat-compat';
 
 // ponytail: 1 MiB per call and 4 MiB total cover normal tool JSON; raise if 9router supports larger tool payloads.
 const MAX_TOOL_CALL_ARGUMENT_BYTES = 1024 * 1024;
@@ -17,16 +18,32 @@ export interface RouterEventEmitter {
   emit(event: RouterStreamEvent): void;
 }
 
+export function isThinkingPartSupported(host: ThinkingPartHost = vscode): boolean {
+  return typeof host.LanguageModelThinkingPart === 'function';
+}
+
 export function createRouterEventEmitter(
-  progress: vscode.Progress<vscode.LanguageModelResponsePart>
+  progress: vscode.Progress<vscode.LanguageModelResponsePart>,
+  host: ThinkingPartHost = vscode
 ): RouterEventEmitter {
   const toolCalls = new Map<string, ToolAccumulator>();
+  const thinkingPart = host.LanguageModelThinkingPart;
   let totalToolCallBytes = 0;
 
   return {
     emit(event) {
       if (event.type === 'text-delta') {
         progress.report(new vscode.LanguageModelTextPart(event.text));
+        return;
+      }
+
+      if (event.type === 'thinking-delta') {
+        if (typeof thinkingPart === 'function') {
+          // Narrow interop cast: thinking parts are accepted by the host at runtime but the stable
+          // LanguageModelResponsePart union does not name them yet.
+          progress.report(new thinkingPart(event.text) as unknown as vscode.LanguageModelResponsePart);
+        }
+
         return;
       }
 

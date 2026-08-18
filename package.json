@@ -6,8 +6,11 @@
   "version": "0.6.0",
   "license": "UNLICENSED",
   "engines": {
-    "vscode": "^1.125.0"
+    "vscode": "^1.133.0"
   },
+  "enabledApiProposals": [
+    "languageModelThinkingPart"
+  ],
   "categories": [
     "Other"
   ],

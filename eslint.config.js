@@ -20,7 +20,13 @@ const sharedGlobals = {
 
 module.exports = [
   {
-    ignores: ['dist/**', 'node_modules/**', '*.vsix']
+    ignores: [
+      'dist/**',
+      'node_modules/**',
+      '*.vsix',
+      // Vendored from microsoft/vscode; keep it in sync with upstream rather than reformatting it.
+      'src/types/vscode.proposed.*.d.ts'
+    ]
   },
   {
     ...js.configs.recommended,

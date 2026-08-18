@@ -68,6 +68,107 @@ describe('NineRouterChatProvider', () => {
     expect(progressCalls.join('')).toBe('Hello world');
   });
 
+  it('streams thinking deltas into VS Code thinking parts', async () => {
+    const thinking: string[] = [];
+    const text: string[] = [];
+    const provider = new NineRouterChatProvider(
+      {
+        secrets: {
+          get: async () => 'token'
+        }
+      } as never,
+      {
+        async *streamChatCompletion() {
+          yield { type: 'thinking-delta', text: 'weighing options' };
+          yield { type: 'text-delta', text: 'Hello' };
+          yield { type: 'response-complete' };
+        }
+      } as never
+    );
+
+    await provider.provideLanguageModelChatResponse(
+      {
+        id: 'daily',
+        name: 'Daily',
+        vendor: '9router',
+        family: 'daily',
+        version: '1',
+        maxInputTokens: 128000,
+        maxOutputTokens: 8192,
+        capabilities: {}
+      },
+      [{ role: 1, content: 'Say hello' }] as never,
+      {} as never,
+      {
+        report: (part: vscode.LanguageModelResponsePart) => {
+          if (part instanceof vscode.LanguageModelThinkingPart) {
+            thinking.push(String(part.value));
+            return;
+          }
+
+          if (part instanceof vscode.LanguageModelTextPart) {
+            text.push(part.value);
+          }
+        }
+      } as vscode.Progress<vscode.LanguageModelResponsePart>,
+      __createCancellationToken().value as never
+    );
+
+    expect(thinking).toEqual(['weighing options']);
+    expect(text.join('')).toBe('Hello');
+  });
+
+  it('logs thinking delivery counts without dumping reasoning text', async () => {
+    __setConfigurationValues({
+      models: [{ id: 'daily', name: 'Daily', modelId: 'combo/daily' }],
+      baseUrl: 'https://router.example.com/v1',
+      maxTokens: 128,
+      requestTimeoutMs: 5000,
+      debugMode: 'metadata'
+    });
+
+    const provider = new NineRouterChatProvider(
+      {
+        secrets: {
+          get: async () => 'token'
+        }
+      } as never,
+      {
+        async *streamChatCompletion() {
+          yield { type: 'thinking-delta', text: 'secret-chain-of-thought' };
+          yield { type: 'thinking-delta', text: 'more private reasoning' };
+          yield { type: 'response-complete' };
+        }
+      } as never
+    );
+
+    await provider.provideLanguageModelChatResponse(
+      {
+        id: 'daily',
+        name: 'Daily',
+        vendor: '9router',
+        family: 'daily',
+        version: '1',
+        maxInputTokens: 128000,
+        maxOutputTokens: 8192,
+        capabilities: {}
+      },
+      [{ role: 1, content: 'Say hello' }] as never,
+      {} as never,
+      { report: () => undefined } as never,
+      __createCancellationToken().value as never
+    );
+
+    const completionLine = __getOutputLines().find((line) =>
+      line.startsWith('9router response stream completed')
+    );
+
+    expect(completionLine).toContain('"thinkingDeltaCount":2');
+    expect(completionLine).toContain('"thinkingPartSupported":true');
+    expect(completionLine).not.toContain('secret-chain-of-thought');
+    expect(completionLine).not.toContain('more private reasoning');
+  });
+
   it('surfaces primary router-error stream events as upstream failures', async () => {
     const provider = new NineRouterChatProvider(
       {
