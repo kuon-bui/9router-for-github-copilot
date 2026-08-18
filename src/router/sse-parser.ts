@@ -190,6 +190,9 @@ export async function* parseRouterEventStream(
         assertSseFrameWithinLimit(frame);
         for (const event of parseSseChunk(frame)) {
           yield event;
+          if (event.type === 'response-complete') {
+            return;
+          }
         }
         boundary = findFrameBoundary(buffer);
       }
@@ -206,6 +209,9 @@ export async function* parseRouterEventStream(
       assertSseFrameWithinLimit(buffer);
       for (const event of parseSseChunk(buffer)) {
         yield event;
+        if (event.type === 'response-complete') {
+          return;
+        }
       }
     }
   } finally {
