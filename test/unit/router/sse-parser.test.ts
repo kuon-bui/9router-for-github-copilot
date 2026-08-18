@@ -170,4 +170,19 @@ describe('parseSseChunk', () => {
 
     expect(cancelled).toBe(true);
   });
+
+  it('stops reading when [DONE] arrives before the server closes the stream', async () => {
+    let cancelled = false;
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode('data: [DONE]\n\n'));
+      },
+      cancel() {
+        cancelled = true;
+      }
+    });
+
+    await expect(collectEvents(stream)).resolves.toEqual([{ type: 'response-complete' }]);
+    expect(cancelled).toBe(true);
+  });
 });
