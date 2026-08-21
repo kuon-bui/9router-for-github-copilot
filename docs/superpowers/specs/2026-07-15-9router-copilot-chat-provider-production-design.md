@@ -212,20 +212,20 @@ Configured context-window values are compatibility fallbacks, not the primary
 metadata source. The cache is not persisted, no refresh timer is used, and
 catalog ids are matched exactly without deriving combo behavior.
 
-For the used-token numerator, the SSE boundary validates usage from terminal
-Responses API events, normalizes `input_tokens`, `output_tokens`, and
-`total_tokens`, and forwards them as `prompt_tokens`, `completion_tokens`, and
-`total_tokens` in a `LanguageModelDataPart` with the Copilot-compatible `usage`
-MIME type. Malformed or missing usage is ignored without failing an otherwise
-valid response.
+For the used-token numerator, every primary streaming request sets
+`stream_options.include_usage` to `true`. The SSE boundary validates the final
+OpenAI-compatible usage chunk, normalizes `prompt_tokens`, `completion_tokens`,
+and `total_tokens`, and forwards it as a `LanguageModelDataPart` with the
+Copilot-compatible `usage` MIME type. Malformed or missing usage is ignored
+without failing an otherwise valid response.
 
 `provideTokenCount` remains available for host token-count calls, but VS Code
 1.129 does not use it as the response usage source for the native Session Info
 widget.
 
 The per-model metadata is independent from `9router-copilot.maxTokens`. The
-setting's default is `0`. Only a positive safe integer is sent as `max_output_tokens`;
-`0` or a malformed value omits `max_output_tokens`, so the extension applies no
+setting's default is `0`. Only a positive safe integer is sent as `max_tokens`;
+`0` or a malformed value omits `max_tokens`, so the extension applies no
 response-token limit. `9router` or an upstream provider may still enforce its
 own limit.
 
@@ -235,9 +235,9 @@ Each valid model configures ordered non-`off` choices through `thinkingEfforts`;
 
 A non-`off` `thinkingMode` must appear in that model's `thinkingEfforts`; invalid or duplicate lists reject only the affected model. A valid host selection overrides the default for the request. `none` maps to internal `off`; enabled values are accepted only when selected model allowlist contains them. Missing, malformed, unsupported, or stale host values fall back to validated `thinkingMode`.
 
-Extension keeps configured `modelId` unchanged. Non-`off` effective levels set OpenAI-compatible `reasoning.effort` and request `reasoning.summary: "auto"`; `off` omits `reasoning`. `9router` owns provider-specific reasoning translation and compatibility policy.
+Extension keeps configured `modelId` unchanged. Non-`off` effective levels set OpenAI-compatible `reasoning_effort`; `off` omits it. `9router` owns provider-specific reasoning translation and compatibility policy.
 
-Reasoning deltas are surfaced. The parser normalizes `response.reasoning_summary_text.delta`, or compatible `response.reasoning_text.delta` events, into `thinking-delta` events. The provider renders them through `LanguageModelThinkingPart`, which is the `languageModelThinkingPart` proposed API declared in `enabledApiProposals`; hosts running without that proposal drop thinking deltas instead of failing the request. Delivery cadence stays a `9router` concern: the extension never buffers or re-chunks reasoning, so a router that emits reasoning in one burst renders as one burst. Diagnostics record `thinkingDeltaCount` and `thinkingPartSupported` only, never reasoning text.
+Reasoning deltas are surfaced. The parser normalizes `delta.reasoning_content`, or `delta.reasoning` when the upstream uses that name, into `thinking-delta` events and forwards them in arrival order ahead of the sibling text delta. The provider renders them through `LanguageModelThinkingPart`, which is the `languageModelThinkingPart` proposed API declared in `enabledApiProposals`; hosts running without that proposal drop thinking deltas instead of failing the request. Delivery cadence stays a `9router` concern: the extension never buffers or re-chunks reasoning, so a router that emits reasoning in one burst renders as one burst. Diagnostics record `thinkingDeltaCount` and `thinkingPartSupported` only, never reasoning text.
 
 ### Recommended behavior
 
@@ -270,21 +270,20 @@ Authorization: Bearer <9router_api_key>
 Recommended request shape:
 
 - `model`: configured opaque `modelId`
-- `input`: message, `function_call`, and `function_call_output` items
-- `stream: true`
-- `store: false`
-- `service_tier: fast` when configured for the selected model
-- flattened Responses API function `tools` when supported
-- `max_output_tokens` when a positive safe integer is configured
+- `messages`
+- `stream`
+- `serviceTier: fast` when configured for the selected model
+- `tools` when supported
+- `max_tokens` when a positive safe integer is configured
 - optional generation parameters that `9router` documents as compatible
 
-Thinking preferences are configured per curated display model. The extension keeps `modelId` unchanged and sends a validated non-`off` level through `reasoning.effort`, with `reasoning.summary: "auto"` for visible thinking deltas. `9router` owns provider-specific reasoning translation, normalization, limits, and upstream compatibility.
+Thinking preferences are configured per curated display model. The extension keeps `modelId` unchanged and sends a validated non-`off` level through `reasoning_effort`. `9router` owns provider-specific reasoning translation, normalization, limits, and upstream compatibility.
 
 ### Compatibility note
 
 The extension should not require `9router` to expose raw internal routing state. It only needs:
 
-- a stable `/v1/responses` surface
+- a stable chat-completion surface
 - stable combo ids
 - predictable streaming behavior
 - optional request ids or metadata for diagnostics
@@ -372,7 +371,7 @@ Recommended proxy flow:
 3. send image inputs directly to `9router` when `visionMode` is `native`
 4. when `visionMode` is `proxy`, run guided setup if source/model is missing
 5. run `VisionProxyService` per image-bearing message, sequentially, through the selected analyzer source
-6. convert VS Code `LanguageModelDataPart` values into Responses API `input_image` data URLs for proxy requests
+6. convert VS Code `LanguageModelDataPart` values into OpenAI-compatible `image_url` data URLs for proxy requests
 7. require a non-empty textual summary, replace raw images with `[Vision proxy summary]`
 8. send the transformed conversation to the selected display model's primary `9router` combo
 9. block image input when `visionMode` is `off`

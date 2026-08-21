@@ -7,7 +7,6 @@
 docs/**
 test/**
 node_modules/**
-.pnpm-store/**
 *.log
 AGENTS.md
 CODE_CONVENTION.md

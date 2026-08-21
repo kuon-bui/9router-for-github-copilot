@@ -56,7 +56,7 @@ Target upstream model provider
 
 - Users already have access to GitHub Copilot Chat in VS Code.
 - VS Code continues to expose the Language Model provider surface needed to register third-party chat models.
-- `9router` can expose an OpenAI-compatible or near-compatible Responses API.
+- `9router` can expose an OpenAI-compatible or near-compatible API for chat completion workloads.
 - The host remains responsible for the top-level Copilot Chat UX, while this extension remains responsible only for provider adaptation.
 
 ## Functional Requirements
@@ -166,7 +166,7 @@ Target upstream model provider
                            +-------------------------------+
                            | 9router API                   |
                            | - model registry              |
-                           | - Responses API endpoint      |
+                           | - chat completion endpoint    |
                            | - routing and accounting      |
                            +---------------+---------------+
                                            |
@@ -215,7 +215,7 @@ When a user submits a prompt in Copilot Chat:
 - VS Code invokes `provideLanguageModelChatResponse`
 - the extension receives the chat messages and tool context
 - the provider classifies the request type
-- the adapter converts the request into the `9router` Responses API payload
+- the adapter converts the request into the `9router` chat payload
 - the client sends the request to `9router`
 - the extension streams the response back as `vscode.LanguageModelResponsePart`
 
@@ -335,33 +335,32 @@ Recommended fields:
 - `supports_vision`
 - `supports_reasoning`
 
-### Responses API
+### Chat completions
 
 Recommended endpoint:
 
 ```http
-POST /v1/responses
+POST /v1/chat/completions
 ```
 
 Recommended request fields:
 
 - `model`
-- `input`
+- `messages`
 - `tools`
 - `tool_choice`
 - `stream`
-- `store`
-- `reasoning`
-- `max_output_tokens`
+- `temperature`
+- `max_tokens`
 - optional metadata such as `conversation_id` or `workspace_id`
 
 Recommended streaming response fields:
 
-- `response.output_text.delta`
-- `response.function_call_arguments.delta`
-- `response.reasoning_summary_text.delta` when enabled
-- terminal `response.completed`, `response.incomplete`, or `response.failed`
-- usage and request id from terminal response envelopes
+- text delta
+- tool call delta
+- finish reason
+- usage
+- request id
 
 ### Compatibility note
 

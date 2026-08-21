@@ -1,19 +1,18 @@
 import { adaptToolOptionsForRouter } from './tool-adapter';
 import type { ConfiguredModel } from '@/types/product-model';
 import type {
-  RouterResponseFunctionCall,
-  RouterResponseFunctionCallOutput,
-  RouterResponseInputContent,
-  RouterResponseInputItem,
-  RouterResponseMessage,
-  RouterResponseRequest
+  RouterChatCompletionRequest,
+  RouterContentPart,
+  RouterMessage,
+  RouterMessageContent,
+  RouterToolCall
 } from '@/types/router-contract';
 import type { HostToolDefinition } from './tool-adapter';
 import type { HostChatRequestMessage } from './vision-proxy';
 import { createRouterImagePart, isHostImageDataPart } from './image-input-adapter';
 import { canonicalJsonStringify } from './canonical-json';
 
-function mapRole(role: unknown): RouterResponseMessage['role'] {
+function mapRole(role: unknown): RouterMessage['role'] {
   if (role === 0 || role === 'system') {
     return 'system';
   }
@@ -50,47 +49,55 @@ function extractTextContent(content: HostChatRequestMessage['content']): string 
     .join('\n');
 }
 
-function adaptNativeVisionContent(
-  content: HostChatRequestMessage['content']
-): string | RouterResponseInputContent[] {
+function adaptNativeVisionContent(content: HostChatRequestMessage['content']): RouterMessageContent {
   if (typeof content === 'string') {
     return content;
   }
 
-  return content
-    .map((part): RouterResponseInputContent | undefined => {
-      if (typeof part === 'string') {
-        return { type: 'input_text', text: part };
-      }
+  return content.map((part): RouterContentPart => {
+    if (typeof part === 'string') {
+      return { type: 'text', text: part };
+    }
 
-      if (isHostImageDataPart(part)) {
-        return createRouterImagePart(part);
-      }
+    if (isHostImageDataPart(part)) {
+      return createRouterImagePart(part);
+    }
 
-      if (typeof part === 'object' && part !== null && 'value' in part && typeof part.value === 'string') {
-        return { type: 'input_text', text: part.value };
-      }
+    if (typeof part === 'object' && part !== null && 'value' in part && typeof part.value === 'string') {
+      return { type: 'text', text: part.value };
+    }
 
-      if (isToolCallPartLike(part) || isToolResultPartLike(part)) {
-        return undefined;
-      }
+    if (typeof part === 'object' && part !== null) {
+      return part as Record<string, unknown>;
+    }
 
-      return { type: 'input_text', text: '[Unsupported input part omitted]' };
-    })
-    .filter((part): part is RouterResponseInputContent => part !== undefined);
+    return { type: 'text', text: String(part) };
+  });
 }
 
 function adaptOrdinaryMessage(
   message: HostChatRequestMessage,
   selectedModel: ConfiguredModel
-): RouterResponseMessage {
-  return {
+): RouterMessage {
+  const routerMessage: RouterMessage = {
     role: mapRole(message.role),
     content:
       selectedModel.visionMode === 'native'
         ? adaptNativeVisionContent(message.content)
         : extractTextContent(message.content)
   };
+
+  if (message.name) {
+    routerMessage.name = message.name;
+  }
+
+  return routerMessage;
+}
+
+interface ToolCallLike {
+  callId: string;
+  name: string;
+  input: object;
 }
 
 interface ToolResultLike {
@@ -120,12 +127,12 @@ function isToolResultPartLike(part: unknown): part is Record<string, unknown> {
 
 function extractRouterToolCalls(
   content: HostChatRequestMessage['content']
-): RouterResponseFunctionCall[] {
+): RouterToolCall[] {
   if (typeof content === 'string') {
     return [];
   }
 
-  const toolCalls: RouterResponseFunctionCall[] = [];
+  const toolCalls: RouterToolCall[] = [];
 
   for (const part of content) {
     const toolCall = createRouterToolCall(part);
@@ -137,7 +144,7 @@ function extractRouterToolCalls(
   return toolCalls;
 }
 
-function createRouterToolCall(part: unknown): RouterResponseFunctionCall | undefined {
+function createRouterToolCall(part: unknown): RouterToolCall | undefined {
   if (!isToolCallPartLike(part)) {
     return undefined;
   }
@@ -164,11 +171,19 @@ function createRouterToolCall(part: unknown): RouterResponseFunctionCall | undef
     return undefined;
   }
 
-  return {
-    type: 'function_call',
-    call_id: callId,
+  const toolCall: ToolCallLike = {
+    callId,
     name,
-    arguments: serializedInput
+    input: part.input
+  };
+
+  return {
+    id: toolCall.callId,
+    type: 'function',
+    function: {
+      name: toolCall.name,
+      arguments: serializedInput
+    }
   };
 }
 
@@ -205,50 +220,51 @@ export function adaptMessagesToRouterRequest(input: {
   tools?: readonly HostToolDefinition[];
   hostToolMode?: unknown;
   maxTokens?: number;
-}): RouterResponseRequest {
+}): RouterChatCompletionRequest {
   const activeToolCallIds = new Set<string>();
-  const responseInput: RouterResponseInputItem[] = [];
+  const messages: RouterMessage[] = [];
 
   for (const message of input.messages) {
     const toolCalls = extractRouterToolCalls(message.content);
     if (toolCalls.length > 0) {
       activeToolCallIds.clear();
+      const routerMessage: RouterMessage = {
+        role: 'assistant',
+        content: extractTextContent(message.content).trim() || null,
+        tool_calls: toolCalls
+      };
 
-      const assistantText = extractTextContent(message.content).trim();
-      if (assistantText) {
-        responseInput.push({
-          role: 'assistant',
-          content: assistantText
-        });
+      if (message.name) {
+        routerMessage.name = message.name;
       }
 
-      responseInput.push(...toolCalls);
+      messages.push(routerMessage);
       for (const toolCall of toolCalls) {
-        activeToolCallIds.add(toolCall.call_id);
+        activeToolCallIds.add(toolCall.id);
       }
       continue;
     }
 
     const toolResults = findToolResultParts(message.content);
     if (toolResults.length > 0) {
-      const matchingResults: RouterResponseFunctionCallOutput[] = [];
+      const matchingResults: RouterMessage[] = [];
       const orphanedResultContents: string[] = [];
 
       for (const toolResult of toolResults) {
         const callId = toolResult.callId.trim();
-        const output = extractToolResultText(toolResult);
+        const content = extractToolResultText(toolResult);
         if (callId.length > 0 && activeToolCallIds.delete(callId)) {
           matchingResults.push({
-            type: 'function_call_output',
-            call_id: callId,
-            output
+            role: 'tool',
+            content,
+            tool_call_id: callId
           });
         } else {
-          orphanedResultContents.push(output);
+          orphanedResultContents.push(content);
         }
       }
 
-      responseInput.push(...matchingResults);
+      messages.push(...matchingResults);
 
       const ordinaryText = extractTextContent(message.content).trim();
       if (orphanedResultContents.length > 0 || ordinaryText) {
@@ -256,14 +272,14 @@ export function adaptMessagesToRouterRequest(input: {
       }
 
       for (const content of orphanedResultContents) {
-        responseInput.push({
+        messages.push({
           role: 'user',
           content
         });
       }
 
       if (ordinaryText) {
-        responseInput.push({
+        messages.push({
           role: 'user',
           content: ordinaryText
         });
@@ -272,21 +288,20 @@ export function adaptMessagesToRouterRequest(input: {
     }
 
     activeToolCallIds.clear();
-    responseInput.push(adaptOrdinaryMessage(message, input.selectedModel));
+    messages.push(adaptOrdinaryMessage(message, input.selectedModel));
   }
 
-  const request: RouterResponseRequest = {
+  const request: RouterChatCompletionRequest = {
     model: input.selectedModel.modelId,
     stream: true,
-    store: false,
-    input: responseInput
+    stream_options: {
+      include_usage: true
+    },
+    messages
   };
 
   if (input.selectedModel.thinkingMode !== 'off') {
-    request.reasoning = {
-      effort: input.selectedModel.thinkingMode,
-      summary: 'auto'
-    };
+    request.reasoning_effort = input.selectedModel.thinkingMode;
   }
 
   if (input.selectedModel.serviceTier === 'fast') {
@@ -294,7 +309,7 @@ export function adaptMessagesToRouterRequest(input: {
   }
 
   if (typeof input.maxTokens === 'number') {
-    request.max_output_tokens = input.maxTokens;
+    request.max_tokens = input.maxTokens;
   }
 
   const toolOptionsInput: Parameters<typeof adaptToolOptionsForRouter>[0] = {

@@ -1,18 +1,18 @@
 import { NineRouterError } from './errors';
 import { parseRouterModels } from './model-catalog';
 import { parseRouterEventStream } from './sse-parser';
-import { buildModelsUrl, buildResponsesUrl } from './url';
+import { buildChatCompletionsUrl, buildModelsUrl } from './url';
 import type { RouterModelMetadata } from './model-catalog';
-import type { RouterResponseRequest, RouterStreamEvent } from '@/types/router-contract';
+import type { RouterChatCompletionRequest, RouterStreamEvent } from '@/types/router-contract';
 
 // ponytail: 16 KiB error prefix is enough for router error classification; raise if 9router wraps model ids deeper.
 const MAX_ERROR_BODY_BYTES = 16 * 1024;
 
 export interface RouterClient {
-  streamResponse(input: {
+  streamChatCompletion(input: {
     baseUrl: string;
     apiKey: string;
-    request: RouterResponseRequest;
+    request: RouterChatCompletionRequest;
     timeoutMs: number;
     signal: AbortSignal;
   }): AsyncIterable<RouterStreamEvent>;
@@ -76,15 +76,14 @@ function createCompositeAbortSignal(signal: AbortSignal, timeoutMs: number): {
 
 export function createRouterClient(deps: { fetch: typeof globalThis.fetch }): RouterClient {
   return {
-    async *streamResponse(input) {
+    async *streamChatCompletion(input) {
       const composite = createCompositeAbortSignal(input.signal, input.timeoutMs);
 
       try {
-        const response = await deps.fetch(buildResponsesUrl(input.baseUrl), {
+        const response = await deps.fetch(buildChatCompletionsUrl(input.baseUrl), {
           method: 'POST',
           headers: {
             'content-type': 'application/json',
-            accept: 'text/event-stream',
             authorization: `Bearer ${input.apiKey}`
           },
           body: JSON.stringify(input.request),

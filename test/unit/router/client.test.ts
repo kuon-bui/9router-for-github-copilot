@@ -11,16 +11,12 @@ function responseBody(text: string): ReadableStream<Uint8Array> {
 }
 
 describe('createRouterClient', () => {
-  it('posts to /v1/responses with bearer auth', async () => {
+  it('posts to /v1/chat/completions with bearer auth', async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       body: new ReadableStream<Uint8Array>({
         start(controller) {
-          controller.enqueue(
-            new TextEncoder().encode(
-              'data: {"type":"response.completed","response":{}}\n\n'
-            )
-          );
+          controller.enqueue(new TextEncoder().encode('data: [DONE]\n\n'));
           controller.close();
         }
       }),
@@ -30,10 +26,10 @@ describe('createRouterClient', () => {
     const client = createRouterClient({ fetch: fetchMock as never });
 
     const events: unknown[] = [];
-    for await (const event of client.streamResponse({
+    for await (const event of client.streamChatCompletion({
       baseUrl: 'https://router.example.com/v1',
       apiKey: 'secret-token',
-      request: { model: 'combo/daily', input: [], stream: true, store: false },
+      request: { model: 'combo/daily', messages: [], stream: true },
       timeoutMs: 1000,
       signal: new AbortController().signal
     })) {
@@ -41,11 +37,10 @@ describe('createRouterClient', () => {
     }
 
     expect(fetchMock).toHaveBeenCalledWith(
-      'https://router.example.com/v1/responses',
+      'https://router.example.com/v1/chat/completions',
       expect.objectContaining({
         method: 'POST',
         headers: expect.objectContaining({
-          accept: 'text/event-stream',
           authorization: 'Bearer secret-token'
         })
       })
@@ -64,10 +59,10 @@ describe('createRouterClient', () => {
     });
 
     const consume = async (): Promise<void> => {
-      for await (const event of client.streamResponse({
+      for await (const event of client.streamChatCompletion({
         baseUrl: 'https://router.example.com/v1',
         apiKey: 'secret-token',
-        request: { model: 'router/missing', input: [], stream: true, store: false },
+        request: { model: 'router/missing', messages: [], stream: true },
         timeoutMs: 1000,
         signal: new AbortController().signal
       })) {
@@ -92,10 +87,10 @@ describe('createRouterClient', () => {
     });
 
     const consume = async (): Promise<void> => {
-      for await (const event of client.streamResponse({
+      for await (const event of client.streamChatCompletion({
         baseUrl: 'https://router.example.com/v1',
         apiKey: 'secret-token',
-        request: { model: '123', input: [], stream: true, store: false },
+        request: { model: '123', messages: [], stream: true },
         timeoutMs: 1000,
         signal: new AbortController().signal
       })) {
@@ -120,10 +115,10 @@ describe('createRouterClient', () => {
     });
 
     const consume = async (): Promise<void> => {
-      for await (const event of client.streamResponse({
+      for await (const event of client.streamChatCompletion({
         baseUrl: 'https://router.example.com/v1',
         apiKey: 'secret-token',
-        request: { model: '123', input: [], stream: true, store: false },
+        request: { model: '123', messages: [], stream: true },
         timeoutMs: 1000,
         signal: new AbortController().signal
       })) {
@@ -207,7 +202,7 @@ describe('createRouterClient', () => {
     ).rejects.toMatchObject({ code: 'AUTHENTICATION_ERROR' });
   });
 
-  it('does not expose raw Responses API error bodies', async () => {
+  it('does not expose raw chat-completion error bodies', async () => {
     const secret = 'prompt-secret';
     const client = createRouterClient({
       fetch: vi.fn().mockResolvedValue({
@@ -218,10 +213,10 @@ describe('createRouterClient', () => {
       }) as never
     });
     const consume = async (): Promise<void> => {
-      for await (const event of client.streamResponse({
+      for await (const event of client.streamChatCompletion({
         baseUrl: 'https://router.example.com/v1',
         apiKey: 'secret-token',
-        request: { model: 'combo/daily', input: [], stream: true, store: false },
+        request: { model: 'combo/daily', messages: [], stream: true },
         timeoutMs: 1000,
         signal: new AbortController().signal
       })) {
@@ -257,10 +252,10 @@ describe('createRouterClient', () => {
       }) as never
     });
     const consume = async (): Promise<void> => {
-      for await (const event of client.streamResponse({
+      for await (const event of client.streamChatCompletion({
         baseUrl: 'https://router.example.com/v1',
         apiKey: 'secret-token',
-        request: { model: 'router/missing', input: [], stream: true, store: false },
+        request: { model: 'router/missing', messages: [], stream: true },
         timeoutMs: 1000,
         signal: new AbortController().signal
       })) {
