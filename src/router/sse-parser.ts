@@ -4,32 +4,41 @@ import type { RouterStreamEvent } from '@/types/router-contract';
 // ponytail: 1 MiB SSE frame ceiling; raise if 9router formalizes larger tool-call delta frames.
 const MAX_SSE_FRAME_BYTES = 1024 * 1024;
 
-interface RouterSsePayload {
-  id?: string;
-  usage?: {
-    prompt_tokens?: unknown;
-    completion_tokens?: unknown;
-    total_tokens?: unknown;
-  };
+interface RouterResponseUsage {
+  input_tokens?: unknown;
+  output_tokens?: unknown;
+  total_tokens?: unknown;
+}
+
+interface RouterResponseEnvelope {
+  id?: unknown;
   error?: {
-    message?: string;
+    message?: unknown;
+  } | null;
+  incomplete_details?: {
+    reason?: unknown;
+  } | null;
+  usage?: RouterResponseUsage | null;
+}
+
+interface RouterResponseFunctionCallItem {
+  type?: unknown;
+  call_id?: unknown;
+  name?: unknown;
+  arguments?: unknown;
+}
+
+interface RouterResponsesSsePayload {
+  type?: unknown;
+  response_id?: unknown;
+  output_index?: unknown;
+  delta?: unknown;
+  message?: unknown;
+  error?: {
+    message?: unknown;
   };
-  choices?: Array<{
-    finish_reason?: string | null;
-    delta?: {
-      content?: string;
-      reasoning_content?: string;
-      reasoning?: string;
-      tool_calls?: Array<{
-        index?: number;
-        id?: string;
-        function?: {
-          name?: string;
-          arguments?: string;
-        };
-      }>;
-    };
-  }>;
+  response?: RouterResponseEnvelope;
+  item?: RouterResponseFunctionCallItem;
 }
 
 export function parseSseChunk(chunk: string): RouterStreamEvent[] {
@@ -57,9 +66,9 @@ function parseSseFrame(frame: string): RouterStreamEvent[] {
     return [{ type: 'response-complete' }];
   }
 
-  let parsed: RouterSsePayload;
+  let decoded: unknown;
   try {
-    parsed = JSON.parse(payload) as RouterSsePayload;
+    decoded = JSON.parse(payload) as unknown;
   } catch {
     throw new NineRouterError('MALFORMED_STREAM_ERROR', '9router returned malformed SSE JSON', {
       details: {
@@ -68,107 +77,191 @@ function parseSseFrame(frame: string): RouterStreamEvent[] {
     });
   }
 
-  if (parsed.error?.message) {
-    const event: RouterStreamEvent = {
-      type: 'router-error',
-      error: parsed.error.message
-    };
-
-    if (parsed.id) {
-      event.requestId = parsed.id;
-    }
-
-    return [event];
-  }
-
-  const events: RouterStreamEvent[] = [];
-  if (
-    isNonNegativeInteger(parsed.usage?.prompt_tokens) &&
-    isNonNegativeInteger(parsed.usage.completion_tokens) &&
-    isNonNegativeInteger(parsed.usage.total_tokens)
-  ) {
-    events.push({
-      type: 'usage',
-      promptTokens: parsed.usage.prompt_tokens,
-      completionTokens: parsed.usage.completion_tokens,
-      totalTokens: parsed.usage.total_tokens
+  if (!isRecord(decoded)) {
+    throw new NineRouterError('MALFORMED_STREAM_ERROR', '9router returned malformed SSE payload', {
+      details: {
+        frameBytes: getUtf8ByteLength(frame)
+      }
     });
   }
 
-  const choice = parsed.choices?.[0];
-  if (!choice) {
-    return events;
+  const parsed = decoded as RouterResponsesSsePayload;
+
+  if (typeof parsed.type !== 'string') {
+    return [];
   }
 
-  const thinking = extractThinkingText(choice.delta);
-  if (thinking !== undefined) {
-    events.push({ type: 'thinking-delta', text: thinking });
+  if (parsed.type === 'response.output_text.delta' || parsed.type === 'response.refusal.delta') {
+    return typeof parsed.delta === 'string' && parsed.delta.length > 0
+      ? [{ type: 'text-delta', text: parsed.delta }]
+      : [];
   }
 
-  const text = choice.delta?.content;
-  if (typeof text === 'string' && text.length > 0) {
-    events.push({ type: 'text-delta', text });
+  if (
+    parsed.type === 'response.reasoning_summary_text.delta' ||
+    parsed.type === 'response.reasoning_text.delta'
+  ) {
+    return typeof parsed.delta === 'string' && parsed.delta.length > 0
+      ? [{ type: 'thinking-delta', text: parsed.delta }]
+      : [];
   }
 
-  const toolCalls = choice.delta?.tool_calls ?? [];
-  for (const toolCall of toolCalls) {
-    const toolCallIndex = toolCall.index;
-    const toolCallId = toolCall.id;
-    const toolName = toolCall.function?.name;
-    const delta = toolCall.function?.arguments;
-    if ((toolCallId || typeof toolCallIndex === 'number') && typeof delta === 'string') {
-      const event: RouterStreamEvent = {
+  if (parsed.type === 'response.output_item.added') {
+    return parseFunctionCallAdded(parsed);
+  }
+
+  if (parsed.type === 'response.output_item.done') {
+    return parseFunctionCallCompleted(parsed);
+  }
+
+  if (parsed.type === 'response.function_call_arguments.delta') {
+    if (!isNonNegativeInteger(parsed.output_index) || typeof parsed.delta !== 'string') {
+      return [];
+    }
+
+    return [
+      {
         type: 'tool-call-delta',
-        delta
-      };
-
-      if (typeof toolCallIndex === 'number') {
-        event.toolCallIndex = toolCallIndex;
+        toolCallIndex: parsed.output_index,
+        delta: parsed.delta
       }
-
-      if (toolCallId) {
-        event.toolCallId = toolCallId;
-      }
-
-      if (toolName) {
-        event.toolName = toolName;
-      }
-
-      events.push(event);
-    }
+    ];
   }
 
-  if (choice.finish_reason) {
-    const event: RouterStreamEvent = {
-      type: 'response-complete',
-      finishReason: choice.finish_reason
-    };
-
-    if (parsed.id) {
-      event.requestId = parsed.id;
-    }
-
-    events.push(event);
+  if (parsed.type === 'response.completed') {
+    return [
+      ...extractUsageEvents(parsed.response?.usage),
+      createResponseCompleteEvent(parsed.response)
+    ];
   }
 
-  return events;
+  if (parsed.type === 'response.incomplete') {
+    const completion = createResponseCompleteEvent(parsed.response);
+    const reason = parsed.response?.incomplete_details?.reason;
+    completion.finishReason = typeof reason === 'string' && reason.length > 0 ? reason : 'incomplete';
+
+    return [...extractUsageEvents(parsed.response?.usage), completion];
+  }
+
+  if (parsed.type === 'response.failed' || parsed.type === 'error') {
+    return [createRouterErrorEvent(parsed)];
+  }
+
+  return [];
 }
 
-// 9router forwards reasoning under `reasoning_content`; some upstreams use `reasoning` instead.
-type RouterSseDelta = NonNullable<RouterSsePayload['choices']>[number]['delta'];
-
-function extractThinkingText(delta: RouterSseDelta): string | undefined {
-  for (const candidate of [delta?.reasoning_content, delta?.reasoning]) {
-    if (typeof candidate === 'string' && candidate.length > 0) {
-      return candidate;
-    }
+function parseFunctionCallAdded(parsed: RouterResponsesSsePayload): RouterStreamEvent[] {
+  const item = parsed.item;
+  if (item?.type !== 'function_call') {
+    return [];
   }
 
-  return undefined;
+  const callId = typeof item.call_id === 'string' ? item.call_id : undefined;
+  const name = typeof item.name === 'string' ? item.name : undefined;
+  if (!callId || !name) {
+    return [];
+  }
+
+  const event: Extract<RouterStreamEvent, { type: 'tool-call-delta' }> = {
+    type: 'tool-call-delta',
+    toolCallId: callId,
+    toolName: name,
+    delta: typeof item.arguments === 'string' ? item.arguments : ''
+  };
+
+  if (isNonNegativeInteger(parsed.output_index)) {
+    event.toolCallIndex = parsed.output_index;
+  }
+
+  return [event];
+}
+
+function parseFunctionCallCompleted(parsed: RouterResponsesSsePayload): RouterStreamEvent[] {
+  const item = parsed.item;
+  if (
+    item?.type !== 'function_call' ||
+    typeof item.call_id !== 'string' ||
+    typeof item.name !== 'string' ||
+    typeof item.arguments !== 'string'
+  ) {
+    return [];
+  }
+
+  const event: Extract<RouterStreamEvent, { type: 'tool-call-complete' }> = {
+    type: 'tool-call-complete',
+    toolCallId: item.call_id,
+    toolName: item.name,
+    arguments: item.arguments
+  };
+
+  if (isNonNegativeInteger(parsed.output_index)) {
+    event.toolCallIndex = parsed.output_index;
+  }
+
+  return [event];
+}
+
+function extractUsageEvents(usage: RouterResponseUsage | null | undefined): RouterStreamEvent[] {
+  if (
+    !isNonNegativeInteger(usage?.input_tokens) ||
+    !isNonNegativeInteger(usage.output_tokens) ||
+    !isNonNegativeInteger(usage.total_tokens)
+  ) {
+    return [];
+  }
+
+  return [
+    {
+      type: 'usage',
+      promptTokens: usage.input_tokens,
+      completionTokens: usage.output_tokens,
+      totalTokens: usage.total_tokens
+    }
+  ];
+}
+
+function createResponseCompleteEvent(
+  response: RouterResponseEnvelope | undefined
+): Extract<RouterStreamEvent, { type: 'response-complete' }> {
+  const event: Extract<RouterStreamEvent, { type: 'response-complete' }> = {
+    type: 'response-complete'
+  };
+  if (typeof response?.id === 'string' && response.id.length > 0) {
+    event.requestId = response.id;
+  }
+
+  return event;
+}
+
+function createRouterErrorEvent(
+  payload: RouterResponsesSsePayload
+): Extract<RouterStreamEvent, { type: 'router-error' }> {
+  const responseMessage = payload.response?.error?.message;
+  const topLevelMessage = payload.error?.message ?? payload.message;
+  const event: Extract<RouterStreamEvent, { type: 'router-error' }> = {
+    type: 'router-error',
+    error:
+      typeof responseMessage === 'string' && responseMessage.length > 0
+        ? responseMessage
+        : typeof topLevelMessage === 'string' && topLevelMessage.length > 0
+          ? topLevelMessage
+          : '9router response failed'
+  };
+
+  const requestId = payload.response?.id ?? payload.response_id;
+  if (typeof requestId === 'string' && requestId.length > 0) {
+    event.requestId = requestId;
+  }
+
+  return event;
 }
 
 function isNonNegativeInteger(value: unknown): value is number {
   return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 function findFrameBoundary(buffer: string): { index: number; length: number } | undefined {

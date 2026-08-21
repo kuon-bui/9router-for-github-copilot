@@ -92,6 +92,28 @@ export function createRouterEventEmitter(
         return;
       }
 
+      if (event.type === 'tool-call-complete') {
+        const key = getToolAccumulatorKey(event);
+        const previous = toolCalls.get(key);
+        const argumentBytes = new TextEncoder().encode(event.arguments).byteLength;
+        const nextTotalBytes = totalToolCallBytes - (previous?.bytes ?? 0) + argumentBytes;
+        if (
+          argumentBytes > MAX_TOOL_CALL_ARGUMENT_BYTES ||
+          nextTotalBytes > MAX_TOTAL_TOOL_CALL_ARGUMENT_BYTES
+        ) {
+          throw createMalformedToolCallError('9router streamed oversized tool call arguments');
+        }
+
+        totalToolCallBytes = nextTotalBytes;
+        toolCalls.set(key, {
+          id: event.toolCallId,
+          name: event.toolName,
+          buffer: event.arguments,
+          bytes: argumentBytes
+        });
+        return;
+      }
+
       if (event.type === 'response-complete') {
         for (const toolCall of toolCalls.values()) {
           emitToolCall(progress, toolCall);
@@ -135,7 +157,9 @@ function isPlainObject(value: unknown): value is object {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function getToolAccumulatorKey(event: Extract<RouterStreamEvent, { type: 'tool-call-delta' }>): string {
+function getToolAccumulatorKey(
+  event: Extract<RouterStreamEvent, { type: 'tool-call-delta' | 'tool-call-complete' }>
+): string {
   if (typeof event.toolCallIndex === 'number') {
     return `index:${event.toolCallIndex}`;
   }

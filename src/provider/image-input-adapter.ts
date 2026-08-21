@@ -1,5 +1,5 @@
 import { Buffer } from 'node:buffer';
-import type { RouterContentPart } from '@/types/router-contract';
+import type { RouterResponseInputImage } from '@/types/router-contract';
 
 export interface HostImageDataPart {
   mimeType: string;
@@ -18,12 +18,10 @@ export function isHostImageDataPart(part: unknown): part is HostImageDataPart {
   );
 }
 
-export function createRouterImagePart(part: HostImageDataPart): RouterContentPart {
+export function createRouterImagePart(part: HostImageDataPart): RouterResponseInputImage {
   return {
-    type: 'image_url',
-    image_url: {
-      url: `data:${part.mimeType};base64,${Buffer.from(part.data).toString('base64')}`
-    }
+    type: 'input_image',
+    image_url: `data:${part.mimeType};base64,${Buffer.from(part.data).toString('base64')}`
   };
 }
 

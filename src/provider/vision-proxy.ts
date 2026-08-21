@@ -10,8 +10,8 @@ import { CopilotVisionAnalyzer } from './copilot-vision-analyzer';
 import type { RouterClient } from '@/router/client';
 import type { ConfiguredModel } from '@/types/product-model';
 import type {
-  RouterChatCompletionRequest,
-  RouterContentPart
+  RouterResponseInputContent,
+  RouterResponseRequest
 } from '@/types/router-contract';
 
 export interface HostChatRequestMessage {
@@ -60,13 +60,13 @@ export function buildVisionProxyRequest(
   modelId: string,
   prompt: string,
   maxTokens?: number
-): RouterChatCompletionRequest {
-  const userContent: RouterContentPart[] = [];
+): RouterResponseRequest {
+  const userContent: RouterResponseInputContent[] = [];
   const parts = typeof message.content === 'string' ? [message.content] : message.content;
 
   for (const part of parts) {
     if (typeof part === 'string') {
-      userContent.push({ type: 'text', text: part });
+      userContent.push({ type: 'input_text', text: part });
     } else if (isHostImageDataPart(part)) {
       userContent.push(createRouterImagePart(part));
     } else if (
@@ -75,21 +75,22 @@ export function buildVisionProxyRequest(
       'value' in part &&
       typeof part.value === 'string'
     ) {
-      userContent.push({ type: 'text', text: part.value });
+      userContent.push({ type: 'input_text', text: part.value });
     }
   }
 
-  const request: RouterChatCompletionRequest = {
+  const request: RouterResponseRequest = {
     model: modelId,
     stream: true,
-    messages: [
+    store: false,
+    input: [
       { role: 'system', content: prompt },
       { role: 'user', content: userContent }
     ]
   };
 
   if (typeof maxTokens === 'number') {
-    request.max_tokens = maxTokens;
+    request.max_output_tokens = maxTokens;
   }
 
   return request;
@@ -304,7 +305,7 @@ export class VisionProxyService {
     let responseCompleted = false;
 
     try {
-      const stream = this.routerClient.streamChatCompletion({
+      const stream = this.routerClient.streamResponse({
         baseUrl: input.baseUrl,
         apiKey: input.apiKey,
         request: buildVisionProxyRequest(message, modelId, prompt, input.maxTokens),

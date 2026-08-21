@@ -32,19 +32,18 @@ export function adaptToolsToRouterDefinitions(
       left.name < right.name ? -1 : left.name > right.name ? 1 : 0
     )
     .map((tool) => {
-    const definition: RouterToolDefinition = {
-      type: 'function',
-      function: {
+      const definition: RouterToolDefinition = {
+        type: 'function',
         name: tool.name,
-        parameters: normalizeToolSchema(tool.inputSchema)
+        parameters: normalizeToolSchema(tool.inputSchema),
+        strict: false
+      };
+
+      if (tool.description) {
+        definition.description = tool.description;
       }
-    };
 
-    if (tool.description) {
-      definition.function.description = tool.description;
-    }
-
-    return definition;
+      return definition;
     });
 }
 
