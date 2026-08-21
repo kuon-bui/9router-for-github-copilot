@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { parseRouterEventStream, parseSseChunk } from '@/router/sse-parser';
 
-async function collectEvents(stream: ReadableStream<Uint8Array>): Promise<unknown[]> {
+async function collectEvents(
+  stream: ReadableStream<Uint8Array>,
+  options?: { closeGraceMs?: number }
+): Promise<unknown[]> {
   const events: unknown[] = [];
-  for await (const event of parseRouterEventStream(stream)) {
+  for await (const event of parseRouterEventStream(stream, options)) {
     events.push(event);
   }
   return events;
@@ -298,7 +301,76 @@ describe('parseSseChunk', () => {
       }
     });
 
-    await expect(collectEvents(stream)).resolves.toEqual([{ type: 'response-complete' }]);
+    await expect(collectEvents(stream, { closeGraceMs: 5 })).resolves.toEqual([
+      { type: 'response-complete' }
+    ]);
+    expect(cancelled).toBe(true);
+  });
+
+  it('lets the server close the stream after completion instead of aborting it', async () => {
+    let cancelled = false;
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(
+          new TextEncoder().encode('data: {"type":"response.completed","response":{}}\n\n')
+        );
+        setTimeout(() => {
+          try {
+            controller.close();
+          } catch {
+            // stream was already cancelled by the parser
+          }
+        }, 5);
+      },
+      cancel() {
+        cancelled = true;
+      }
+    });
+
+    await expect(collectEvents(stream, { closeGraceMs: 500 })).resolves.toEqual([
+      { type: 'response-complete' }
+    ]);
+    expect(cancelled).toBe(false);
+  });
+
+  it('discards trailing frames sent between completion and stream close', async () => {
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(
+          new TextEncoder().encode('data: {"type":"response.completed","response":{}}\n\n')
+        );
+        setTimeout(() => {
+          try {
+            controller.enqueue(new TextEncoder().encode('data: [DONE]\n\n'));
+            controller.close();
+          } catch {
+            // stream was already cancelled by the parser
+          }
+        }, 5);
+      }
+    });
+
+    await expect(collectEvents(stream, { closeGraceMs: 500 })).resolves.toEqual([
+      { type: 'response-complete' }
+    ]);
+  });
+
+  it('does not wait for a close when the grace window is disabled', async () => {
+    let cancelled = false;
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(
+          new TextEncoder().encode('data: {"type":"response.completed","response":{}}\n\n')
+        );
+      },
+      cancel() {
+        cancelled = true;
+      }
+    });
+
+    await expect(collectEvents(stream, { closeGraceMs: 0 })).resolves.toEqual([
+      { type: 'response-complete' }
+    ]);
     expect(cancelled).toBe(true);
   });
 });

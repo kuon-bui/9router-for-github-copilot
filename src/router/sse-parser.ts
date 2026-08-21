@@ -4,6 +4,15 @@ import type { RouterStreamEvent } from '@/types/router-contract';
 // ponytail: 1 MiB SSE frame ceiling; raise if 9router formalizes larger tool-call delta frames.
 const MAX_SSE_FRAME_BYTES = 1024 * 1024;
 
+// ponytail: 150 ms lets a well-behaved 9router close the SSE body after completion so the HTTP
+// request ends cleanly instead of being aborted; lower it if end-of-turn latency ever matters more
+// than a clean connection teardown, or set it to 0 to always cancel immediately.
+const STREAM_CLOSE_GRACE_MS = 150;
+
+export interface RouterEventStreamOptions {
+  closeGraceMs?: number;
+}
+
 interface RouterResponseUsage {
   input_tokens?: unknown;
   output_tokens?: unknown;
@@ -280,10 +289,12 @@ function findFrameBoundary(buffer: string): { index: number; length: number } | 
 }
 
 export async function* parseRouterEventStream(
-  stream: ReadableStream<Uint8Array>
+  stream: ReadableStream<Uint8Array>,
+  options?: RouterEventStreamOptions
 ): AsyncIterable<RouterStreamEvent> {
   const reader = stream.getReader();
   const decoder = new TextDecoder();
+  const closeGraceMs = options?.closeGraceMs ?? STREAM_CLOSE_GRACE_MS;
   let buffer = '';
   let completed = false;
 
@@ -304,6 +315,7 @@ export async function* parseRouterEventStream(
         for (const event of parseSseChunk(frame)) {
           yield event;
           if (event.type === 'response-complete') {
+            completed = await awaitStreamClose(reader, closeGraceMs);
             return;
           }
         }
@@ -332,6 +344,47 @@ export async function* parseRouterEventStream(
       await reader.cancel().catch(() => undefined);
     }
     reader.releaseLock();
+  }
+}
+
+type StreamCloseOutcome = 'closed' | 'chunk' | 'failed' | 'expired';
+
+// Drains and discards whatever 9router still has queued after the terminal event, so the response
+// body reaches its own end and the HTTP request is not aborted client-side. Routers that hold the
+// SSE body open past completion hit the grace window and fall back to cancelling the reader.
+async function awaitStreamClose(
+  reader: ReadableStreamDefaultReader<Uint8Array>,
+  graceMs: number
+): Promise<boolean> {
+  if (graceMs <= 0) {
+    return false;
+  }
+
+  let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
+  const expired = new Promise<StreamCloseOutcome>((resolve) => {
+    timeoutHandle = setTimeout(() => resolve('expired'), graceMs);
+  });
+
+  try {
+    while (true) {
+      const outcome = await Promise.race([
+        reader.read().then(
+          (result): StreamCloseOutcome => (result.done ? 'closed' : 'chunk'),
+          (): StreamCloseOutcome => 'failed'
+        ),
+        expired
+      ]);
+
+      if (outcome === 'chunk') {
+        continue;
+      }
+
+      return outcome === 'closed';
+    }
+  } finally {
+    if (timeoutHandle !== undefined) {
+      clearTimeout(timeoutHandle);
+    }
   }
 }
 
