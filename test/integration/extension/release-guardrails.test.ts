@@ -163,8 +163,9 @@ describe('release guardrails', () => {
     expect(readme).toContain('thinkingEfforts');
     expect(readme).toContain('maxInputTokens');
     expect(readme).toContain('maxOutputTokens');
-    expect(readme).toContain('reasoning_effort');
-    expect(readme).toContain('stream_options.include_usage');
+    expect(readme).toContain('/v1/responses');
+    expect(readme).toContain('reasoning.effort');
+    expect(readme).toContain('response.completed');
     for (const document of [readme, productionDesign]) {
       expect(document).toContain('capabilities.contextWindow');
       expect(document).toContain('capabilities.maxOutput');
@@ -195,7 +196,7 @@ describe('release guardrails', () => {
     for (const document of [readme, productionDesign]) {
       expect(document).toContain('default is `0`');
       expect(document).toContain('positive safe integer');
-      expect(document).toContain('omits `max_tokens`');
+      expect(document).toContain('omits `max_output_tokens`');
       expect(document).toContain('upstream');
     }
   });
@@ -232,6 +233,7 @@ describe('release guardrails', () => {
     expect(vscodeIgnore).toContain('src/**');
     expect(vscodeIgnore).toContain('test/**');
     expect(vscodeIgnore).toContain('docs/**');
+    expect(vscodeIgnore).toContain('.pnpm-store/**');
     expect(vscodeIgnore).toContain('AGENTS.md');
     expect(vscodeIgnore).toContain('CODE_CONVENTION.md');
     expect(vscodeIgnore).toContain('pnpm-lock.yaml');

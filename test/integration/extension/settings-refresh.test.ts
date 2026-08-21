@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { buildSettingsSnapshot } from '@/config/settings';
 import { NineRouterChatProvider } from '@/provider/provider';
 import { NineRouterError } from '@/router/errors';
-import type { RouterChatCompletionRequest } from '@/types/router-contract';
+import type { RouterResponseRequest } from '@/types/router-contract';
 import { handleConfigurationChange } from '@/runtime/activate';
 import type { PublishedModel } from '@/types/product-model';
 import { __createCancellationToken } from '@test/support/vscode';
@@ -33,14 +33,14 @@ describe('handleConfigurationChange', () => {
 
 describe('NineRouterChatProvider snapshot refresh', () => {
   const context = { secrets: { get: async () => 'token' } } as never;
-  const streamChatCompletion = async function* () {
+  const streamResponse = async function* () {
     yield { type: 'response-complete' };
   };
   const routerClient = {
     async listModels() {
       return [];
     },
-    streamChatCompletion
+    streamResponse
   } as never;
 
   it('adds, removes, renames, and reorders arbitrary picker models after refresh', async () => {
@@ -179,7 +179,7 @@ describe('NineRouterChatProvider snapshot refresh', () => {
       ]);
     const provider = new NineRouterChatProvider(
       context,
-      { listModels, streamChatCompletion } as never,
+      { listModels, streamResponse } as never,
       createSnapshot([
         {
           id: 'coder',
@@ -226,7 +226,7 @@ describe('NineRouterChatProvider snapshot refresh', () => {
         listModels: vi.fn().mockRejectedValue(
           new NineRouterError('TRANSPORT_ERROR', 'catalog unavailable')
         ),
-        streamChatCompletion
+        streamResponse
       } as never,
       createSnapshot([
         {
@@ -265,7 +265,7 @@ describe('NineRouterChatProvider snapshot refresh', () => {
       .mockRejectedValueOnce(new NineRouterError('TRANSPORT_ERROR', 'catalog unavailable'));
     const provider = new NineRouterChatProvider(
       context,
-      { listModels, streamChatCompletion } as never,
+      { listModels, streamResponse } as never,
       createSnapshot([model], { baseUrl: 'https://old-router.example.com/v1' })
     );
     const token = __createCancellationToken().value as never;
@@ -291,7 +291,7 @@ describe('NineRouterChatProvider snapshot refresh', () => {
     const listModels = vi.fn().mockReturnValue(catalog);
     const provider = new NineRouterChatProvider(
       context,
-      { listModels, streamChatCompletion } as never,
+      { listModels, streamResponse } as never,
       createSnapshot([
         {
           id: 'coder',
@@ -331,7 +331,7 @@ describe('NineRouterChatProvider snapshot refresh', () => {
     );
     const provider = new NineRouterChatProvider(
       context,
-      { listModels, streamChatCompletion } as never,
+      { listModels, streamResponse } as never,
       createSnapshot([{ id: 'coder', name: 'Coder', modelId: 'router/coder' }])
     );
     const firstToken = __createCancellationToken();
@@ -360,7 +360,7 @@ describe('NineRouterChatProvider snapshot refresh', () => {
     const listModels = vi.fn();
     const provider = new NineRouterChatProvider(
       { secrets: { get: async () => undefined } } as never,
-      { listModels, streamChatCompletion } as never,
+      { listModels, streamResponse } as never,
       createSnapshot([
         { id: 'coder', name: 'Coder', modelId: 'router/coder' }
       ])
@@ -400,7 +400,7 @@ describe('NineRouterChatProvider snapshot refresh', () => {
     };
     const provider = new NineRouterChatProvider(
       context,
-      { listModels, streamChatCompletion } as never,
+      { listModels, streamResponse } as never,
       createSnapshot([model], { baseUrl: 'https://old-router.example.com/v1' })
     );
     const token = __createCancellationToken().value as never;
@@ -474,7 +474,7 @@ describe('NineRouterChatProvider snapshot refresh', () => {
       { baseUrl: 'not-a-url', maxTokens: 256 }
     );
     let submitted:
-      | { baseUrl: string; timeoutMs: number; request: RouterChatCompletionRequest }
+      | { baseUrl: string; timeoutMs: number; request: RouterResponseRequest }
       | undefined;
     const provider = new NineRouterChatProvider(
       {
@@ -483,10 +483,10 @@ describe('NineRouterChatProvider snapshot refresh', () => {
         }
       } as never,
       {
-        async *streamChatCompletion(input: {
+        async *streamResponse(input: {
           baseUrl: string;
           timeoutMs: number;
-          request: RouterChatCompletionRequest;
+          request: RouterResponseRequest;
         }) {
           submitted = input;
           yield { type: 'response-complete' };
@@ -520,7 +520,7 @@ describe('NineRouterChatProvider snapshot refresh', () => {
       baseUrl: 'https://old-router.example.com/v1',
       request: {
         model: 'router/old',
-        max_tokens: 128
+        max_output_tokens: 128
       }
     });
   });
