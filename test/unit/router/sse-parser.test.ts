@@ -409,5 +409,12 @@ describe('parseRouterEventStream incremental delivery', () => {
       'got:text-delta',
       'got:response-complete'
     ]);
+
+    // Delivery must be incremental: at least one frame is still unsent when the first event is
+    // yielded, so a parser that drains the whole body before yielding fails here.
+    const firstDelivery = trace.findIndex((entry) => entry.startsWith('got:'));
+    const lastEnqueue = trace.lastIndexOf(`sent#${frames.length}`);
+    expect(firstDelivery).toBeGreaterThanOrEqual(0);
+    expect(lastEnqueue).toBeGreaterThan(firstDelivery);
   });
 });
