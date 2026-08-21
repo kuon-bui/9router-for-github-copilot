@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.0](https://github.com/kuon-bui/9router-for-github-copilot/compare/v0.7.0...v0.8.0) (2026-08-21)
+
+
+### Features
+
+* change reasoning api ([#25](https://github.com/kuon-bui/9router-for-github-copilot/issues/25)) ([6badb74](https://github.com/kuon-bui/9router-for-github-copilot/commit/6badb74066bd74a741216ec2b1855c2d9bb8d934))
+
 ## [0.7.0](https://github.com/kuon-bui/9router-for-github-copilot/compare/v0.6.0...v0.7.0) (2026-08-18)
 
 
