@@ -46,15 +46,16 @@ describe('adaptToolsToRouterDefinitions', () => {
     ).toEqual([
       {
         type: 'function',
-        name: 'lookupUser',
-        description: 'Look up a user',
-        parameters: {
-          type: 'object',
-          properties: {
-            id: { type: 'string' }
+        function: {
+          name: 'lookupUser',
+          description: 'Look up a user',
+          parameters: {
+            type: 'object',
+            properties: {
+              id: { type: 'string' }
+            }
           }
-        },
-        strict: false
+        }
       }
     ]);
   });
@@ -70,13 +71,14 @@ describe('adaptToolsToRouterDefinitions', () => {
     ).toEqual([
       {
         type: 'function',
-        name: 'listFiles',
-        description: 'List files',
-        parameters: {
-          type: 'object',
-          properties: {}
-        },
-        strict: false
+        function: {
+          name: 'listFiles',
+          description: 'List files',
+          parameters: {
+            type: 'object',
+            properties: {}
+          }
+        }
       }
     ]);
   });
@@ -111,11 +113,11 @@ describe('adaptToolsToRouterDefinitions', () => {
       }
     ]);
 
-    expect(definitions.map((definition) => definition.name)).toEqual([
+    expect(definitions.map((definition) => definition.function.name)).toEqual([
       'alphaTool',
       'zetaTool'
     ]);
-    expect(JSON.stringify(definitions[1]?.parameters)).toBe(
+    expect(JSON.stringify(definitions[1]?.function.parameters)).toBe(
       '{"properties":{"alpha":{"properties":{"first":{"type":"number"},"second":{"type":"number"}},"type":"object"},"zeta":{"type":"string"}},"required":["zeta","alpha"],"type":"object"}'
     );
   });

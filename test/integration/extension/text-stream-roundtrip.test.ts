@@ -3,7 +3,7 @@ import * as vscode from 'vscode';
 import { NineRouterChatProvider } from '@/provider/provider';
 import { NineRouterError } from '@/router/errors';
 import { createVisionProxyConfigurator } from '@/runtime/vision-configuration';
-import type { RouterResponseRequest } from '@/types/router-contract';
+import type { RouterChatCompletionRequest } from '@/types/router-contract';
 import {
   __createCancellationToken,
   __getOutputLines,
@@ -34,7 +34,7 @@ describe('NineRouterChatProvider', () => {
         }
       } as never,
       {
-        async *streamResponse() {
+        async *streamChatCompletion() {
           yield { type: 'text-delta', text: 'Hello' };
           yield { type: 'text-delta', text: ' world' };
           yield { type: 'response-complete' };
@@ -78,7 +78,7 @@ describe('NineRouterChatProvider', () => {
         }
       } as never,
       {
-        async *streamResponse() {
+        async *streamChatCompletion() {
           yield { type: 'thinking-delta', text: 'weighing options' };
           yield { type: 'text-delta', text: 'Hello' };
           yield { type: 'response-complete' };
@@ -134,7 +134,7 @@ describe('NineRouterChatProvider', () => {
         }
       } as never,
       {
-        async *streamResponse() {
+        async *streamChatCompletion() {
           yield { type: 'thinking-delta', text: 'secret-chain-of-thought' };
           yield { type: 'thinking-delta', text: 'more private reasoning' };
           yield { type: 'response-complete' };
@@ -177,7 +177,7 @@ describe('NineRouterChatProvider', () => {
         }
       } as never,
       {
-        async *streamResponse() {
+        async *streamChatCompletion() {
           yield { type: 'router-error', error: 'upstream failed', requestId: 'req-up' };
         }
       } as never
@@ -203,7 +203,7 @@ describe('NineRouterChatProvider', () => {
     ).rejects.toMatchObject({
       code: 'UPSTREAM_UNAVAILABLE',
       requestId: 'req-up',
-      details: { phase: 'responses-api' }
+      details: { phase: 'chat-completion' }
     });
   });
 
@@ -216,7 +216,7 @@ describe('NineRouterChatProvider', () => {
         }
       } as never,
       {
-        async *streamResponse() {
+        async *streamChatCompletion() {
           yield { type: 'text-delta', text: 'partial' };
         }
       } as never
@@ -247,7 +247,7 @@ describe('NineRouterChatProvider', () => {
       )
     ).rejects.toMatchObject({
       code: 'MALFORMED_STREAM_ERROR',
-      details: { phase: 'responses-api' }
+      details: { phase: 'chat-completion' }
     });
     expect(progressCalls).toEqual(['partial']);
   });
@@ -260,7 +260,7 @@ describe('NineRouterChatProvider', () => {
         }
       } as never,
       {
-        async *streamResponse() {
+        async *streamChatCompletion() {
           yield {
             type: 'tool-call-delta',
             toolCallIndex: 0,
@@ -314,7 +314,7 @@ describe('NineRouterChatProvider', () => {
     });
 
     let submittedRequest:
-      | { model: string; reasoning?: { effort?: string; summary?: string } }
+      | { model: string; reasoning_effort?: string }
       | undefined;
     const provider = new NineRouterChatProvider(
       {
@@ -323,8 +323,8 @@ describe('NineRouterChatProvider', () => {
         }
       } as never,
       {
-        async *streamResponse(input: {
-          request: { model: string; reasoning?: { effort?: string; summary?: string } };
+        async *streamChatCompletion(input: {
+          request: { model: string; reasoning_effort?: string };
         }) {
           submittedRequest = input.request;
           yield { type: 'response-complete' };
@@ -355,10 +355,7 @@ describe('NineRouterChatProvider', () => {
 
     expect(submittedRequest).toMatchObject({
       model: 'combo/daily',
-      reasoning: {
-        effort: 'max',
-        summary: 'auto'
-      }
+      reasoning_effort: 'max'
     });
   });
 
@@ -387,7 +384,7 @@ describe('NineRouterChatProvider', () => {
         }
       } as never,
       {
-        async *streamResponse(input: { request: { model: string } }) {
+        async *streamChatCompletion(input: { request: { model: string } }) {
           submittedModel = input.request.model;
           yield { type: 'response-complete' };
         }
@@ -435,11 +432,11 @@ describe('NineRouterChatProvider', () => {
       debugMode: 'minimal'
     });
 
-    let submittedRequest: RouterResponseRequest | undefined;
+    let submittedRequest: RouterChatCompletionRequest | undefined;
     const provider = new NineRouterChatProvider(
       { secrets: { get: async () => 'token' } } as never,
       {
-        async *streamResponse(input: { request: RouterResponseRequest }) {
+        async *streamChatCompletion(input: { request: RouterChatCompletionRequest }) {
           submittedRequest = input.request;
           yield { type: 'response-complete' };
         }
@@ -465,10 +462,7 @@ describe('NineRouterChatProvider', () => {
 
     expect(submittedRequest).toMatchObject({
       model: 'combo/daily',
-      reasoning: {
-        effort: 'low',
-        summary: 'auto'
-      }
+      reasoning_effort: 'low'
     });
   });
 
@@ -496,7 +490,7 @@ describe('NineRouterChatProvider', () => {
         }
       } as never,
       {
-        async *streamResponse() {
+        async *streamChatCompletion() {
           yield { type: 'response-complete' };
         }
       } as never
@@ -543,7 +537,7 @@ describe('NineRouterChatProvider', () => {
         }
       } as never,
       {
-        async *streamResponse() {
+        async *streamChatCompletion() {
           streamCalled = true;
           yield { type: 'response-complete' };
         }
@@ -603,15 +597,15 @@ describe('NineRouterChatProvider', () => {
     });
 
     const calls: Array<{
-      request: RouterResponseRequest;
+      request: RouterChatCompletionRequest;
       signal: AbortSignal;
     }> = [];
     const visible: string[] = [];
     const provider = new NineRouterChatProvider(
       { secrets: { get: async () => 'token' } } as never,
       {
-        async *streamResponse(input: {
-          request: RouterResponseRequest;
+        async *streamChatCompletion(input: {
+          request: RouterChatCompletionRequest;
           signal: AbortSignal;
         }) {
           calls.push(input);
@@ -668,34 +662,32 @@ describe('NineRouterChatProvider', () => {
     );
 
     expect(calls).toHaveLength(2);
-    expect(calls[0]?.request.max_output_tokens).toBe(128);
-    expect(calls[1]?.request.max_output_tokens).toBe(128);
+    expect(calls[0]?.request.max_tokens).toBe(128);
+    expect(calls[1]?.request.max_tokens).toBe(128);
     expect(calls[0]?.request.model).toBe('combo/vision');
-    expect(calls[0]?.request).not.toHaveProperty('reasoning');
+    expect(calls[0]?.request).not.toHaveProperty('reasoning_effort');
     expect(calls[0]?.request).not.toHaveProperty('tools');
     expect(calls[0]?.request).not.toHaveProperty('tool_choice');
     expect(calls[1]?.request).toMatchObject({
       model: 'combo/agent',
-      reasoning: {
-        effort: 'max',
-        summary: 'auto'
-      },
+      reasoning_effort: 'max',
       tools: [{
         type: 'function',
-        name: 'inspectDiagram',
-        description: 'Inspect a diagram element',
-        parameters: {
-          type: 'object',
-          properties: { element: { type: 'string' } },
-          required: ['element']
-        },
-        strict: false
+        function: {
+          name: 'inspectDiagram',
+          description: 'Inspect a diagram element',
+          parameters: {
+            type: 'object',
+            properties: { element: { type: 'string' } },
+            required: ['element']
+          }
+        }
       }],
       tool_choice: 'required'
     });
     expect(calls[0]?.signal).toBe(calls[1]?.signal);
-    expect(JSON.stringify(calls[1]?.request.input)).toContain('[Vision proxy summary]');
-    expect(JSON.stringify(calls[1]?.request.input)).not.toContain('data:image/png');
+    expect(JSON.stringify(calls[1]?.request.messages)).toContain('[Vision proxy summary]');
+    expect(JSON.stringify(calls[1]?.request.messages)).not.toContain('data:image/png');
     expect(visible).toEqual(['Primary answer']);
   });
 
@@ -725,12 +717,12 @@ describe('NineRouterChatProvider', () => {
     const provider = new NineRouterChatProvider(
       { secrets: { get: async () => 'token' } } as never,
       {
-        async *streamResponse(input: { request: RouterResponseRequest }) {
+        async *streamChatCompletion(input: { request: RouterChatCompletionRequest }) {
           modelsCalled.push(input.request.model);
           if (input.request.model === 'router/vision') {
             yield { type: 'text-delta', text: 'configured summary' };
           } else {
-            primaryPayload = JSON.stringify(input.request.input);
+            primaryPayload = JSON.stringify(input.request.messages);
             yield { type: 'text-delta', text: 'primary answer' };
           }
           yield { type: 'response-complete' };
@@ -790,7 +782,7 @@ describe('NineRouterChatProvider', () => {
     const provider = new NineRouterChatProvider(
       { secrets: { get: async () => 'token' } } as never,
       {
-        async *streamResponse() {
+        async *streamChatCompletion() {
           calls += 1;
           yield { type: 'response-complete' };
         }
@@ -852,7 +844,7 @@ describe('NineRouterChatProvider', () => {
     const provider = new NineRouterChatProvider(
       { secrets: { get: async () => 'token' } } as never,
       {
-        async *streamResponse() {
+        async *streamChatCompletion() {
           calls += 1;
           yield { type: 'response-complete' };
         }
@@ -944,7 +936,7 @@ describe('NineRouterChatProvider', () => {
       const provider = new NineRouterChatProvider(
         { secrets: { get: async () => 'token' } } as never,
         {
-          async *streamResponse() {
+          async *streamChatCompletion() {
             calls += 1;
             yield { type: 'response-complete' };
           }
@@ -1040,12 +1032,12 @@ describe('NineRouterChatProvider', () => {
     const provider = new NineRouterChatProvider(
       { secrets: { get: async () => 'token' } } as never,
       {
-        async *streamResponse(input: { request: RouterResponseRequest }) {
+        async *streamChatCompletion(input: { request: RouterChatCompletionRequest }) {
           modelsCalled.push(input.request.model);
           if (input.request.model !== 'combo/agent') {
             throw new Error(`unexpected model: ${input.request.model}`);
           }
-          primaryPayload = JSON.stringify(input.request.input);
+          primaryPayload = JSON.stringify(input.request.messages);
           yield { type: 'text-delta', text: 'primary answer' };
           yield { type: 'response-complete' };
         }
@@ -1083,7 +1075,7 @@ describe('NineRouterChatProvider', () => {
     expect(primaryPayload).not.toContain('data:image/png');
   });
 
-  it('omits max_output_tokens from Vision and primary requests when maxTokens is zero', async () => {
+  it('omits max_tokens from Vision and primary requests when maxTokens is zero', async () => {
     __setConfigurationValues({
       models: [
         {
@@ -1100,11 +1092,11 @@ describe('NineRouterChatProvider', () => {
       debugMode: 'minimal'
     });
 
-    const requests: RouterResponseRequest[] = [];
+    const requests: RouterChatCompletionRequest[] = [];
     const provider = new NineRouterChatProvider(
       { secrets: { get: async () => 'token' } } as never,
       {
-        async *streamResponse(input: { request: RouterResponseRequest }) {
+        async *streamChatCompletion(input: { request: RouterChatCompletionRequest }) {
           requests.push(input.request);
           if (input.request.model === 'router/vision') {
             yield { type: 'text-delta', text: 'safe image summary' };
@@ -1140,8 +1132,8 @@ describe('NineRouterChatProvider', () => {
       'router/vision',
       'router/agent'
     ]);
-    expect(requests[0]).not.toHaveProperty('max_output_tokens');
-    expect(requests[1]).not.toHaveProperty('max_output_tokens');
+    expect(requests[0]).not.toHaveProperty('max_tokens');
+    expect(requests[1]).not.toHaveProperty('max_tokens');
   });
 
   it('fails closed before the primary call when the Vision stream is truncated', async () => {
@@ -1164,7 +1156,7 @@ describe('NineRouterChatProvider', () => {
     const provider = new NineRouterChatProvider(
       { secrets: { get: async () => 'token' } } as never,
       {
-        async *streamResponse(input: { request: RouterResponseRequest }) {
+        async *streamChatCompletion(input: { request: RouterChatCompletionRequest }) {
           modelsCalled.push(input.request.model);
           yield { type: 'text-delta', text: 'partial-summary-secret' };
         }
@@ -1215,7 +1207,7 @@ describe('NineRouterChatProvider', () => {
     const provider = new NineRouterChatProvider(
       { secrets: { get: async () => 'token' } } as never,
       {
-        async *streamResponse() {
+        async *streamChatCompletion() {
           calls += 1;
           yield { type: 'response-complete' };
         }
@@ -1272,7 +1264,7 @@ describe('NineRouterChatProvider', () => {
     const provider = new NineRouterChatProvider(
       { secrets: { get: async () => 'token' } } as never,
       {
-        async *streamResponse(input: { request: RouterResponseRequest }) {
+        async *streamChatCompletion(input: { request: RouterChatCompletionRequest }) {
           modelsCalled.push(input.request.model);
           throw new NineRouterError('MODEL_MAPPING_ERROR', 'missing', {
             requestId: 'vision-404',
@@ -1334,7 +1326,7 @@ describe('NineRouterChatProvider', () => {
     const provider = new NineRouterChatProvider(
       { secrets: { get: async () => 'api-key-secret' } } as never,
       {
-        async *streamResponse(input: { request: RouterResponseRequest }) {
+        async *streamChatCompletion(input: { request: RouterChatCompletionRequest }) {
           if (input.request.model === 'combo/vision') {
             yield { type: 'text-delta', text: 'vision-summary-secret' };
             yield { type: 'response-complete', requestId: 'vision-safe-id' };
@@ -1392,7 +1384,7 @@ describe('NineRouterChatProvider', () => {
         }
       } as never,
       {
-        async *streamResponse() {
+        async *streamChatCompletion() {
           throw new NineRouterError('MODEL_MAPPING_ERROR', '9router model mapping was not found', {
             requestId: 'req-404',
             details: {

@@ -437,7 +437,7 @@ export class NineRouterChatProvider
       }
 
       const emitter = createRouterEventEmitter(progress);
-      const stream = this.routerClient.streamResponse({
+      const stream = this.routerClient.streamChatCompletion({
         baseUrl: snapshot.runtime.baseUrl,
         apiKey,
         request,
@@ -454,7 +454,7 @@ export class NineRouterChatProvider
             '9router upstream execution failed',
             {
               ...(event.requestId ? { requestId: event.requestId } : {}),
-              details: { phase: 'responses-api' }
+              details: { phase: 'chat-completion' }
             }
           );
         }
@@ -481,7 +481,7 @@ export class NineRouterChatProvider
         throw new NineRouterError(
           'MALFORMED_STREAM_ERROR',
           '9router response stream ended before response completion',
-          { details: { phase: 'responses-api' } }
+          { details: { phase: 'chat-completion' } }
         );
       }
     } catch (error) {

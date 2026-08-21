@@ -1,61 +1,44 @@
-export type RouterResponseMessageRole = 'system' | 'user' | 'assistant';
+export type RouterRole = 'system' | 'user' | 'assistant' | 'tool';
 
-export interface RouterResponseInputText {
-  type: 'input_text';
-  text: string;
+export type RouterContentPart = string | Record<string, unknown>;
+export type RouterMessageContent = string | RouterContentPart[];
+
+export interface RouterToolCall {
+  id: string;
+  type: 'function';
+  function: {
+    name: string;
+    arguments: string;
+  };
 }
 
-export interface RouterResponseInputImage {
-  type: 'input_image';
-  image_url: string;
+export interface RouterMessage {
+  role: RouterRole;
+  content: RouterMessageContent | null;
+  name?: string;
+  tool_call_id?: string;
+  tool_calls?: RouterToolCall[];
 }
-
-export type RouterResponseInputContent =
-  | RouterResponseInputText
-  | RouterResponseInputImage;
-
-export interface RouterResponseMessage {
-  role: RouterResponseMessageRole;
-  content: string | RouterResponseInputContent[];
-}
-
-export interface RouterResponseFunctionCall {
-  type: 'function_call';
-  call_id: string;
-  name: string;
-  arguments: string;
-}
-
-export interface RouterResponseFunctionCallOutput {
-  type: 'function_call_output';
-  call_id: string;
-  output: string;
-}
-
-export type RouterResponseInputItem =
-  | RouterResponseMessage
-  | RouterResponseFunctionCall
-  | RouterResponseFunctionCallOutput;
 
 export interface RouterToolDefinition {
   type: 'function';
-  name: string;
-  description?: string;
-  parameters: Record<string, unknown>;
-  strict: false;
+  function: {
+    name: string;
+    description?: string;
+    parameters: Record<string, unknown>;
+  };
 }
 
-export interface RouterResponseRequest {
+export interface RouterChatCompletionRequest {
   model: string;
-  input: RouterResponseInputItem[];
+  messages: RouterMessage[];
   stream: true;
-  store: false;
   service_tier?: 'fast';
-  max_output_tokens?: number;
-  reasoning?: {
-    effort: 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
-    summary: 'auto';
+  stream_options?: {
+    include_usage: true;
   };
+  max_tokens?: number;
+  reasoning_effort?: 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
   tools?: RouterToolDefinition[];
   tool_choice?: 'auto' | 'required';
 }
@@ -75,13 +58,6 @@ export type RouterStreamEvent =
       toolCallId?: string;
       toolName?: string;
       delta: string;
-    }
-  | {
-      type: 'tool-call-complete';
-      toolCallIndex?: number;
-      toolCallId: string;
-      toolName: string;
-      arguments: string;
     }
   | { type: 'response-complete'; finishReason?: string; requestId?: string }
   | { type: 'router-error'; error: string; requestId?: string };

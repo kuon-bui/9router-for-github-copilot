@@ -1,48 +1,41 @@
 import { describe, expect, it } from 'vitest';
 import { parseRouterEventStream, parseSseChunk } from '@/router/sse-parser';
 
-async function collectEvents(
-  stream: ReadableStream<Uint8Array>,
-  options?: { closeGraceMs?: number }
-): Promise<unknown[]> {
+async function collectEvents(stream: ReadableStream<Uint8Array>): Promise<unknown[]> {
   const events: unknown[] = [];
-  for await (const event of parseRouterEventStream(stream, options)) {
+  for await (const event of parseRouterEventStream(stream)) {
     events.push(event);
   }
   return events;
 }
 
 describe('parseSseChunk', () => {
-  it('extracts text deltas from Responses API events', () => {
-    const events = parseSseChunk(
-      'event: response.output_text.delta\n' +
-        'data: {"type":"response.output_text.delta","delta":"Hel"}\n\n'
-    );
+  it('extracts text deltas from OpenAI-style data lines', () => {
+    const events = parseSseChunk('data: {"choices":[{"delta":{"content":"Hel"}}]}\n\n');
 
     expect(events).toEqual([{ type: 'text-delta', text: 'Hel' }]);
   });
 
   it('extracts events from CRLF-delimited frames', () => {
     const events = parseSseChunk(
-      'event: response.output_text.delta\r\n' +
-        'data: {"type":"response.output_text.delta","delta":"Hel"}\r\n\r\n' +
-        'event: response.completed\r\n' +
-        'data: {"type":"response.completed","response":{"id":"resp-1"}}\r\n\r\n'
+      'data: {"choices":[{"delta":{"content":"Hel"}}]}\r\n\r\ndata: [DONE]\r\n\r\n'
     );
 
     expect(events).toEqual([
       { type: 'text-delta', text: 'Hel' },
-      { type: 'response-complete', requestId: 'resp-1' }
+      { type: 'response-complete' }
     ]);
   });
 
-  it('accepts a trailing done sentinel for router compatibility', () => {
-    expect(parseSseChunk('data: [DONE]\n\n')).toEqual([{ type: 'response-complete' }]);
+  it('marks the stream complete when the router sends [DONE]', () => {
+    const events = parseSseChunk('data: [DONE]\n\n');
+
+    expect(events).toEqual([{ type: 'response-complete' }]);
   });
 
-  it('extracts usage from the completed response', () => {
+  it('extracts normalized token usage from the final usage chunk', () => {
     const events = parseSseChunk(
-      'data: {"type":"response.completed","response":{"id":"resp-usage","usage":{"input_tokens":321,"output_tokens":17,"total_tokens":338}}}\n\n'
+      'data: {"choices":[],"usage":{"prompt_tokens":321,"completion_tokens":17,"total_tokens":338}}\n\n'
     );
 
     expect(events).toEqual([
@@ -51,23 +44,21 @@ describe('parseSseChunk', () => {
         promptTokens: 321,
         completionTokens: 17,
         totalTokens: 338
-      },
-      { type: 'response-complete', requestId: 'resp-usage' }
+      }
     ]);
   });
 
-  it('ignores malformed token usage without failing completion', () => {
+  it('ignores malformed token usage instead of exposing untrusted values', () => {
     const events = parseSseChunk(
-      'data: {"type":"response.completed","response":{"usage":{"input_tokens":321,"output_tokens":-1,"total_tokens":320}}}\n\n'
+      'data: {"choices":[],"usage":{"prompt_tokens":321,"completion_tokens":-1,"total_tokens":320}}\n\n'
     );
 
-    expect(events).toEqual([{ type: 'response-complete' }]);
+    expect(events).toEqual([]);
   });
 
-  it('extracts function call metadata and argument deltas by output index', () => {
+  it('extracts tool-call deltas with stable index information', () => {
     const events = parseSseChunk(
-      'data: {"type":"response.output_item.added","output_index":0,"item":{"type":"function_call","call_id":"call-1","name":"lookupUser","arguments":""}}\n\n' +
-        'data: {"type":"response.function_call_arguments.delta","output_index":0,"delta":"{\\"id\\""}\n\n'
+      'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call-1","function":{"name":"lookupUser","arguments":"{\\"id\\""}}]}}]}\n\n'
     );
 
     expect(events).toEqual([
@@ -76,108 +67,50 @@ describe('parseSseChunk', () => {
         toolCallIndex: 0,
         toolCallId: 'call-1',
         toolName: 'lookupUser',
-        delta: ''
-      },
-      {
-        type: 'tool-call-delta',
-        toolCallIndex: 0,
         delta: '{"id"'
       }
     ]);
   });
 
-  it('extracts the completed function call as the authoritative argument payload', () => {
+  it('extracts thinking deltas from reasoning-only frames', () => {
     const events = parseSseChunk(
-      'data: {"type":"response.output_item.done","output_index":0,"item":{"type":"function_call","call_id":"call-1","name":"lookupUser","arguments":"{\\"id\\":\\"42\\"}"}}\n\n'
-    );
-
-    expect(events).toEqual([
-      {
-        type: 'tool-call-complete',
-        toolCallIndex: 0,
-        toolCallId: 'call-1',
-        toolName: 'lookupUser',
-        arguments: '{"id":"42"}'
-      }
-    ]);
-  });
-
-  it('extracts thinking deltas from reasoning summary events', () => {
-    const events = parseSseChunk(
-      'data: {"type":"response.reasoning_summary_text.delta","delta":"step one"}\n\n'
+      'data: {"choices":[{"delta":{"reasoning_content":"step one"}}]}\n\n'
     );
 
     expect(events).toEqual([{ type: 'thinking-delta', text: 'step one' }]);
   });
 
-  it('accepts reasoning text deltas as a router-compatible alias', () => {
+  it('emits the thinking delta before a sibling text delta', () => {
     const events = parseSseChunk(
-      'data: {"type":"response.reasoning_text.delta","delta":"step one"}\n\n'
+      'data: {"choices":[{"delta":{"content":"Visible","reasoning_content":"step one"}}]}\n\n'
+    );
+
+    expect(events).toEqual([
+      { type: 'thinking-delta', text: 'step one' },
+      { type: 'text-delta', text: 'Visible' }
+    ]);
+  });
+
+  it('accepts reasoning as an alias for reasoning_content', () => {
+    const events = parseSseChunk('data: {"choices":[{"delta":{"reasoning":"step one"}}]}\n\n');
+
+    expect(events).toEqual([{ type: 'thinking-delta', text: 'step one' }]);
+  });
+
+  it('emits a single thinking delta when both reasoning fields carry the same text', () => {
+    const events = parseSseChunk(
+      'data: {"choices":[{"delta":{"reasoning_content":"step one","reasoning":"step one"}}]}\n\n'
     );
 
     expect(events).toEqual([{ type: 'thinking-delta', text: 'step one' }]);
   });
 
-  it('forwards refusal deltas as visible text', () => {
+  it('ignores reasoning fields that are empty or not strings', () => {
     const events = parseSseChunk(
-      'data: {"type":"response.refusal.delta","delta":"I cannot help with that."}\n\n'
+      'data: {"choices":[{"delta":{"reasoning_content":"","reasoning":42,"content":"Visible"}}]}\n\n'
     );
 
-    expect(events).toEqual([{ type: 'text-delta', text: 'I cannot help with that.' }]);
-  });
-
-  it('treats incomplete responses as terminal and preserves the reason', () => {
-    const events = parseSseChunk(
-      'data: {"type":"response.incomplete","response":{"id":"resp-limited","incomplete_details":{"reason":"max_output_tokens"},"usage":{"input_tokens":10,"output_tokens":5,"total_tokens":15}}}\n\n'
-    );
-
-    expect(events).toEqual([
-      {
-        type: 'usage',
-        promptTokens: 10,
-        completionTokens: 5,
-        totalTokens: 15
-      },
-      {
-        type: 'response-complete',
-        requestId: 'resp-limited',
-        finishReason: 'max_output_tokens'
-      }
-    ]);
-  });
-
-  it('extracts safe router errors from failed response events', () => {
-    const events = parseSseChunk(
-      'data: {"type":"response.failed","response":{"id":"resp-failed","error":{"message":"upstream unavailable"}}}\n\n'
-    );
-
-    expect(events).toEqual([
-      {
-        type: 'router-error',
-        error: 'upstream unavailable',
-        requestId: 'resp-failed'
-      }
-    ]);
-  });
-
-  it('extracts top-level Responses API error events', () => {
-    const events = parseSseChunk(
-      'data: {"type":"error","response_id":"resp-error","message":"bad request"}\n\n'
-    );
-
-    expect(events).toEqual([
-      {
-        type: 'router-error',
-        error: 'bad request',
-        requestId: 'resp-error'
-      }
-    ]);
-  });
-
-  it('ignores unknown or malformed event shapes', () => {
-    expect(parseSseChunk('data: {"type":"response.output_text.delta","delta":42}\n\n')).toEqual([]);
-    expect(parseSseChunk('data: {"type":"response.created","response":{}}\n\n')).toEqual([]);
-    expect(parseSseChunk('data: {"choices":[{"delta":{"content":"legacy"}}]}\n\n')).toEqual([]);
+    expect(events).toEqual([{ type: 'text-delta', text: 'Visible' }]);
   });
 
   it('does not include raw malformed frame content in parser errors', () => {
@@ -197,29 +130,12 @@ describe('parseSseChunk', () => {
     }
   });
 
-  it('classifies valid JSON primitives as malformed stream payloads', () => {
-    expect(() => parseSseChunk('data: null\n\n')).toThrow(
-      expect.objectContaining({
-        code: 'MALFORMED_STREAM_ERROR',
-        details: expect.objectContaining({ frameBytes: expect.any(Number) })
-      })
-    );
-  });
-
   it('extracts CRLF events split across network chunks', async () => {
     const stream = new ReadableStream<Uint8Array>({
       start(controller) {
-        controller.enqueue(
-          new TextEncoder().encode(
-            'event: response.output_text.delta\r\ndata: {"type":"response.output_text.delta","delta":"A"}\r'
-          )
-        );
+        controller.enqueue(new TextEncoder().encode('data: {"choices":[{"delta":{"content":"A"}}]}\r'));
         controller.enqueue(new TextEncoder().encode('\n\r'));
-        controller.enqueue(
-          new TextEncoder().encode(
-            '\nevent: response.completed\r\ndata: {"type":"response.completed","response":{}}\r\n\r\n'
-          )
-        );
+        controller.enqueue(new TextEncoder().encode('\ndata: [DONE]\r\n\r\n'));
         controller.close();
       }
     });
@@ -247,9 +163,7 @@ describe('parseSseChunk', () => {
   it('measures SSE limits in UTF-8 bytes', async () => {
     const stream = new ReadableStream<Uint8Array>({
       start(controller) {
-        controller.enqueue(
-          new TextEncoder().encode(`data: ${'\u20ac'.repeat(400_000)}\n\n`)
-        );
+        controller.enqueue(new TextEncoder().encode(`data: ${'€'.repeat(400_000)}\n\n`));
         controller.close();
       }
     });
@@ -267,11 +181,7 @@ describe('parseSseChunk', () => {
     let cancelled = false;
     const stream = new ReadableStream<Uint8Array>({
       pull(controller) {
-        controller.enqueue(
-          new TextEncoder().encode(
-            'data: {"type":"response.output_text.delta","delta":"A"}\n\n'
-          )
-        );
+        controller.enqueue(new TextEncoder().encode('data: [DONE]\n\n'));
       },
       cancel() {
         cancelled = true;
@@ -286,102 +196,28 @@ describe('parseSseChunk', () => {
     expect(cancelled).toBe(true);
   });
 
-  it('stops reading when response.completed arrives before the server closes', async () => {
+  it('stops reading when [DONE] arrives before the server closes the stream', async () => {
     let cancelled = false;
     const stream = new ReadableStream<Uint8Array>({
       start(controller) {
-        controller.enqueue(
-          new TextEncoder().encode(
-            'data: {"type":"response.completed","response":{}}\n\n'
-          )
-        );
+        controller.enqueue(new TextEncoder().encode('data: [DONE]\n\n'));
       },
       cancel() {
         cancelled = true;
       }
     });
 
-    await expect(collectEvents(stream, { closeGraceMs: 5 })).resolves.toEqual([
-      { type: 'response-complete' }
-    ]);
-    expect(cancelled).toBe(true);
-  });
-
-  it('lets the server close the stream after completion instead of aborting it', async () => {
-    let cancelled = false;
-    const stream = new ReadableStream<Uint8Array>({
-      start(controller) {
-        controller.enqueue(
-          new TextEncoder().encode('data: {"type":"response.completed","response":{}}\n\n')
-        );
-        setTimeout(() => {
-          try {
-            controller.close();
-          } catch {
-            // stream was already cancelled by the parser
-          }
-        }, 5);
-      },
-      cancel() {
-        cancelled = true;
-      }
-    });
-
-    await expect(collectEvents(stream, { closeGraceMs: 500 })).resolves.toEqual([
-      { type: 'response-complete' }
-    ]);
-    expect(cancelled).toBe(false);
-  });
-
-  it('discards trailing frames sent between completion and stream close', async () => {
-    const stream = new ReadableStream<Uint8Array>({
-      start(controller) {
-        controller.enqueue(
-          new TextEncoder().encode('data: {"type":"response.completed","response":{}}\n\n')
-        );
-        setTimeout(() => {
-          try {
-            controller.enqueue(new TextEncoder().encode('data: [DONE]\n\n'));
-            controller.close();
-          } catch {
-            // stream was already cancelled by the parser
-          }
-        }, 5);
-      }
-    });
-
-    await expect(collectEvents(stream, { closeGraceMs: 500 })).resolves.toEqual([
-      { type: 'response-complete' }
-    ]);
-  });
-
-  it('does not wait for a close when the grace window is disabled', async () => {
-    let cancelled = false;
-    const stream = new ReadableStream<Uint8Array>({
-      start(controller) {
-        controller.enqueue(
-          new TextEncoder().encode('data: {"type":"response.completed","response":{}}\n\n')
-        );
-      },
-      cancel() {
-        cancelled = true;
-      }
-    });
-
-    await expect(collectEvents(stream, { closeGraceMs: 0 })).resolves.toEqual([
-      { type: 'response-complete' }
-    ]);
+    await expect(collectEvents(stream)).resolves.toEqual([{ type: 'response-complete' }]);
     expect(cancelled).toBe(true);
   });
 });
 
 describe('parseRouterEventStream incremental delivery', () => {
-  it('yields each response delta without buffering the full stream', async () => {
+  it('yields each frame before the next one is enqueued', async () => {
     const frames = [
-      'data: {"type":"response.reasoning_summary_text.delta","delta":"think"}\n\n',
-      'data: {"type":"response.output_text.delta","delta":"He"}\n\n',
-      'data: {"type":"response.output_text.delta","delta":"llo"}\n\n',
-      'data: {"type":"response.completed","response":{}}\n\n'
+      'data: {"choices":[{"delta":{"reasoning_content":"think"}}]}\n\n',
+      'data: {"choices":[{"delta":{"content":"He"}}]}\n\n',
+      'data: {"choices":[{"delta":{"content":"llo"}}]}\n\n'
     ];
     const trace: string[] = [];
     let next = 0;
@@ -403,18 +239,13 @@ describe('parseRouterEventStream incremental delivery', () => {
       trace.push(`got:${event.type}`);
     }
 
-    expect(trace.filter((entry) => entry.startsWith('got:'))).toEqual([
+    expect(trace).toEqual([
+      'sent#1',
+      'sent#2',
       'got:thinking-delta',
+      'sent#3',
       'got:text-delta',
-      'got:text-delta',
-      'got:response-complete'
+      'got:text-delta'
     ]);
-
-    // Delivery must be incremental: at least one frame is still unsent when the first event is
-    // yielded, so a parser that drains the whole body before yielding fails here.
-    const firstDelivery = trace.findIndex((entry) => entry.startsWith('got:'));
-    const lastEnqueue = trace.lastIndexOf(`sent#${frames.length}`);
-    expect(firstDelivery).toBeGreaterThanOrEqual(0);
-    expect(lastEnqueue).toBeGreaterThan(firstDelivery);
   });
 });

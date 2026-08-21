@@ -9,7 +9,7 @@ The extension is a thin adapter. Users publish an ordered set of user-defined cu
 - Package version: `0.1.0`
 - License policy: `UNLICENSED`
 - Runtime target: VS Code `^1.125.0`
-- Backend contract: OpenAI-compatible `9router` `/v1/responses`
+- Backend contract: OpenAI-compatible `9router` `/v1/chat/completions`
 
 ## Installation
 
@@ -72,7 +72,7 @@ Existing model objects with a non-`off` `thinkingMode` must add that value to `t
 - `id`: Stable Copilot-facing id matching `[a-z0-9][a-z0-9._-]*`.
 - `name`: Display name shown in the picker.
 - `modelId`: Opaque backend model id sent unchanged as the OpenAI-compatible `model` field. It must refer to an existing 9router model; an empty or invalid value leaves only that entry unpublished.
-- `serviceTier`: Optional `fast` value sent as the OpenAI-compatible `service_tier` field. Omit it to leave service tier selection to `9router`.
+- `serviceTier`: Optional `fast` value sent unchanged as the OpenAI-compatible `serviceTier` field. Omit it to leave service tier selection to `9router`.
 - `toolMode`: `auto` exposes supported host tools; `off` disables tools.
 - `visionMode`: `native`, `proxy`, or `off`.
 - `thinkingMode`: Default Thinking Effort: `off`, `minimal`, `low`, `medium`, `high`, `xhigh`, or `max`.
@@ -83,13 +83,13 @@ Unknown fields, duplicate ids, invalid values, and empty mappings are rejected p
 
 Before returning picker models, the provider attempts one authenticated `GET /v1/models` refresh. For an exact `modelId` match, `capabilities.contextWindow` is the total context size and `capabilities.maxOutput` is the output budget. The provider publishes `maxInputTokens = contextWindow - maxOutputTokens`; therefore, published input and output limits sum to `contextWindow` when the catalog values produce a positive input limit. `maxOutputTokens` falls back to the model object's compatibility value when catalog output metadata is missing. If total context is missing or does not exceed the resolved output limit, `maxInputTokens` falls back to its configured value. Built-in fallback for either configured field is `264000`. The latest successful catalog stays in RAM; a failed refresh keeps that cache.
 
-`9router-copilot.maxTokens` remains independent of Context Window metadata. Its default is `0`. A positive safe integer is sent as `max_output_tokens`; `0` or a malformed value omits `max_output_tokens`, applying no extension-level response limit. `9router` or an upstream provider may still enforce its own limit. Usage is read from terminal `response.completed` or `response.incomplete` events.
+`9router-copilot.maxTokens` remains independent of Context Window metadata. Its default is `0`. A positive safe integer is sent as `max_tokens`; `0` or a malformed value omits `max_tokens`, applying no extension-level response limit. `9router` or an upstream provider may still enforce its own limit. Streaming requests continue to set `stream_options.include_usage`.
 
 `9router-copilot.requestTimeoutMs` defaults to `60000`. A positive value limits each HTTP request sent to `9router`; `0` disables extension-level timeouts. VS Code cancellation still stops active requests.
 
 ### Tools
 
-Models default to `toolMode: "off"`; the manifest's initial `agent` example explicitly uses `auto`. Tool definitions are translated to Responses API function tools only when enabled. Previous calls and results are sent as `function_call` and `function_call_output` input items. Routing and tool compatibility policy remain in `9router`.
+Models default to `toolMode: "off"`; the manifest's initial `agent` example explicitly uses `auto`. Tool definitions are translated to the OpenAI-compatible request only when enabled. Routing and tool compatibility policy remain in `9router`.
 
 ### Vision
 
@@ -117,11 +117,11 @@ Proxy mode is fail-closed: discovery errors, missing/stale analyzer ids, consent
 
 ### Thinking Effort
 
-Each model with at least one configured `thinkingEfforts` value gets the native Copilot Chat Thinking Effort picker. `None` is always first, then configured values in array order. `None` omits `reasoning`; allowed values send `reasoning.effort` with `reasoning.summary: "auto"` while keeping `modelId` unchanged. Missing, malformed, unsupported, or stale host selections fall back to that model's validated `thinkingMode`. An empty list omits `configurationSchema` and hides the picker. `9router` owns provider-specific reasoning translation.
+Each model with at least one configured `thinkingEfforts` value gets the native Copilot Chat Thinking Effort picker. `None` is always first, then configured values in array order. `None` omits `reasoning_effort`; allowed values send the selected value while keeping `modelId` unchanged. Missing, malformed, unsupported, or stale host selections fall back to that model's validated `thinkingMode`. An empty list omits `configurationSchema` and hides the picker. `9router` owns provider-specific reasoning translation.
 
 ### Reasoning display
 
-Reasoning returned by `9router` through `response.reasoning_summary_text.delta` (or the compatible `response.reasoning_text.delta` event) is forwarded to Copilot Chat as thinking content. This uses the `languageModelThinkingPart` proposed API, so VS Code must be started with the proposal enabled:
+Reasoning returned by `9router` as `reasoning_content` (or `reasoning`) is forwarded to Copilot Chat as thinking content. This uses the `languageModelThinkingPart` proposed API, so VS Code must be started with the proposal enabled:
 
 ```bash
 code --enable-proposed-api local.9router-copilot-chat-provider

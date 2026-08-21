@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { NineRouterError } from '@/router/errors';
-import type { RouterResponseRequest } from '@/types/router-contract';
+import type { RouterChatCompletionRequest } from '@/types/router-contract';
 import {
   buildVisionProxyRequest,
   VisionProxyService
@@ -31,11 +31,11 @@ function createCancellationToken() {
 
 describe('VisionProxyService', () => {
   it('summarizes each image-bearing message sequentially', async () => {
-    const requests: RouterResponseRequest[] = [];
+    const requests: RouterChatCompletionRequest[] = [];
     let active = 0;
     let maxActive = 0;
     const service = new VisionProxyService({
-      async *streamResponse(input) {
+      async *streamChatCompletion(input) {
         requests.push(input.request);
         active += 1;
         maxActive = Math.max(maxActive, active);
@@ -92,7 +92,7 @@ describe('VisionProxyService', () => {
   it('rejects a missing shared model before calling 9router', async () => {
     let called = false;
     const service = new VisionProxyService({
-      async *streamResponse() {
+      async *streamChatCompletion() {
         called = true;
         yield { type: 'response-complete' };
       }
@@ -128,7 +128,7 @@ describe('VisionProxyService', () => {
   ] as const)('returns %s mode without proxying', async (visionMode, outcome) => {
     let called = false;
     const service = new VisionProxyService({
-      async *streamResponse() {
+      async *streamChatCompletion() {
         called = true;
         yield { type: 'response-complete' };
       }
@@ -155,7 +155,7 @@ describe('VisionProxyService', () => {
 
   it('does not classify tool parts as images', async () => {
     const service = new VisionProxyService({
-      async *streamResponse() {
+      async *streamChatCompletion() {
         throw new Error('must not be called');
       }
     });
@@ -178,7 +178,7 @@ describe('VisionProxyService', () => {
 
   it('rejects an empty Vision stream', async () => {
     const service = new VisionProxyService({
-      async *streamResponse() {
+      async *streamChatCompletion() {
         yield { type: 'response-complete' };
       }
     });
@@ -205,7 +205,7 @@ describe('VisionProxyService', () => {
 
   it('rejects a truncated Vision stream after text deltas without leaking the summary', async () => {
     const service = new VisionProxyService({
-      async *streamResponse() {
+      async *streamChatCompletion() {
         yield { type: 'text-delta', text: 'partial-summary-secret' };
       }
     });
@@ -238,7 +238,7 @@ describe('VisionProxyService', () => {
 
   it('maps a missing Vision model to the shared setting without raw response text', async () => {
     const service = new VisionProxyService({
-      async *streamResponse() {
+      async *streamChatCompletion() {
         throw new NineRouterError('MODEL_MAPPING_ERROR', 'missing', {
           requestId: 'req-404',
           details: { status: 404, responseText: 'raw-secret' }
@@ -281,7 +281,7 @@ describe('VisionProxyService', () => {
     'UPSTREAM_UNAVAILABLE'
   ] as const)('preserves %s with safe phase details', async (code) => {
     const service = new VisionProxyService({
-      async *streamResponse() {
+      async *streamChatCompletion() {
         throw new NineRouterError(code, 'safe message', {
           details: { responseText: 'must-not-survive' }
         });
@@ -307,7 +307,7 @@ describe('VisionProxyService', () => {
 
   it('converts router-error events to upstream unavailable', async () => {
     const service = new VisionProxyService({
-      async *streamResponse() {
+      async *streamChatCompletion() {
         yield { type: 'router-error', error: 'upstream failed', requestId: 'req-up' };
       }
     });
@@ -336,7 +336,7 @@ describe('VisionProxyService', () => {
   it('rejects a missing Vision source before calling analyzers', async () => {
     let called = false;
     const service = new VisionProxyService({
-      async *streamResponse() {
+      async *streamChatCompletion() {
         called = true;
         yield { type: 'response-complete' };
       }
@@ -369,7 +369,7 @@ describe('VisionProxyService', () => {
   it('rejects a blank Vision prompt before calling analyzers', async () => {
     let called = false;
     const service = new VisionProxyService({
-      async *streamResponse() {
+      async *streamChatCompletion() {
         called = true;
         yield { type: 'response-complete' };
       }
@@ -403,7 +403,7 @@ describe('VisionProxyService', () => {
     let routerCalled = false;
     const service = new VisionProxyService(
       {
-        async *streamResponse() {
+        async *streamChatCompletion() {
           routerCalled = true;
           yield { type: 'response-complete' };
         }
@@ -444,13 +444,12 @@ describe('buildVisionProxyRequest', () => {
     expect(request).toMatchObject({
       model: 'combo/vision',
       stream: true,
-      store: false,
-      max_output_tokens: 256
+      max_tokens: 256
     });
     expect(request).not.toHaveProperty('tools');
     expect(request).not.toHaveProperty('tool_choice');
-    expect(request).not.toHaveProperty('reasoning');
-    expect(JSON.stringify(request.input)).toContain('data:image/png;base64,YQ==');
+    expect(request).not.toHaveProperty('reasoning_effort');
+    expect(JSON.stringify(request.messages)).toContain('data:image/png;base64,YQ==');
   });
 
   it('treats hybrid image parts as images before generic value text', () => {
@@ -465,12 +464,13 @@ describe('buildVisionProxyRequest', () => {
           }
         ]
       },
-      'combo/vision',
+      'combo/vision'
+      ,
       'Custom image instruction.'
     );
 
-    expect(JSON.stringify(request.input)).toContain('data:image/png;base64,YQ==');
-    expect(JSON.stringify(request.input)).not.toContain('must-not-replace-image');
+    expect(JSON.stringify(request.messages)).toContain('data:image/png;base64,YQ==');
+    expect(JSON.stringify(request.messages)).not.toContain('must-not-replace-image');
   });
 
   it('uses the configured prompt as the complete 9router system instruction', () => {
@@ -481,7 +481,7 @@ describe('buildVisionProxyRequest', () => {
       256
     );
 
-    expect(request.input[0]).toEqual({
+    expect(request.messages[0]).toEqual({
       role: 'system',
       content: 'Custom image instruction.'
     });

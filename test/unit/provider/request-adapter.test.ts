@@ -35,11 +35,13 @@ describe('adaptMessagesToRouterRequest', () => {
     expect(request).toMatchObject({
       model: 'combo/daily',
       stream: true,
-      store: false,
-      max_output_tokens: 256,
-      input: [{ role: 'user', content: 'Say hello' }]
+      stream_options: {
+        include_usage: true
+      },
+      max_tokens: 256,
+      messages: [{ role: 'user', content: 'Say hello' }]
     });
-    expect(request).not.toHaveProperty('reasoning');
+    expect(request).not.toHaveProperty('reasoning_effort');
     expect(request).not.toHaveProperty('serviceTier');
   });
 
@@ -52,7 +54,7 @@ describe('adaptMessagesToRouterRequest', () => {
     expect(request.service_tier).toBe('fast');
   });
 
-  it('keeps the model id bare and forwards thinking through Responses reasoning', () => {
+  it('keeps the model id bare and forwards thinking as reasoning_effort', () => {
     const request = adaptMessagesToRouterRequest({
       selectedModel: selectedModel({ thinkingMode: 'high' }),
       messages: [{ role: 1, content: 'Solve this carefully' }]
@@ -60,10 +62,7 @@ describe('adaptMessagesToRouterRequest', () => {
 
     expect(request).toMatchObject({
       model: '123',
-      reasoning: {
-        effort: 'high',
-        summary: 'auto'
-      }
+      reasoning_effort: 'high'
     });
   });
 
@@ -90,17 +89,25 @@ describe('adaptMessagesToRouterRequest', () => {
       ]
     });
 
-    expect(request.input).toEqual([
+    expect(request.messages).toEqual([
       {
-        type: 'function_call',
-        call_id: 'call-1',
-        name: 'lookupUser',
-        arguments: '{"id":"42"}'
+        role: 'assistant',
+        content: null,
+        tool_calls: [
+          {
+            id: 'call-1',
+            type: 'function',
+            function: {
+              name: 'lookupUser',
+              arguments: '{"id":"42"}'
+            }
+          }
+        ]
       },
       {
-        type: 'function_call_output',
-        call_id: 'call-1',
-        output: 'result text'
+        role: 'tool',
+        content: 'result text',
+        tool_call_id: 'call-1'
       }
     ]);
   });
@@ -121,11 +128,19 @@ describe('adaptMessagesToRouterRequest', () => {
       ]
     });
 
-    expect(request.input[0]).toEqual({
-      type: 'function_call',
-      call_id: 'call-1',
-      name: 'lookupUser',
-      arguments: '{"alpha":"first","zebra":"last"}'
+    expect(request.messages[0]).toEqual({
+      role: 'assistant',
+      content: null,
+      tool_calls: [
+        {
+          id: 'call-1',
+          type: 'function',
+          function: {
+            name: 'lookupUser',
+            arguments: '{"alpha":"first","zebra":"last"}'
+          }
+        }
+      ]
     });
   });
 
@@ -158,28 +173,38 @@ describe('adaptMessagesToRouterRequest', () => {
       ]
     });
 
-    expect(request.input).toEqual([
+    expect(request.messages).toEqual([
       {
-        type: 'function_call',
-        call_id: 'call-1',
-        name: 'lookupUser',
-        arguments: '{"id":"42"}'
+        role: 'assistant',
+        content: null,
+        tool_calls: [
+          {
+            id: 'call-1',
+            type: 'function',
+            function: {
+              name: 'lookupUser',
+              arguments: '{"id":"42"}'
+            }
+          },
+          {
+            id: 'call-2',
+            type: 'function',
+            function: {
+              name: 'lookupTeam',
+              arguments: '{"slug":"core"}'
+            }
+          }
+        ]
       },
       {
-        type: 'function_call',
-        call_id: 'call-2',
-        name: 'lookupTeam',
-        arguments: '{"slug":"core"}'
+        role: 'tool',
+        content: 'user result',
+        tool_call_id: 'call-1'
       },
       {
-        type: 'function_call_output',
-        call_id: 'call-1',
-        output: 'user result'
-      },
-      {
-        type: 'function_call_output',
-        call_id: 'call-2',
-        output: 'team result'
+        role: 'tool',
+        content: 'team result',
+        tool_call_id: 'call-2'
       }
     ]);
   });
@@ -195,7 +220,7 @@ describe('adaptMessagesToRouterRequest', () => {
       ]
     });
 
-    expect(request.input).toEqual([
+    expect(request.messages).toEqual([
       {
         role: 'user',
         content: 'Internal progress-message instructions'
@@ -214,7 +239,7 @@ describe('adaptMessagesToRouterRequest', () => {
       ]
     });
 
-    expect(request.input).toEqual([
+    expect(request.messages).toEqual([
       {
         role: 'user',
         content: 'Internal tool-like instructions'
@@ -237,10 +262,10 @@ describe('adaptMessagesToRouterRequest', () => {
       ]
     });
 
-    expect(request.input[0]).toMatchObject({
+    expect(request.messages[0]).toMatchObject({
       role: 'user'
     });
-    expect(request.input[0]).not.toHaveProperty('call_id');
+    expect(request.messages[0]).not.toHaveProperty('tool_call_id');
   });
 
   it('degrades orphaned tool results to user content', () => {
@@ -258,7 +283,7 @@ describe('adaptMessagesToRouterRequest', () => {
       ]
     });
 
-    expect(request.input).toEqual([
+    expect(request.messages).toEqual([
       {
         role: 'user',
         content: 'orphaned result'
@@ -293,7 +318,7 @@ describe('adaptMessagesToRouterRequest', () => {
       ]
     });
 
-    expect(request.input[2]).toEqual({
+    expect(request.messages[2]).toEqual({
       role: 'user',
       content: 'late result'
     });
@@ -323,11 +348,11 @@ describe('adaptMessagesToRouterRequest', () => {
       ]
     });
 
-    expect(request.input.slice(1)).toEqual([
+    expect(request.messages.slice(1)).toEqual([
       {
-        type: 'function_call_output',
-        call_id: 'call-1',
-        output: 'result text'
+        role: 'tool',
+        content: 'result text',
+        tool_call_id: 'call-1'
       },
       {
         role: 'user',
@@ -352,8 +377,7 @@ describe('adaptMessagesToRouterRequest', () => {
 
     expect(request.tools).toEqual([
       expect.objectContaining({
-        name: 'lookupUser',
-        strict: false
+        function: expect.objectContaining({ name: 'lookupUser' })
       })
     ]);
     expect(request.tool_choice).toBe('required');
@@ -375,12 +399,10 @@ describe('adaptMessagesToRouterRequest', () => {
       messages: [{ role: 1, content: ['What is in this image?', imagePart] }]
     });
 
-    expect(request.input[0]).toMatchObject({
-      content: [
-        { type: 'input_text', text: 'What is in this image?' },
-        { type: 'input_image', image_url: 'data:image/png;base64,YWJj' }
-      ]
-    });
+    expect(request.messages[0]?.content).toEqual([
+      { type: 'text', text: 'What is in this image?' },
+      { type: 'image_url', image_url: { url: 'data:image/png;base64,YWJj' } }
+    ]);
   });
 
   it('treats hybrid native image parts as images before generic value text', () => {
@@ -405,8 +427,8 @@ describe('adaptMessagesToRouterRequest', () => {
       ]
     });
 
-    expect(request.input[0]).toMatchObject({
-      content: [{ type: 'input_image', image_url: 'data:image/png;base64,YWJj' }]
-    });
+    expect(request.messages[0]?.content).toEqual([
+      { type: 'image_url', image_url: { url: 'data:image/png;base64,YWJj' } }
+    ]);
   });
 });
