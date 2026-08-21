@@ -21,10 +21,10 @@ describe('image-input-adapter', () => {
     expect(isHostImageDataPart({ callId: 'call-1', name: 'tool', input: {} })).toBe(false);
   });
 
-  it('creates an OpenAI-compatible image_url part', () => {
+  it('creates an OpenAI Responses input_image part', () => {
     expect(createRouterImagePart(png)).toEqual({
-      type: 'image_url',
-      image_url: { url: 'data:image/png;base64,AAEC/w==' }
+      type: 'input_image',
+      image_url: 'data:image/png;base64,AAEC/w=='
     });
   });
 

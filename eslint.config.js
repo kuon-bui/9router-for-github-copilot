@@ -7,6 +7,7 @@ const sharedGlobals = {
   AbortSignal: 'readonly',
   Headers: 'readonly',
   ReadableStream: 'readonly',
+  ReadableStreamDefaultReader: 'readonly',
   TextDecoder: 'readonly',
   TextEncoder: 'readonly',
   URL: 'readonly',

@@ -69,6 +69,33 @@ describe('createRouterEventEmitter', () => {
     expect(parts[0]).toBeInstanceOf(vscode.LanguageModelToolCallPart);
   });
 
+  it('uses the completed Responses function call payload as authoritative', () => {
+    const parts: unknown[] = [];
+    const emitter = createRouterEventEmitter({
+      report(part) {
+        parts.push(part);
+      }
+    } as vscode.Progress<vscode.LanguageModelResponsePart>);
+
+    emitter.emit({
+      type: 'tool-call-delta',
+      toolCallIndex: 0,
+      toolCallId: 'call-1',
+      toolName: 'lookupUser',
+      delta: '{"id"'
+    });
+    emitter.emit({
+      type: 'tool-call-complete',
+      toolCallIndex: 0,
+      toolCallId: 'call-1',
+      toolName: 'lookupUser',
+      arguments: '{"id":"42"}'
+    });
+    emitter.emit({ type: 'response-complete' });
+
+    expect((parts[0] as vscode.LanguageModelToolCallPart).input).toEqual({ id: '42' });
+  });
+
   it('rejects non-object tool call arguments on completion', () => {
     const emitter = createRouterEventEmitter({
       report() {

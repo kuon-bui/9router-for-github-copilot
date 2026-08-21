@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { NineRouterError } from '@/router/errors';
 import { NineRouterChatProvider } from '@/provider/provider';
-import type { RouterChatCompletionRequest } from '@/types/router-contract';
+import type { RouterResponseRequest } from '@/types/router-contract';
 import {
   __createCancellationToken,
   __resetVscodeState,
@@ -29,7 +29,7 @@ describe('NineRouterChatProvider cancellation flow', () => {
         }
       } as never,
       {
-        async *streamChatCompletion({ signal }) {
+        async *streamResponse({ signal }) {
           const abortPromise = new Promise<void>((resolve) => {
             signal.addEventListener('abort', () => {
               resolve();
@@ -96,8 +96,8 @@ describe('NineRouterChatProvider cancellation flow', () => {
     const provider = new NineRouterChatProvider(
       { secrets: { get: async () => 'token' } } as never,
       {
-        async *streamChatCompletion(input: {
-          request: RouterChatCompletionRequest;
+        async *streamResponse(input: {
+          request: RouterResponseRequest;
           signal: AbortSignal;
         }) {
           modelsCalled.push(input.request.model);
