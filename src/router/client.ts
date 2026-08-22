@@ -2,11 +2,14 @@ import { NineRouterError } from './errors';
 import { parseRouterModels } from './model-catalog';
 import { parseRouterEventStream } from './sse-parser';
 import { buildModelsUrl, buildResponsesUrl } from './url';
+import { redactSensitiveText } from '@/debug/redaction';
 import type { RouterModelMetadata } from './model-catalog';
 import type { RouterResponseRequest, RouterStreamEvent } from '@/types/router-contract';
 
 // ponytail: 16 KiB error prefix is enough for router error classification; raise if 9router wraps model ids deeper.
 const MAX_ERROR_BODY_BYTES = 16 * 1024;
+const MAX_ERROR_MESSAGE_LENGTH = 1_024;
+const MAX_ERROR_FIELD_LENGTH = 256;
 
 export interface RouterClient {
   streamResponse(input: {
@@ -282,6 +285,72 @@ function extractRouterErrorMessage(responseText: string): string {
   return responseText;
 }
 
+interface RouterErrorDetails {
+  routerErrorCode?: string;
+  routerErrorMessage?: string;
+  routerErrorParam?: string;
+  routerErrorType?: string;
+}
+
+function sanitizeRouterErrorField(value: unknown, maxLength: number): string | undefined {
+  if (typeof value !== 'string') {
+    return undefined;
+  }
+
+  const sanitized = redactSensitiveText(value)
+    .split('')
+    .map((character) => {
+      const code = character.charCodeAt(0);
+      return code <= 31 || code === 127 ? ' ' : character;
+    })
+    .join('')
+    .trim();
+  if (sanitized.length === 0) {
+    return undefined;
+  }
+
+  return sanitized.slice(0, maxLength);
+}
+
+function extractRouterErrorDetails(responseText: string): RouterErrorDetails {
+  try {
+    const payload: unknown = JSON.parse(responseText);
+    if (typeof payload !== 'object' || payload === null || !('error' in payload)) {
+      return {};
+    }
+
+    const error = payload.error;
+    if (typeof error === 'string') {
+      const routerErrorMessage = sanitizeRouterErrorField(error, MAX_ERROR_MESSAGE_LENGTH);
+      return routerErrorMessage ? { routerErrorMessage } : {};
+    }
+
+    if (typeof error !== 'object' || error === null) {
+      return {};
+    }
+
+    const routerErrorCode =
+      'code' in error ? sanitizeRouterErrorField(error.code, MAX_ERROR_FIELD_LENGTH) : undefined;
+    const routerErrorMessage =
+      'message' in error
+        ? sanitizeRouterErrorField(error.message, MAX_ERROR_MESSAGE_LENGTH)
+        : undefined;
+    const routerErrorParam =
+      'param' in error ? sanitizeRouterErrorField(error.param, MAX_ERROR_FIELD_LENGTH) : undefined;
+    const routerErrorType =
+      'type' in error ? sanitizeRouterErrorField(error.type, MAX_ERROR_FIELD_LENGTH) : undefined;
+
+    return {
+      ...(routerErrorCode ? { routerErrorCode } : {}),
+      ...(routerErrorMessage ? { routerErrorMessage } : {}),
+      ...(routerErrorParam ? { routerErrorParam } : {}),
+      ...(routerErrorType ? { routerErrorType } : {})
+    };
+  } catch {
+    return {};
+  }
+}
+
 function isExplicitMissingModelError(responseText: string): boolean {
   const normalized = extractRouterErrorMessage(responseText).trim().toLowerCase();
   return (
@@ -295,7 +364,8 @@ function isExplicitMissingModelError(responseText: string): boolean {
 
 function classifyStatusError(status: number, requestId: string | undefined, responseText: string): NineRouterError {
   const details = {
-    status
+    status,
+    ...(status === 400 ? extractRouterErrorDetails(responseText) : {})
   };
 
   if (status === 401 || status === 403) {
@@ -318,6 +388,14 @@ function classifyStatusError(status: number, requestId: string | undefined, resp
     return new NineRouterError(
       'UPSTREAM_UNAVAILABLE',
       '9router upstream execution is unavailable',
+      buildErrorOptions(requestId, details)
+    );
+  }
+
+  if (status === 400) {
+    return new NineRouterError(
+      'TRANSPORT_ERROR',
+      '9router rejected the request with status 400. Check diagnostics for validation details.',
       buildErrorOptions(requestId, details)
     );
   }

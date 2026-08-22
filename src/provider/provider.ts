@@ -8,6 +8,7 @@ import { logDebugEvent } from '@/debug/output-channel';
 import { NineRouterError } from '@/router/errors';
 import { adaptToolOptionsForRouter } from './tool-adapter';
 import { adaptMessagesToRouterRequest } from './request-adapter';
+import { createRouterRequestDiagnostics } from './request-diagnostics';
 import { createRouterEventEmitter, isThinkingPartSupported } from './stream-adapter';
 import { createAbortSignalFromToken } from './cancellation';
 import { resolveEffectiveThinkingMode } from './thinking-effort';
@@ -429,7 +430,8 @@ export class NineRouterChatProvider
         thinkingModeSource: effectiveThinking.source,
         baseUrl: snapshot.runtime.baseUrl,
         snapshotState: snapshot.state,
-        issueCount: snapshot.issues.length
+        issueCount: snapshot.issues.length,
+        ...createRouterRequestDiagnostics(request)
       });
 
       if (requestCancellation.signal.aborted) {
@@ -485,6 +487,14 @@ export class NineRouterChatProvider
         );
       }
     } catch (error) {
+      if (error instanceof NineRouterError) {
+        logDebugEvent(snapshot.runtime.debugMode, '9router request failed', {
+          ...(error.details ?? {}),
+          errorCode: error.code,
+          requestId: error.requestId
+        });
+      }
+
       throw mapProviderError(error, selectedModel);
     } finally {
       requestCancellation.cleanup();

@@ -235,6 +235,77 @@ describe('createRouterClient', () => {
     expect(JSON.stringify(error)).not.toContain(secret);
   });
 
+  it('preserves sanitized structured validation details for status 400', async () => {
+    const client = createRouterClient({
+      fetch: vi.fn().mockResolvedValue({
+        ok: false,
+        status: 400,
+        headers: new Headers({ 'x-request-id': 'req-invalid-tools' }),
+        body: responseBody(
+          JSON.stringify({
+            error: {
+              message: "Invalid value at 'tools[0].name'\nBearer secret-token",
+              type: 'invalid_request_error',
+              param: 'tools[0].name',
+              code: 'invalid_value'
+            }
+          })
+        )
+      }) as never
+    });
+    const consume = async (): Promise<void> => {
+      for await (const event of client.streamResponse({
+        baseUrl: 'https://router.example.com/v1',
+        apiKey: 'secret-token',
+        request: { model: 'combo/daily', input: [], stream: true, store: false },
+        timeoutMs: 1000,
+        signal: new AbortController().signal
+      })) {
+        void event;
+      }
+    };
+
+    await expect(consume()).rejects.toMatchObject({
+      code: 'TRANSPORT_ERROR',
+      requestId: 'req-invalid-tools',
+      details: {
+        status: 400,
+        routerErrorCode: 'invalid_value',
+        routerErrorMessage: "Invalid value at 'tools[0].name' Bearer [REDACTED]",
+        routerErrorParam: 'tools[0].name',
+        routerErrorType: 'invalid_request_error'
+      }
+    });
+  });
+
+  it('does not retain unstructured status 400 response bodies', async () => {
+    const secret = 'prompt-secret-that-must-not-be-retained';
+    const client = createRouterClient({
+      fetch: vi.fn().mockResolvedValue({
+        ok: false,
+        status: 400,
+        headers: new Headers(),
+        body: responseBody(secret)
+      }) as never
+    });
+    const consume = async (): Promise<void> => {
+      for await (const event of client.streamResponse({
+        baseUrl: 'https://router.example.com/v1',
+        apiKey: 'secret-token',
+        request: { model: 'combo/daily', input: [], stream: true, store: false },
+        timeoutMs: 1000,
+        signal: new AbortController().signal
+      })) {
+        void event;
+      }
+    };
+
+    const error = await consume().catch((caught: unknown) => caught as Error);
+
+    expect(JSON.stringify(error)).not.toContain(secret);
+    expect(error.message).toContain('status 400');
+  });
+
   it('decodes only the bounded error prefix and cancels the remaining body', async () => {
     let cancelled = false;
     const client = createRouterClient({
