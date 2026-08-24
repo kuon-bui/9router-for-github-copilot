@@ -10,13 +10,26 @@ export interface RouterResponseInputImage {
   image_url: string;
 }
 
+// The Responses API accepts `input_text`/`input_image` only on user and system turns; assistant
+// turns must carry `output_text`, so the two directions are separate content unions.
+export interface RouterResponseOutputText {
+  type: 'output_text';
+  text: string;
+}
+
 export type RouterResponseInputContent =
   | RouterResponseInputText
   | RouterResponseInputImage;
 
+export type RouterResponseOutputContent = RouterResponseOutputText;
+
+export type RouterResponseMessageContent =
+  | RouterResponseInputContent
+  | RouterResponseOutputContent;
+
 export interface RouterResponseMessage {
   role: RouterResponseMessageRole;
-  content: string | RouterResponseInputContent[];
+  content: string | RouterResponseMessageContent[];
 }
 
 export interface RouterResponseFunctionCall {
