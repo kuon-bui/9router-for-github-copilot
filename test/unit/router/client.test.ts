@@ -105,7 +105,7 @@ describe('createRouterClient', () => {
 
     await expect(consume()).rejects.toMatchObject({
       code: 'TRANSPORT_ERROR',
-      message: '9router request failed with status 404'
+      message: '9router request failed with status 404: No active credentials for provider: openai'
     });
   });
 
@@ -133,8 +133,172 @@ describe('createRouterClient', () => {
 
     await expect(consume()).rejects.toMatchObject({
       code: 'TRANSPORT_ERROR',
-      message: '9router request failed with status 404'
+      message: '9router request failed with status 404: Invalid model response from provider'
     });
+  });
+
+  it('surfaces the 9router error message for an unhandled status', async () => {
+    const client = createRouterClient({
+      fetch: vi.fn().mockResolvedValue({
+        ok: false,
+        status: 400,
+        headers: new Headers({ 'x-request-id': 'req-invalid-value' }),
+        body: responseBody(
+          JSON.stringify({
+            error: {
+              message: "Invalid value: 'input_text'. Supported values are: 'output_text' and 'refusal'.",
+              param: 'input[1].content[0].type'
+            }
+          })
+        )
+      }) as never
+    });
+
+    const consume = async (): Promise<void> => {
+      for await (const event of client.streamResponse({
+        baseUrl: 'https://router.example.com/v1',
+        apiKey: 'secret-token',
+        request: { model: 'combo/daily', input: [], stream: true, store: false },
+        timeoutMs: 1000,
+        signal: new AbortController().signal
+      })) {
+        void event;
+      }
+    };
+
+    await expect(consume()).rejects.toMatchObject({
+      code: 'TRANSPORT_ERROR',
+      requestId: 'req-invalid-value',
+      message:
+        "9router request failed with status 400: Invalid value: 'input_text'. Supported values are: 'output_text' and 'refusal'.",
+      details: { status: 400 }
+    });
+  });
+
+  it('keeps the raw error body on the error for diagnostics but out of details', async () => {
+    const rawBody = JSON.stringify({
+      error: { message: 'Unsupported content part', param: 'input[1].content[0].type' }
+    });
+    const client = createRouterClient({
+      fetch: vi.fn().mockResolvedValue({
+        ok: false,
+        status: 400,
+        headers: new Headers(),
+        body: responseBody(rawBody)
+      }) as never
+    });
+
+    const consume = async (): Promise<void> => {
+      for await (const event of client.streamResponse({
+        baseUrl: 'https://router.example.com/v1',
+        apiKey: 'secret-token',
+        request: { model: 'combo/daily', input: [], stream: true, store: false },
+        timeoutMs: 1000,
+        signal: new AbortController().signal
+      })) {
+        void event;
+      }
+    };
+
+    const error = (await consume().catch((caught: unknown) => caught)) as {
+      responseBody?: string;
+      details?: Record<string, unknown>;
+    };
+
+    expect(error.responseBody).toBe(rawBody);
+    expect(error.details).not.toHaveProperty('responseText');
+    expect(error.details).not.toHaveProperty('responseBody');
+  });
+
+  it('collapses a multi-line error body into a single-line message', async () => {
+    const client = createRouterClient({
+      fetch: vi.fn().mockResolvedValue({
+        ok: false,
+        status: 502,
+        headers: new Headers(),
+        body: responseBody('<html>\n  <body>Bad Gateway</body>\n</html>')
+      }) as never
+    });
+
+    const consume = async (): Promise<void> => {
+      for await (const event of client.streamResponse({
+        baseUrl: 'https://router.example.com/v1',
+        apiKey: 'secret-token',
+        request: { model: 'combo/daily', input: [], stream: true, store: false },
+        timeoutMs: 1000,
+        signal: new AbortController().signal
+      })) {
+        void event;
+      }
+    };
+
+    const error = (await consume().catch((caught: unknown) => caught)) as { message: string };
+
+    expect(error.message).toBe(
+      '9router upstream execution is unavailable: <html> <body>Bad Gateway</body> </html>'
+    );
+    expect(error.message).not.toContain('\n');
+  });
+
+  it('bounds the surfaced error message and never echoes an auth body', async () => {
+    const client = createRouterClient({
+      fetch: vi.fn().mockResolvedValue({
+        ok: false,
+        status: 401,
+        headers: new Headers(),
+        body: responseBody('{"error":{"message":"Invalid API key: sk-live-do-not-echo"}}')
+      }) as never
+    });
+
+    const consume = async (): Promise<void> => {
+      for await (const event of client.streamResponse({
+        baseUrl: 'https://router.example.com/v1',
+        apiKey: 'secret-token',
+        request: { model: 'combo/daily', input: [], stream: true, store: false },
+        timeoutMs: 1000,
+        signal: new AbortController().signal
+      })) {
+        void event;
+      }
+    };
+
+    const error = (await consume().catch((caught: unknown) => caught)) as {
+      code: string;
+      message: string;
+      responseBody?: string;
+    };
+
+    expect(error.code).toBe('AUTHENTICATION_ERROR');
+    expect(error.message).toBe('9router authentication failed');
+    expect(error.responseBody).toBeUndefined();
+  });
+
+  it('truncates an oversized error message', async () => {
+    const client = createRouterClient({
+      fetch: vi.fn().mockResolvedValue({
+        ok: false,
+        status: 400,
+        headers: new Headers(),
+        body: responseBody(JSON.stringify({ error: { message: 'x'.repeat(1200) } }))
+      }) as never
+    });
+
+    const consume = async (): Promise<void> => {
+      for await (const event of client.streamResponse({
+        baseUrl: 'https://router.example.com/v1',
+        apiKey: 'secret-token',
+        request: { model: 'combo/daily', input: [], stream: true, store: false },
+        timeoutMs: 1000,
+        signal: new AbortController().signal
+      })) {
+        void event;
+      }
+    };
+
+    const error = (await consume().catch((caught: unknown) => caught)) as { message: string };
+
+    expect(error.message).toHaveLength('9router request failed with status 400: '.length + 512);
+    expect(error.message.endsWith('...')).toBe(true);
   });
 
   it('gets and validates the full /v1/models catalog with bearer auth', async () => {
@@ -207,14 +371,14 @@ describe('createRouterClient', () => {
     ).rejects.toMatchObject({ code: 'AUTHENTICATION_ERROR' });
   });
 
-  it('does not expose raw Responses API error bodies', async () => {
-    const secret = 'prompt-secret';
+  it('keeps raw Responses API error bodies out of details and bounds the message', async () => {
+    const marker = 'prompt-echo';
     const client = createRouterClient({
       fetch: vi.fn().mockResolvedValue({
         ok: false,
         status: 500,
         headers: new Headers(),
-        body: responseBody(`${secret} ${'x'.repeat(20_000)}`)
+        body: responseBody(`${marker} ${'x'.repeat(20_000)}`)
       }) as never
     });
     const consume = async (): Promise<void> => {
@@ -229,10 +393,18 @@ describe('createRouterClient', () => {
       }
     };
 
-    const error = await consume().catch((caught: unknown) => caught as { details?: Record<string, unknown> });
+    const error = (await consume().catch((caught: unknown) => caught)) as {
+      message: string;
+      details?: Record<string, unknown>;
+      responseBody?: string;
+    };
 
     expect(error.details).toEqual({ status: 500 });
-    expect(JSON.stringify(error)).not.toContain(secret);
+    expect(JSON.stringify(error.details)).not.toContain(marker);
+    expect(error.message.length).toBeLessThanOrEqual(
+      '9router upstream execution is unavailable: '.length + 512
+    );
+    expect(error.responseBody).toContain(marker);
   });
 
   it('decodes only the bounded error prefix and cancels the remaining body', async () => {

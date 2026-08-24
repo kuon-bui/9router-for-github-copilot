@@ -383,6 +383,68 @@ describe('adaptMessagesToRouterRequest', () => {
     });
   });
 
+  it('emits output_text for assistant turns under native vision', () => {
+    const request = adaptMessagesToRouterRequest({
+      selectedModel: selectedModel({
+        name: 'Agent Vision',
+        modelId: 'combo/agent-vision',
+        toolMode: 'off',
+        visionMode: 'native'
+      }),
+      messages: [
+        { role: 1, content: ['What is in this image?'] },
+        { role: 2, content: ['A cat.'] },
+        { role: 1, content: ['And this one?'] }
+      ]
+    });
+
+    expect(request.input).toEqual([
+      { role: 'user', content: [{ type: 'input_text', text: 'What is in this image?' }] },
+      { role: 'assistant', content: [{ type: 'output_text', text: 'A cat.' }] },
+      { role: 'user', content: [{ type: 'input_text', text: 'And this one?' }] }
+    ]);
+  });
+
+  it('keeps assistant placeholder text as output_text under native vision', () => {
+    const request = adaptMessagesToRouterRequest({
+      selectedModel: selectedModel({
+        name: 'Agent Vision',
+        modelId: 'combo/agent-vision',
+        toolMode: 'off',
+        visionMode: 'native'
+      }),
+      messages: [{ role: 2, content: [{ unsupported: true }] }]
+    });
+
+    expect(request.input).toEqual([
+      {
+        role: 'assistant',
+        content: [{ type: 'output_text', text: '[Unsupported input part omitted]' }]
+      }
+    ]);
+  });
+
+  it('drops image parts from assistant turns under native vision', () => {
+    const request = adaptMessagesToRouterRequest({
+      selectedModel: selectedModel({
+        name: 'Agent Vision',
+        modelId: 'combo/agent-vision',
+        toolMode: 'off',
+        visionMode: 'native'
+      }),
+      messages: [
+        {
+          role: 2,
+          content: ['Here it is.', { mimeType: 'image/png', data: new Uint8Array([97, 98, 99]) }]
+        }
+      ]
+    });
+
+    expect(request.input).toEqual([
+      { role: 'assistant', content: [{ type: 'output_text', text: 'Here it is.' }] }
+    ]);
+  });
+
   it('treats hybrid native image parts as images before generic value text', () => {
     const request = adaptMessagesToRouterRequest({
       selectedModel: selectedModel({

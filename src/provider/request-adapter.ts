@@ -3,9 +3,9 @@ import type { ConfiguredModel } from '@/types/product-model';
 import type {
   RouterResponseFunctionCall,
   RouterResponseFunctionCallOutput,
-  RouterResponseInputContent,
   RouterResponseInputItem,
   RouterResponseMessage,
+  RouterResponseMessageContent,
   RouterResponseRequest
 } from '@/types/router-contract';
 import type { HostToolDefinition } from './tool-adapter';
@@ -50,45 +50,53 @@ function extractTextContent(content: HostChatRequestMessage['content']): string 
     .join('\n');
 }
 
+// An assistant turn may only carry `output_text`, and it has no notion of an inbound image, so
+// image parts are dropped there rather than sent as `input_image` and rejected by the router.
 function adaptNativeVisionContent(
-  content: HostChatRequestMessage['content']
-): string | RouterResponseInputContent[] {
+  content: HostChatRequestMessage['content'],
+  role: RouterResponseMessage['role']
+): string | RouterResponseMessageContent[] {
   if (typeof content === 'string') {
     return content;
   }
 
+  const asText = (text: string): RouterResponseMessageContent =>
+    role === 'assistant' ? { type: 'output_text', text } : { type: 'input_text', text };
+
   return content
-    .map((part): RouterResponseInputContent | undefined => {
+    .map((part): RouterResponseMessageContent | undefined => {
       if (typeof part === 'string') {
-        return { type: 'input_text', text: part };
+        return asText(part);
       }
 
       if (isHostImageDataPart(part)) {
-        return createRouterImagePart(part);
+        return role === 'assistant' ? undefined : createRouterImagePart(part);
       }
 
       if (typeof part === 'object' && part !== null && 'value' in part && typeof part.value === 'string') {
-        return { type: 'input_text', text: part.value };
+        return asText(part.value);
       }
 
       if (isToolCallPartLike(part) || isToolResultPartLike(part)) {
         return undefined;
       }
 
-      return { type: 'input_text', text: '[Unsupported input part omitted]' };
+      return asText('[Unsupported input part omitted]');
     })
-    .filter((part): part is RouterResponseInputContent => part !== undefined);
+    .filter((part): part is RouterResponseMessageContent => part !== undefined);
 }
 
 function adaptOrdinaryMessage(
   message: HostChatRequestMessage,
   selectedModel: ConfiguredModel
 ): RouterResponseMessage {
+  const role = mapRole(message.role);
+
   return {
-    role: mapRole(message.role),
+    role,
     content:
       selectedModel.visionMode === 'native'
-        ? adaptNativeVisionContent(message.content)
+        ? adaptNativeVisionContent(message.content, role)
         : extractTextContent(message.content)
   };
 }

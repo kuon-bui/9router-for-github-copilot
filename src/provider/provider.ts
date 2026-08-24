@@ -5,7 +5,7 @@ import {
   getExtensionConfiguration
 } from '@/config/settings';
 import { logDebugEvent } from '@/debug/output-channel';
-import { NineRouterError } from '@/router/errors';
+import { NineRouterError, appendErrorDetail } from '@/router/errors';
 import { adaptToolOptionsForRouter } from './tool-adapter';
 import { adaptMessagesToRouterRequest } from './request-adapter';
 import { createRouterEventEmitter, isThinkingPartSupported } from './stream-adapter';
@@ -14,6 +14,7 @@ import { resolveEffectiveThinkingMode } from './thinking-effort';
 import { VisionProxyService } from './vision-proxy';
 import { hasImageParts } from './image-input-adapter';
 import { resolvePublishedModels } from './model-catalog';
+import type { DebugMode } from '@/debug/output-channel';
 import type { RouterClient } from '@/router/client';
 import type { RuntimeSettings, SettingsSnapshot } from '@/config/settings';
 import type { RouterModelMetadata } from '@/router/model-catalog';
@@ -451,7 +452,7 @@ export class NineRouterChatProvider
         if (event.type === 'router-error') {
           throw new NineRouterError(
             'UPSTREAM_UNAVAILABLE',
-            '9router upstream execution failed',
+            appendErrorDetail('9router upstream execution failed', event.error),
             {
               ...(event.requestId ? { requestId: event.requestId } : {}),
               details: { phase: 'responses-api' }
@@ -485,6 +486,7 @@ export class NineRouterChatProvider
         );
       }
     } catch (error) {
+      logChatResponseFailure(snapshot.runtime.debugMode, selectedModel, error);
       throw mapProviderError(error, selectedModel);
     } finally {
       requestCancellation.cleanup();
@@ -510,6 +512,40 @@ export function findSelectedModelSetting(
   model: PublishedModel
 ): ConfiguredModel | undefined {
   return settings.find((setting) => setting.id === model.id);
+}
+
+// A failed chat response is otherwise invisible: the host shows only the concise message, so the
+// classification always lands in the output channel and the raw body waits behind verbose.
+function logChatResponseFailure(
+  debugMode: DebugMode,
+  selectedModel: ConfiguredModel,
+  error: unknown
+): void {
+  const routerError = error instanceof NineRouterError ? error : undefined;
+
+  logDebugEvent(
+    debugMode,
+    '9router chat response failed',
+    {
+      displayModel: selectedModel.id,
+      modelId: selectedModel.modelId,
+      errorCode: routerError?.code ?? 'UNKNOWN',
+      requestId: routerError?.requestId,
+      reason: error instanceof Error ? error.message : 'Unknown error',
+      ...(routerError?.details ?? {})
+    },
+    'minimal'
+  );
+
+  // Already bounded by the transport error-prefix cap, so it needs no second truncation here.
+  if (routerError?.responseBody) {
+    logDebugEvent(
+      debugMode,
+      '9router chat response error body',
+      { responseBody: routerError.responseBody },
+      'verbose'
+    );
+  }
 }
 
 function mapProviderError(error: unknown, selectedModel: ConfiguredModel): NineRouterError {
