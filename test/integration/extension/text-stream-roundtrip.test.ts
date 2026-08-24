@@ -1454,4 +1454,139 @@ describe('NineRouterChatProvider', () => {
       details: expect.objectContaining({ responseText: expect.anything() })
     });
   });
+
+  it('surfaces the 9router stream error message to the host', async () => {
+    const provider = new NineRouterChatProvider(
+      { secrets: { get: async () => 'token' } } as never,
+      {
+        async *streamResponse() {
+          yield {
+            type: 'router-error',
+            error: "Invalid value: 'input_text'. Supported values are: 'output_text' and 'refusal'.",
+            requestId: 'resp_1'
+          };
+        }
+      } as never
+    );
+
+    await expect(
+      provider.provideLanguageModelChatResponse(
+        {
+          id: 'daily',
+          name: 'Daily',
+          vendor: '9router',
+          family: 'daily',
+          version: '1',
+          maxInputTokens: 128000,
+          maxOutputTokens: 8192,
+          capabilities: {}
+        },
+        [{ role: 1, content: 'Say hello' }] as never,
+        {} as never,
+        { report: () => undefined } as never,
+        __createCancellationToken().value as never
+      )
+    ).rejects.toMatchObject({
+      code: 'UPSTREAM_UNAVAILABLE',
+      requestId: 'resp_1',
+      message:
+        "9router upstream execution failed: Invalid value: 'input_text'. Supported values are: 'output_text' and 'refusal'."
+    });
+  });
+
+  it('logs a failed chat response with its error classification', async () => {
+    const provider = new NineRouterChatProvider(
+      { secrets: { get: async () => 'token' } } as never,
+      {
+        async *streamResponse() {
+          throw new NineRouterError('TRANSPORT_ERROR', '9router request failed with status 400', {
+            requestId: 'req-400',
+            details: { status: 400 },
+            responseBody: '{"error":{"param":"input[1].content[0].type"}}'
+          });
+        }
+      } as never
+    );
+
+    await expect(
+      provider.provideLanguageModelChatResponse(
+        {
+          id: 'daily',
+          name: 'Daily',
+          vendor: '9router',
+          family: 'daily',
+          version: '1',
+          maxInputTokens: 128000,
+          maxOutputTokens: 8192,
+          capabilities: {}
+        },
+        [{ role: 1, content: 'Say hello' }] as never,
+        {} as never,
+        { report: () => undefined } as never,
+        __createCancellationToken().value as never
+      )
+    ).rejects.toMatchObject({ code: 'TRANSPORT_ERROR' });
+
+    const output = __getOutputLines().join('\n');
+    expect(output).toContain('9router chat response failed');
+    expect(output).toContain('TRANSPORT_ERROR');
+    expect(output).toContain('req-400');
+    expect(output).toContain('9router request failed with status 400');
+  });
+
+  it('dumps the raw router error body only at the verbose debug level', async () => {
+    const bodyMarker = 'input[1].content[0].type';
+    const rawBody = `{"error":{"param":"${bodyMarker}"}}`;
+    const createProvider = (): NineRouterChatProvider =>
+      new NineRouterChatProvider(
+        { secrets: { get: async () => 'token' } } as never,
+        {
+          async *streamResponse() {
+            throw new NineRouterError('TRANSPORT_ERROR', '9router request failed with status 400', {
+              details: { status: 400 },
+              responseBody: rawBody
+            });
+          }
+        } as never
+      );
+
+    const model = {
+      id: 'daily',
+      name: 'Daily',
+      vendor: '9router',
+      family: 'daily',
+      version: '1',
+      maxInputTokens: 128000,
+      maxOutputTokens: 8192,
+      capabilities: {}
+    };
+    const send = async (provider: NineRouterChatProvider): Promise<void> => {
+      await provider
+        .provideLanguageModelChatResponse(
+          model as never,
+          [{ role: 1, content: 'Say hello' }] as never,
+          {} as never,
+          { report: () => undefined } as never,
+          __createCancellationToken().value as never
+        )
+        .catch(() => undefined);
+    };
+
+    await send(createProvider());
+    expect(__getOutputLines().join('\n')).not.toContain(bodyMarker);
+
+    __resetVscodeState();
+    __setConfigurationValues({
+      models: [{ id: 'daily', name: 'Daily', modelId: 'combo/daily' }],
+      baseUrl: 'https://router.example.com/v1',
+      maxTokens: 128,
+      requestTimeoutMs: 5000,
+      debugMode: 'verbose'
+    });
+
+    await send(createProvider());
+    const verboseOutput = __getOutputLines().join('\n');
+    expect(verboseOutput).toContain('9router chat response error body');
+    expect(verboseOutput).toContain(bodyMarker);
+  });
 });

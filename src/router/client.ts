@@ -1,4 +1,4 @@
-import { NineRouterError } from './errors';
+import { NineRouterError, appendErrorDetail } from './errors';
 import { parseRouterModels } from './model-catalog';
 import { parseRouterEventStream } from './sse-parser';
 import { buildModelsUrl, buildResponsesUrl } from './url';
@@ -7,6 +7,7 @@ import type { RouterResponseRequest, RouterStreamEvent } from '@/types/router-co
 
 // ponytail: 16 KiB error prefix is enough for router error classification; raise if 9router wraps model ids deeper.
 const MAX_ERROR_BODY_BYTES = 16 * 1024;
+
 
 export interface RouterClient {
   streamResponse(input: {
@@ -298,6 +299,8 @@ function classifyStatusError(status: number, requestId: string | undefined, resp
     status
   };
 
+  // An auth body can echo the submitted credential, so it is dropped from both the message and
+  // the diagnostics payload; the status alone already tells the user what to fix.
   if (status === 401 || status === 403) {
     return new NineRouterError(
       'AUTHENTICATION_ERROR',
@@ -306,26 +309,32 @@ function classifyStatusError(status: number, requestId: string | undefined, resp
     );
   }
 
+  const summary = extractRouterErrorMessage(responseText);
+  const options = {
+    ...buildErrorOptions(requestId, details),
+    ...(responseText.length > 0 ? { responseBody: responseText } : {})
+  };
+
   if (status === 404 && isExplicitMissingModelError(responseText)) {
     return new NineRouterError(
       'MODEL_MAPPING_ERROR',
-      '9router model mapping was not found',
-      buildErrorOptions(requestId, details)
+      appendErrorDetail('9router model mapping was not found', summary),
+      options
     );
   }
 
   if (status >= 500) {
     return new NineRouterError(
       'UPSTREAM_UNAVAILABLE',
-      '9router upstream execution is unavailable',
-      buildErrorOptions(requestId, details)
+      appendErrorDetail('9router upstream execution is unavailable', summary),
+      options
     );
   }
 
   return new NineRouterError(
     'TRANSPORT_ERROR',
-    `9router request failed with status ${status}`,
-    buildErrorOptions(requestId, details)
+    appendErrorDetail(`9router request failed with status ${status}`, summary),
+    options
   );
 }
 
