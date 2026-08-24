@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.1](https://github.com/kuon-bui/9router-for-github-copilot/compare/v0.8.0...v0.8.1) (2026-08-24)
+
+
+### Bug Fixes
+
+* surface 9router error messages and fix input_text on assistant turns ([#27](https://github.com/kuon-bui/9router-for-github-copilot/issues/27)) ([fbbcad9](https://github.com/kuon-bui/9router-for-github-copilot/commit/fbbcad981241de5587e92c40024238e5bcf1b17f))
+
 ## [0.8.0](https://github.com/kuon-bui/9router-for-github-copilot/compare/v0.7.0...v0.8.0) (2026-08-21)
 
 
