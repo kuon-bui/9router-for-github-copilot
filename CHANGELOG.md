@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.0](https://github.com/kuon-bui/9router-for-github-copilot/compare/v0.8.1...v0.9.0) (2026-08-28)
+
+
+### Features
+
+* publish extension to VS Code Marketplace on release ([#29](https://github.com/kuon-bui/9router-for-github-copilot/issues/29)) ([e7324a5](https://github.com/kuon-bui/9router-for-github-copilot/commit/e7324a5d87aa276fc57388615bae45cb55bafce1))
+
 ## [0.8.1](https://github.com/kuon-bui/9router-for-github-copilot/compare/v0.8.0...v0.8.1) (2026-08-24)
 
 
