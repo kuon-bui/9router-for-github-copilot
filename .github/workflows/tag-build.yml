@@ -98,3 +98,14 @@ jobs:
           tag_name: ${{ needs.release.outputs.tag_name || inputs.tag }}
           files: "*.vsix"
           fail_on_unmatched_files: true
+
+      - name: Publish to VS Code Marketplace
+        if: needs.release.outputs.release_created == 'true'
+        shell: bash
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+        run: |
+          pnpm exec vsce publish \
+            --packagePath "$(ls -1 *.vsix)" \
+            --allow-proposed-apis languageModelThinkingPart \
+            --skip-duplicate

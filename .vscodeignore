@@ -20,3 +20,4 @@ eslint.config.js
 pnpm-workspace.yaml
 pnpm-lock.yaml
 tsconfig.json
+renovate.json
