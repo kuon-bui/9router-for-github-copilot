@@ -2,7 +2,11 @@
   "name": "9router-copilot-chat-provider",
   "displayName": "9router Copilot Chat Provider",
   "description": "Expose 9router as a custom provider inside GitHub Copilot Chat.",
-  "publisher": "local",
+  "publisher": "kuon",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kuon-bui/9router-for-github-copilot.git"
+  },
   "version": "0.8.1",
   "license": "UNLICENSED",
   "engines": {
