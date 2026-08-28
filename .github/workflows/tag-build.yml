@@ -49,9 +49,7 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
         with:
-          # release-please now creates the release as a draft, and a draft
-          # release has no git tag yet. Check out the release commit instead.
-          ref: ${{ github.sha }}
+          ref: ${{ github.event_name == 'workflow_dispatch' && github.sha || needs.release.outputs.tag_name }}
 
       - name: Verify manual release version
         if: github.event_name == 'workflow_dispatch'
