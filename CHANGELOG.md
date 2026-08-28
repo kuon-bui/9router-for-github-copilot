@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.1](https://github.com/kuon-bui/9router-for-github-copilot/compare/v0.9.0...v0.9.1) (2026-08-28)
+
+
+### Bug Fixes
+
+* create releases as drafts so VSIX upload survives immutable releases ([#31](https://github.com/kuon-bui/9router-for-github-copilot/issues/31)) ([12c4ffc](https://github.com/kuon-bui/9router-for-github-copilot/commit/12c4ffc2fa673b8a455274bfd601affa2f14bd17))
+
 ## [0.9.0](https://github.com/kuon-bui/9router-for-github-copilot/compare/v0.8.1...v0.9.0) (2026-08-28)
 
 
