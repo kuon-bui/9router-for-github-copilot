@@ -15,8 +15,10 @@ function configuration(values: Record<string, unknown>) {
 }
 
 describe('runtime settings', () => {
-  it('normalizes the router base url to /v1', () => {
-    expect(normalizeBaseUrl('https://router.example.com')).toBe('https://router.example.com/v1');
+  it('normalizes the router base url to an unversioned root', () => {
+    expect(normalizeBaseUrl('https://router.example.com/v1/')).toBe(
+      'https://router.example.com'
+    );
   });
 
   it('loads default Vision prompt with no selected source', () => {

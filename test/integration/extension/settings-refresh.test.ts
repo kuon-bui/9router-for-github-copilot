@@ -211,7 +211,7 @@ describe('NineRouterChatProvider snapshot refresh', () => {
     expect(listModels).toHaveBeenCalledTimes(3);
     expect(listModels).toHaveBeenCalledWith(
       expect.objectContaining({
-        baseUrl: 'http://127.0.0.1:3456/v1',
+        baseUrl: 'http://127.0.0.1:3456',
         apiKey: 'token',
         timeoutMs: 60_000,
         signal: expect.any(AbortSignal)
@@ -517,7 +517,7 @@ describe('NineRouterChatProvider snapshot refresh', () => {
     await response;
 
     expect(submitted).toMatchObject({
-      baseUrl: 'https://old-router.example.com/v1',
+      baseUrl: 'https://old-router.example.com',
       request: {
         model: 'router/old',
         max_output_tokens: 128

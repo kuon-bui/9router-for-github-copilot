@@ -1,17 +1,11 @@
 export function buildResponsesUrl(baseUrl: string): string {
-  const normalizedBaseUrl = baseUrl.trim().replace(/\/+$/, '');
-  const versionedBaseUrl = normalizedBaseUrl.endsWith('/v1')
-    ? normalizedBaseUrl
-    : `${normalizedBaseUrl}/v1`;
-
-  return `${versionedBaseUrl}/responses`;
+  return `${baseUrl}/v1/responses`;
 }
 
 export function buildModelsUrl(baseUrl: string): string {
-  const normalizedBaseUrl = baseUrl.trim().replace(/\/+$/, '');
-  const versionedBaseUrl = normalizedBaseUrl.endsWith('/v1')
-    ? normalizedBaseUrl
-    : `${normalizedBaseUrl}/v1`;
+  return `${baseUrl}/v1/models`;
+}
 
-  return `${versionedBaseUrl}/models`;
+export function buildUsageUrl(baseUrl: string): string {
+  return `${baseUrl}/tools/usages`;
 }

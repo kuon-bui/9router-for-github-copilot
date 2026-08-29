@@ -28,6 +28,10 @@ Run `9router: Set API Key` from the Command Palette. The key is stored only in V
 
 Run `9router: Test Connection` to validate the current base URL and API key through authenticated `GET /v1/models`. The result reports latency, available model count, and missing configured model mappings without exposing credentials.
 
+Run `9router: Show Usage` or chat `@9router /usage` to fetch authenticated `GET /tools/usage`. Both paths open a two-column connection-card usage dashboard (VS Code does not support a free-form HTML modal overlay) with remaining-quota meters and reset timers per connection. The command opens the dashboard in the active editor; `@9router /usage` opens it beside the current editor, leaves a short confirmation in chat, and does not dump quota details into the thread or keep `@9router` sticky for follow-up messages.
+
+Provider logos in the usage dashboard load from the official Lobe Icons SVG package through `unpkg.com` using the `@latest` CDN tag. If a provider is not mapped, its initial is shown instead.
+
 Run `9router: Toggle Model Fast Tier` to select a curated model and add or remove its `serviceTier: "fast"` setting.
 Fast-tier models appear in the picker as `⚡ Name`.
 

@@ -90,9 +90,17 @@ describe('release guardrails', () => {
     expect(manifest.contributes.commands).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ command: '9routerCopilot.testConnection' }),
+        expect.objectContaining({ command: '9routerCopilot.showUsage' }),
         expect.objectContaining({ command: '9routerCopilot.configureVisionProxy' })
       ])
     );
+    expect(manifest.contributes.chatParticipants).toEqual([
+      expect.objectContaining({
+        id: '9router-copilot.9router',
+        name: '9router',
+        commands: [expect.objectContaining({ name: 'usage' })]
+      })
+    ]);
   });
 
   it('defaults maxTokens to unlimited', () => {

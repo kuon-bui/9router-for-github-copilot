@@ -63,8 +63,7 @@ export interface SettingsSnapshot {
 }
 
 export function normalizeBaseUrl(input: string): string {
-  const trimmed = input.trim().replace(/\/+$/, '');
-  return trimmed.endsWith('/v1') ? trimmed : `${trimmed}/v1`;
+  return input.trim().replace(/\/v1\/*$|\/+$/, '');
 }
 
 export function normalizeMaxTokens(input: unknown): number | undefined {
@@ -223,9 +222,9 @@ function validateRuntimeSettings(
 ): RuntimeSettings | undefined {
   const runtime = loadRuntimeSettings(configuration);
   const baseUrlInput = configuration.get<string>('baseUrl') ?? DEFAULT_BASE_URL;
-  const normalizedBaseUrl = baseUrlInput.trim().length > 0 ? normalizeBaseUrl(baseUrlInput) : '';
+  const baseUrl = baseUrlInput.trim().length > 0 ? runtime.baseUrl : '';
 
-  if (!isValidBaseUrl(normalizedBaseUrl)) {
+  if (!isValidBaseUrl(baseUrl)) {
     issues.push({
       scope: 'runtime',
       code: 'INVALID_BASE_URL',
@@ -247,10 +246,7 @@ function validateRuntimeSettings(
     return undefined;
   }
 
-  return {
-    ...runtime,
-    baseUrl: normalizedBaseUrl
-  };
+  return runtime;
 }
 
 function isValidBaseUrl(input: string): boolean {
