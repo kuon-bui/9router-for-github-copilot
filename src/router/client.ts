@@ -212,8 +212,7 @@ export function createRouterClient(deps: { fetch: typeof globalThis.fetch }): Ro
         const response = await deps.fetch(buildUsageUrl(input.baseUrl), {
           method: 'GET',
           headers: {
-            'x-api-key': 'doi-gia-tri-nay'
-            // authorization: `Bearer ${input.apiKey}`
+            authorization: `Bearer ${input.apiKey}`
           },
           signal: composite.signal
         });

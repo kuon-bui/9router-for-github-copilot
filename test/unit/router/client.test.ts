@@ -31,7 +31,7 @@ describe('createRouterClient', () => {
 
     const events: unknown[] = [];
     for await (const event of client.streamResponse({
-      baseUrl: 'https://router.example.com/v1',
+      baseUrl: 'https://router.example.com',
       apiKey: 'secret-token',
       request: { model: 'combo/daily', input: [], stream: true, store: false },
       timeoutMs: 1000,
@@ -65,7 +65,7 @@ describe('createRouterClient', () => {
 
     const consume = async (): Promise<void> => {
       for await (const event of client.streamResponse({
-        baseUrl: 'https://router.example.com/v1',
+        baseUrl: 'https://router.example.com',
         apiKey: 'secret-token',
         request: { model: 'router/missing', input: [], stream: true, store: false },
         timeoutMs: 1000,
@@ -93,7 +93,7 @@ describe('createRouterClient', () => {
 
     const consume = async (): Promise<void> => {
       for await (const event of client.streamResponse({
-        baseUrl: 'https://router.example.com/v1',
+        baseUrl: 'https://router.example.com',
         apiKey: 'secret-token',
         request: { model: '123', input: [], stream: true, store: false },
         timeoutMs: 1000,
@@ -121,7 +121,7 @@ describe('createRouterClient', () => {
 
     const consume = async (): Promise<void> => {
       for await (const event of client.streamResponse({
-        baseUrl: 'https://router.example.com/v1',
+        baseUrl: 'https://router.example.com',
         apiKey: 'secret-token',
         request: { model: '123', input: [], stream: true, store: false },
         timeoutMs: 1000,
@@ -156,7 +156,7 @@ describe('createRouterClient', () => {
 
     const consume = async (): Promise<void> => {
       for await (const event of client.streamResponse({
-        baseUrl: 'https://router.example.com/v1',
+        baseUrl: 'https://router.example.com',
         apiKey: 'secret-token',
         request: { model: 'combo/daily', input: [], stream: true, store: false },
         timeoutMs: 1000,
@@ -190,7 +190,7 @@ describe('createRouterClient', () => {
 
     const consume = async (): Promise<void> => {
       for await (const event of client.streamResponse({
-        baseUrl: 'https://router.example.com/v1',
+        baseUrl: 'https://router.example.com',
         apiKey: 'secret-token',
         request: { model: 'combo/daily', input: [], stream: true, store: false },
         timeoutMs: 1000,
@@ -222,7 +222,7 @@ describe('createRouterClient', () => {
 
     const consume = async (): Promise<void> => {
       for await (const event of client.streamResponse({
-        baseUrl: 'https://router.example.com/v1',
+        baseUrl: 'https://router.example.com',
         apiKey: 'secret-token',
         request: { model: 'combo/daily', input: [], stream: true, store: false },
         timeoutMs: 1000,
@@ -252,7 +252,7 @@ describe('createRouterClient', () => {
 
     const consume = async (): Promise<void> => {
       for await (const event of client.streamResponse({
-        baseUrl: 'https://router.example.com/v1',
+        baseUrl: 'https://router.example.com',
         apiKey: 'secret-token',
         request: { model: 'combo/daily', input: [], stream: true, store: false },
         timeoutMs: 1000,
@@ -285,7 +285,7 @@ describe('createRouterClient', () => {
 
     const consume = async (): Promise<void> => {
       for await (const event of client.streamResponse({
-        baseUrl: 'https://router.example.com/v1',
+        baseUrl: 'https://router.example.com',
         apiKey: 'secret-token',
         request: { model: 'combo/daily', input: [], stream: true, store: false },
         timeoutMs: 1000,
@@ -327,7 +327,7 @@ describe('createRouterClient', () => {
 
     await expect(
       client.listModels({
-        baseUrl: 'https://router.example.com/v1',
+        baseUrl: 'https://router.example.com',
         apiKey: 'secret-token',
         timeoutMs: 1000,
         signal: new AbortController().signal
@@ -352,7 +352,7 @@ describe('createRouterClient', () => {
     );
   });
 
-  it('gets and validates /v1/usage with bearer auth', async () => {
+  it('gets and validates /tools/usage with bearer auth', async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       status: 200,
@@ -389,7 +389,7 @@ describe('createRouterClient', () => {
 
     await expect(
       client.getUsage({
-        baseUrl: 'https://router.example.com/v1',
+        baseUrl: 'https://router.example.com',
         apiKey: 'secret-token',
         timeoutMs: 1000,
         signal: new AbortController().signal
@@ -400,7 +400,7 @@ describe('createRouterClient', () => {
     });
 
     expect(fetchMock).toHaveBeenCalledWith(
-      'https://router.example.com/v1/usage',
+      'https://router.example.com/tools/usage',
       expect.objectContaining({
         method: 'GET',
         headers: expect.objectContaining({ authorization: 'Bearer secret-token' })
@@ -439,7 +439,7 @@ describe('createRouterClient', () => {
     });
     const consume = async (): Promise<void> => {
       for await (const event of client.streamResponse({
-        baseUrl: 'https://router.example.com/v1',
+        baseUrl: 'https://router.example.com',
         apiKey: 'secret-token',
         request: { model: 'combo/daily', input: [], stream: true, store: false },
         timeoutMs: 1000,
@@ -486,7 +486,7 @@ describe('createRouterClient', () => {
     });
     const consume = async (): Promise<void> => {
       for await (const event of client.streamResponse({
-        baseUrl: 'https://router.example.com/v1',
+        baseUrl: 'https://router.example.com',
         apiKey: 'secret-token',
         request: { model: 'router/missing', input: [], stream: true, store: false },
         timeoutMs: 1000,

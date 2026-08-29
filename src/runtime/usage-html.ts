@@ -7,6 +7,7 @@ import {
   quotaRemainingPercent,
   quotaTone
 } from './usage-format';
+import { resolveProviderIcon } from './provider-icons';
 
 export { formatResetLabel } from './usage-format';
 
@@ -21,24 +22,21 @@ function escapeHtml(value: string): string {
     .replace(/'/g, '&#39;');
 }
 
-function providerTone(provider: string): string {
-  const key = provider.trim().toLowerCase();
-  if (key.includes('codex') || key.includes('openai')) {
-    return 'codex';
-  }
-  if (key.includes('deepseek')) {
-    return 'deepseek';
-  }
-  if (key.includes('grok')) {
-    return 'grok';
-  }
-
-  return 'generic';
-}
-
 function providerInitial(provider: string): string {
   const trimmed = provider.trim();
   return trimmed.length === 0 ? '?' : trimmed.charAt(0).toUpperCase();
+}
+
+function renderProviderAvatar(provider: string): string {
+  const icon = resolveProviderIcon(provider);
+  if (!icon) {
+    return `<div class="avatar generic" aria-hidden="true">${escapeHtml(providerInitial(provider))}</div>`;
+  }
+
+  return `<div class="avatar provider-logo" data-provider-logo="${icon.slug}" aria-hidden="true">
+  <span>${escapeHtml(providerInitial(provider))}</span>
+  <img src="${icon.url}" alt="" loading="lazy" referrerpolicy="no-referrer" />
+</div>`;
 }
 
 function refreshIcon(): string {
@@ -80,12 +78,11 @@ function renderConnection(entry: RouterUsageEntry, nowMs: number): string {
     entry.message && entry.message.trim().length > 0
       ? `<p class="message">${escapeHtml(entry.message)}</p>`
       : '';
-  const tone = providerTone(entry.provider);
 
   return `<article class="card">
   <header class="card-head">
     <div class="identity">
-      <div class="avatar ${escapeHtml(tone)}" aria-hidden="true">${escapeHtml(providerInitial(entry.provider))}</div>
+      ${renderProviderAvatar(entry.provider)}
       <div class="copy">
         <div class="provider">${escapeHtml(formatProviderName(entry.provider))}</div>
         <div class="account">${escapeHtml(entry.name)}</div>
@@ -112,14 +109,16 @@ export function formatUsageHtml(
   const body =
     snapshot.entries.length === 0
       ? '<p class="empty page-empty">No connection usage entries returned.</p>'
-      : `<div class="board">${snapshot.entries.map((entry) => renderConnection(entry, nowMs)).join('\n')}</div>`;
+        : `<div class="board">${snapshot.entries
+          .map((entry) => renderConnection(entry, nowMs))
+          .join('\n')}</div>`;
 
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:;" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src https://unpkg.com;" />
   <title>9router Usage</title>
   <style>
     :root {
@@ -134,7 +133,6 @@ export function formatUsageHtml(
       --critical: #f85149;
       --track-ok: color-mix(in srgb, var(--ok) 22%, transparent);
       --track-critical: color-mix(in srgb, var(--critical) 22%, transparent);
-      --avatar-fg: #fff;
     }
     * { box-sizing: border-box; }
     body {
@@ -195,14 +193,22 @@ export function formatUsageHtml(
       display: grid;
       place-items: center;
       flex-shrink: 0;
-      color: var(--avatar-fg);
+      color: var(--fg);
       font-size: 14px;
       font-weight: 700;
-      background: color-mix(in srgb, var(--fg) 28%, transparent);
+      background: color-mix(in srgb, var(--fg) 9%, var(--card));
     }
-    .avatar.codex { background: #111; }
-    .avatar.deepseek { background: #4f6bff; }
-    .avatar.grok { background: #2a2a2a; }
+    .avatar.provider-logo { position: relative; color: #111; background: #f4f4f4; }
+    .avatar.provider-logo span { font-size: 13px; font-weight: 700; }
+    .avatar img {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      display: block;
+      width: 21px;
+      height: 21px;
+      transform: translate(-50%, -50%);
+    }
     .copy { min-width: 0; }
     .provider {
       font-size: 15px;

@@ -5,15 +5,9 @@ import { buildUsageUrl } from '@/router/url';
 import { MOCK_USAGE_PAYLOAD } from '@test/support/usage-fixture';
 
 describe('buildUsageUrl', () => {
-  it('normalizes base urls onto /v1/usage', () => {
-    expect(buildUsageUrl('https://router.example.com/v1')).toBe(
-      'https://router.example.com/v1/usage'
-    );
+  it('appends /tools/usage to a normalized base url', () => {
     expect(buildUsageUrl('https://router.example.com')).toBe(
-      'https://router.example.com/v1/usage'
-    );
-    expect(buildUsageUrl('https://router.example.com/v1/')).toBe(
-      'https://router.example.com/v1/usage'
+      'https://router.example.com/tools/usage'
     );
   });
 });

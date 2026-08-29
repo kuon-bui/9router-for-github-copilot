@@ -51,7 +51,7 @@ describe('createConnectionTester', () => {
     expect(result.durationMs).toBeGreaterThanOrEqual(0);
     expect(listModels).toHaveBeenCalledWith(
       expect.objectContaining({
-        baseUrl: 'https://router.example.com/v1',
+        baseUrl: 'https://router.example.com',
         apiKey: 'secret',
         timeoutMs: 5_000,
         signal: expect.any(AbortSignal)

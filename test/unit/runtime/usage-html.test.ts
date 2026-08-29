@@ -23,9 +23,109 @@ describe('formatUsageHtml', () => {
     expect(html).toContain('100%');
     expect(html).toContain('N/A');
     expect(html).toContain('command:9routerCopilot.showUsage');
+    expect(html).toContain('data-provider-logo="codex"');
+    expect(html).toContain('data-provider-logo="deepseek"');
     expect(html).not.toContain('Plan: plus');
     expect(html).not.toContain('Current session');
     expect(html).not.toContain('Weekly limits');
+  });
+
+  it('uses matching brand logos and falls back for unknown providers', () => {
+    const providers = [
+      'antigravity',
+      'claude',
+      'codebuddy-cn',
+      'codebuddy-intl',
+      'codex',
+      'deepseek',
+      'gemini-cli',
+      'github',
+      'glm',
+      'glm-cn',
+      'grok-cli',
+      'kimi',
+      'kiro',
+      'minimax',
+      'minimax-cn',
+      'ollama',
+      'qoder',
+      'vercel-ai-gateway',
+      'zed',
+      'openai',
+      'xai',
+      'custom-router'
+    ];
+    const html = formatUsageHtml({
+      count: providers.length,
+      lastSweepAt: '2026-08-29T02:15:29.747Z',
+      entries: providers.map((provider, index) => ({
+        connectionId: `connection-${index}`,
+        provider,
+        name: 'account',
+        authType: 'oauth',
+        status: 'ok',
+        plan: 'default',
+        quotas: {},
+        message: null,
+        fetchedAt: '2026-08-29T02:15:29.747Z',
+        stale: false
+      }))
+    });
+
+    for (const slug of [
+      'antigravity',
+      'claude',
+      'codebuddy',
+      'codex',
+      'deepseek',
+      'gemini',
+      'copilot',
+      'zai',
+      'zhipu',
+      'grok',
+      'kimi',
+      'kiro',
+      'minimax',
+      'ollama',
+      'qoder',
+      'vercel',
+      'openai',
+      'xai'
+    ]) {
+      expect(html).toContain(`data-provider-logo="${slug}"`);
+    }
+
+    expect(html.match(/data-provider-logo="codebuddy"/g)).toHaveLength(2);
+    expect(html.match(/data-provider-logo="minimax"/g)).toHaveLength(2);
+    expect(html).toContain('<div class="avatar generic" aria-hidden="true">Z</div>');
+    expect(html).toContain('<div class="avatar generic" aria-hidden="true">C</div>');
+  });
+
+  it('loads repeated provider logos from the Lobe SVG CDN', () => {
+    const html = formatUsageHtml({
+      count: 2,
+      lastSweepAt: '2026-08-29T02:15:29.747Z',
+      entries: [0, 1].map((index) => ({
+        connectionId: `codex-${index}`,
+        provider: 'codex',
+        name: `account-${index}`,
+        authType: 'oauth',
+        status: 'ok',
+        plan: 'plus',
+        quotas: {},
+        message: null,
+        fetchedAt: '2026-08-29T02:15:29.747Z',
+        stale: false
+      }))
+    });
+
+    expect(
+      html.match(
+        /https:\/\/unpkg\.com\/@lobehub\/icons-static-svg@latest\/icons\/codex-color\.svg/g
+      )
+    ).toHaveLength(2);
+    expect(html).toContain("img-src https://unpkg.com;");
+    expect(html).not.toContain('<script');
   });
 
   it('marks exhausted quotas as 0% remaining', () => {
