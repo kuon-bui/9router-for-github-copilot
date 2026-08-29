@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.10.0](https://github.com/kuon-bui/9router-for-github-copilot/compare/v0.9.1...v0.10.0) (2026-08-28)
+
+
+### ⚠ BREAKING CHANGES
+
+* release v1.0.0 ([#35](https://github.com/kuon-bui/9router-for-github-copilot/issues/35))
+
+### Features
+
+* release v1.0.0 ([#35](https://github.com/kuon-bui/9router-for-github-copilot/issues/35)) ([632326d](https://github.com/kuon-bui/9router-for-github-copilot/commit/632326d0a8bacf8c7ceb7d88ce9d5c36509bd13d))
+
 ## [0.9.1](https://github.com/kuon-bui/9router-for-github-copilot/compare/v0.9.0...v0.9.1) (2026-08-28)
 
 
