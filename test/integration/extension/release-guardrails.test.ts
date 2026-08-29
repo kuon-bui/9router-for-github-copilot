@@ -229,9 +229,8 @@ describe('release guardrails', () => {
     await expect(access(resolve(process.cwd(), 'LICENSE'), constants.R_OK)).resolves.toBeUndefined();
 
     const license = await readFile(resolve(process.cwd(), 'LICENSE'), 'utf8');
-    expect(manifest.license).toBe('UNLICENSED');
-    expect(license).toContain('UNLICENSED');
-    expect(license).toContain('not licensed for copying');
+    expect(manifest.license).toBe('MIT');
+    expect(license).toContain('MIT License');
   });
 
   it('keeps source, tests, and internal docs out of the packaged VSIX', async () => {
