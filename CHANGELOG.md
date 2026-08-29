@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.11.1](https://github.com/kuon-bui/9router-for-github-copilot/compare/v0.11.0...v0.11.1) (2026-08-29)
+
+
+### Bug Fixes
+
+* **test:** add license MIT, tool api ([#41](https://github.com/kuon-bui/9router-for-github-copilot/issues/41)) ([e1104fa](https://github.com/kuon-bui/9router-for-github-copilot/commit/e1104fa846735d83461e328d0d9385c705765130))
+
 ## [0.11.0](https://github.com/kuon-bui/9router-for-github-copilot/compare/v0.10.0...v0.11.0) (2026-08-29)
 
 
