@@ -8,7 +8,7 @@
     "url": "https://github.com/kuon-bui/9router-for-github-copilot.git"
   },
   "version": "0.10.0",
-  "license": "UNLICENSED",
+  "license": "MIT",
   "engines": {
     "vscode": "^1.133.0"
   },

@@ -7,7 +7,7 @@ The extension is a thin adapter. Users publish an ordered set of user-defined cu
 ## Status
 
 - Package version: `0.1.0`
-- License policy: `UNLICENSED`
+- License: [MIT](./LICENSE)
 - Runtime target: VS Code `^1.125.0`
 - Backend contract: OpenAI-compatible `9router` `/v1/responses`
 
