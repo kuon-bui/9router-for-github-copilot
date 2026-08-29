@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.11.0](https://github.com/kuon-bui/9router-for-github-copilot/compare/v0.10.0...v0.11.0) (2026-08-29)
+
+
+### Features
+
+* **quota:** Add connection quota usage dashboard ([#37](https://github.com/kuon-bui/9router-for-github-copilot/issues/37)) ([669a157](https://github.com/kuon-bui/9router-for-github-copilot/commit/669a157866f9e5cf086c39908dc3d130873247f7))
+
 ## [0.10.0](https://github.com/kuon-bui/9router-for-github-copilot/compare/v0.9.1...v0.10.0) (2026-08-28)
 
 
