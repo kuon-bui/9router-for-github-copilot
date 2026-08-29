@@ -3,12 +3,14 @@ import { buildSettingsSnapshot } from '@/config/settings';
 import { formatSettingsSnapshotDiagnostics } from '@/debug/output-channel';
 import { NineRouterError } from '@/router/errors';
 import { registerCommands } from '@/runtime/commands';
+import { __resetUsagePanelForTests } from '@/runtime/usage-panel';
 import {
   __createCancellationToken,
   __getErrorMessages,
   __getCommandHandler,
   __getInformationMessages,
   __getOutputLines,
+  __getWebviewPanels,
   __resetVscodeState,
   __getConfigurationUpdates,
   __setConfigurationValues,
@@ -19,6 +21,7 @@ import {
 describe('9routerCopilot.showDiagnostics', () => {
   beforeEach(() => {
     __resetVscodeState();
+    __resetUsagePanelForTests();
   });
 
   it('prints the current validated snapshot to the output channel', async () => {
@@ -180,6 +183,94 @@ describe('9routerCopilot.showDiagnostics', () => {
 
     expect(__getErrorMessages()).toEqual([
       '9router connection failed: 9router authentication failed Request ID: req-safe.'
+    ]);
+    expect(__getInformationMessages()).toEqual([]);
+  });
+
+  it('opens a connection-card usage webview panel without a notification', async () => {
+    const showUsage = vi.fn(async () => ({
+      count: 2,
+      lastSweepAt: '2026-08-29T02:15:29.747Z',
+      entries: [
+        {
+          connectionId: 'conn-1',
+          provider: 'codex',
+          name: 'test@gmail.com',
+          authType: 'oauth',
+          status: 'ok',
+          plan: 'plus',
+          quotas: {
+            session: {
+              used: 95,
+              total: 100,
+              remaining: 5,
+              resetAt: '2026-08-29T05:50:05.000Z',
+              unlimited: false
+            }
+          },
+          message: null,
+          fetchedAt: '2026-08-29T02:15:28.016Z',
+          stale: false
+        }
+      ]
+    }));
+
+    registerCommands(
+      {
+        subscriptions: [],
+        secrets: {
+          get: async () => undefined,
+          store: async () => undefined,
+          delete: async () => undefined
+        }
+      } as never,
+      { showUsage }
+    );
+
+    await __getCommandHandler('9routerCopilot.showUsage')?.();
+
+    expect(showUsage).toHaveBeenCalledTimes(1);
+    const panels = __getWebviewPanels();
+    expect(panels).toHaveLength(1);
+    expect(panels[0]).toMatchObject({
+      viewType: '9routerCopilot.usage',
+      title: 'Usage',
+      showOptions: {
+        viewColumn: -1,
+        preserveFocus: false
+      }
+    });
+    expect(panels[0]?.html).toContain('session');
+    expect(panels[0]?.html).toContain('5%');
+    expect(panels[0]?.html).toContain('plus · oauth');
+    expect(panels[0]?.html).toContain('Codex');
+    expect(__getInformationMessages()).toEqual([]);
+    expect(__getErrorMessages()).toEqual([]);
+  });
+
+  it('reports safe usage errors with request ids', async () => {
+    registerCommands(
+      {
+        subscriptions: [],
+        secrets: {
+          get: async () => undefined,
+          store: async () => undefined,
+          delete: async () => undefined
+        }
+      } as never,
+      {
+        showUsage: async () => {
+          throw new NineRouterError('TRANSPORT_ERROR', '9router request failed with status 500', {
+            requestId: 'req-usage'
+          });
+        }
+      }
+    );
+
+    await __getCommandHandler('9routerCopilot.showUsage')?.();
+
+    expect(__getErrorMessages()).toEqual([
+      '9router usage failed: 9router request failed with status 500 Request ID: req-usage.'
     ]);
     expect(__getInformationMessages()).toEqual([]);
   });

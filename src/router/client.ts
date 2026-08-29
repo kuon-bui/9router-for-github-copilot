@@ -1,8 +1,10 @@
 import { NineRouterError, appendErrorDetail } from './errors';
 import { parseRouterModels } from './model-catalog';
 import { parseRouterEventStream } from './sse-parser';
-import { buildModelsUrl, buildResponsesUrl } from './url';
+import { parseRouterUsage } from './usage';
+import { buildModelsUrl, buildResponsesUrl, buildUsageUrl } from './url';
 import type { RouterModelMetadata } from './model-catalog';
+import type { RouterUsageSnapshot } from './usage';
 import type { RouterResponseRequest, RouterStreamEvent } from '@/types/router-contract';
 
 // ponytail: 16 KiB error prefix is enough for router error classification; raise if 9router wraps model ids deeper.
@@ -23,6 +25,12 @@ export interface RouterClient {
     timeoutMs: number;
     signal: AbortSignal;
   }): Promise<RouterModelMetadata[]>;
+  getUsage(input: {
+    baseUrl: string;
+    apiKey: string;
+    timeoutMs: number;
+    signal: AbortSignal;
+  }): Promise<RouterUsageSnapshot>;
 }
 
 interface ResponseBodySource {
@@ -195,6 +203,63 @@ export function createRouterClient(deps: { fetch: typeof globalThis.fetch }): Ro
       } finally {
         composite.cleanup();
       }
+    },
+
+    async getUsage(input) {
+      const composite = createCompositeAbortSignal(input.signal, input.timeoutMs);
+
+      try {
+        const response = await deps.fetch(buildUsageUrl(input.baseUrl), {
+          method: 'GET',
+          headers: {
+            'x-api-key': 'doi-gia-tri-nay'
+            // authorization: `Bearer ${input.apiKey}`
+          },
+          signal: composite.signal
+        });
+
+        const requestId = response.headers.get('x-request-id') ?? undefined;
+        if (!response.ok) {
+          throw classifyDiscoveryStatusError(response.status, requestId, 'usage-discovery');
+        }
+
+        let payload: unknown;
+        try {
+          payload = await response.json();
+        } catch {
+          throw createMalformedUsageError(requestId);
+        }
+
+        try {
+          return parseRouterUsage(payload);
+        } catch (error) {
+          if (error instanceof NineRouterError) {
+            throw withRequestId(error, requestId);
+          }
+
+          throw createMalformedUsageError(requestId);
+        }
+      } catch (error) {
+        if (composite.didTimeout()) {
+          throw new NineRouterError('TIMEOUT_ERROR', '9router request timed out');
+        }
+
+        if (input.signal.aborted) {
+          throw new NineRouterError('CANCELLATION_ERROR', '9router request was cancelled');
+        }
+
+        if (error instanceof NineRouterError) {
+          throw error;
+        }
+
+        if (error instanceof Error) {
+          throw new NineRouterError('TRANSPORT_ERROR', error.message);
+        }
+
+        throw new NineRouterError('TRANSPORT_ERROR', 'Unknown transport error');
+      } finally {
+        composite.cleanup();
+      }
     }
   };
 }
@@ -241,6 +306,14 @@ function createMalformedCatalogError(requestId: string | undefined): NineRouterE
     'UPSTREAM_UNAVAILABLE',
     '9router model catalog response is malformed',
     buildErrorOptions(requestId, { phase: 'model-catalog-discovery' })
+  );
+}
+
+function createMalformedUsageError(requestId: string | undefined): NineRouterError {
+  return new NineRouterError(
+    'UPSTREAM_UNAVAILABLE',
+    '9router usage response is malformed',
+    buildErrorOptions(requestId, { phase: 'usage-discovery' })
   );
 }
 
@@ -338,10 +411,14 @@ function classifyStatusError(status: number, requestId: string | undefined, resp
   );
 }
 
-function classifyDiscoveryStatusError(status: number, requestId: string | undefined): NineRouterError {
+function classifyDiscoveryStatusError(
+  status: number,
+  requestId: string | undefined,
+  phase: string = 'model-catalog-discovery'
+): NineRouterError {
   const details = {
     status,
-    phase: 'model-catalog-discovery'
+    phase
   };
 
   if (status === 401 || status === 403) {

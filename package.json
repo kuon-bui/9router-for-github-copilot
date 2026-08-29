@@ -37,6 +37,10 @@
         "title": "9router: Test Connection"
       },
       {
+        "command": "9routerCopilot.showUsage",
+        "title": "9router: Show Usage"
+      },
+      {
         "command": "9routerCopilot.toggleModelFastTier",
         "title": "9router: Toggle Model Fast Tier"
       },
@@ -47,6 +51,20 @@
       {
         "command": "9routerCopilot.configureVisionProxy",
         "title": "9router: Configure Vision Proxy"
+      }
+    ],
+    "chatParticipants": [
+      {
+        "id": "9router-copilot.9router",
+        "name": "9router",
+        "fullName": "9router",
+        "description": "9router command",
+        "commands": [
+          {
+            "name": "usage",
+            "description": "Show connection quotas and usage"
+          }
+        ]
       }
     ],
     "languageModelChatProviders": [

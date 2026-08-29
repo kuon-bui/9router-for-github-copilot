@@ -352,6 +352,62 @@ describe('createRouterClient', () => {
     );
   });
 
+  it('gets and validates /v1/usage with bearer auth', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: new Headers({ 'x-request-id': 'req-usage' }),
+      json: async () => ({
+        count: 1,
+        lastSweepAt: '2026-08-29T02:15:29.747Z',
+        entries: [
+          {
+            connectionId: 'conn-1',
+            provider: 'codex',
+            name: 'test@gmail.com',
+            authType: 'oauth',
+            status: 'ok',
+            plan: 'plus',
+            quotas: {
+              session: {
+                used: 95,
+                total: 100,
+                remaining: 5,
+                resetAt: '2026-08-29T05:50:05.000Z',
+                unlimited: false
+              }
+            },
+            message: null,
+            fetchedAt: '2026-08-29T02:15:28.016Z',
+            stale: false
+          }
+        ]
+      })
+    });
+
+    const client = createRouterClient({ fetch: fetchMock as never });
+
+    await expect(
+      client.getUsage({
+        baseUrl: 'https://router.example.com/v1',
+        apiKey: 'secret-token',
+        timeoutMs: 1000,
+        signal: new AbortController().signal
+      })
+    ).resolves.toMatchObject({
+      count: 1,
+      entries: [expect.objectContaining({ provider: 'codex' })]
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://router.example.com/v1/usage',
+      expect.objectContaining({
+        method: 'GET',
+        headers: expect.objectContaining({ authorization: 'Bearer secret-token' })
+      })
+    );
+  });
+
   it('maps unauthorized discovery status to AUTHENTICATION_ERROR', async () => {
     const client = createRouterClient({
       fetch: vi.fn().mockResolvedValue({

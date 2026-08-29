@@ -2,9 +2,11 @@ import * as vscode from 'vscode';
 import { clearApiKey, setApiKey } from '@/config/secret-store';
 import { showDiagnostics, showSettingsSnapshotDiagnostics } from '@/debug/output-channel';
 import { NineRouterError } from '@/router/errors';
+import { showUsagePanel } from './usage-panel';
 import type { SettingsSnapshot } from '@/config/settings';
 import type { VisionProxyConfigurator } from './vision-configuration';
 import type { ConnectionTester } from './test-connection';
+import type { UsageReporter } from './show-usage';
 
 interface FastTierQuickPickItem extends vscode.QuickPickItem {
   sourceIndex: number;
@@ -15,6 +17,7 @@ interface CommandDependencies {
   getSettingsSnapshot?: () => SettingsSnapshot | undefined;
   configureVisionProxy?: VisionProxyConfigurator;
   testConnection?: ConnectionTester;
+  showUsage?: UsageReporter;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -70,6 +73,29 @@ export function registerCommands(
           error instanceof NineRouterError ? error.message : 'Unexpected connection error';
         await vscode.window.showErrorMessage(
           `9router connection failed: ${message}${requestId ? ` Request ID: ${requestId}.` : ''}`
+        );
+      } finally {
+        cancellation.dispose();
+      }
+    })
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand('9routerCopilot.showUsage', async () => {
+      const cancellation = new vscode.CancellationTokenSource();
+      try {
+        const snapshot = await dependencies.showUsage?.(cancellation.token);
+        if (!snapshot) {
+          return;
+        }
+
+        showUsagePanel(snapshot);
+      } catch (error) {
+        const requestId = error instanceof NineRouterError ? error.requestId : undefined;
+        const message =
+          error instanceof NineRouterError ? error.message : 'Unexpected usage error';
+        await vscode.window.showErrorMessage(
+          `9router usage failed: ${message}${requestId ? ` Request ID: ${requestId}.` : ''}`
         );
       } finally {
         cancellation.dispose();

@@ -8,8 +8,10 @@ import { disposeOutputChannel } from '@/debug/output-channel';
 import { createRouterClient } from '@/router/client';
 import { NineRouterChatProvider } from '@/provider/provider';
 import { registerCommands } from './commands';
+import { registerUsageChatParticipant } from './chat-participant';
 import { createVisionProxyConfigurator } from './vision-configuration';
 import { createConnectionTester } from './test-connection';
+import { createUsageReporter } from './show-usage';
 import type { RouterClient } from '@/router/client';
 import type { SettingsSnapshot } from '@/config/settings';
 import type { VisionProxyConfigurator } from './vision-configuration';
@@ -55,11 +57,18 @@ export async function activateExtension(
     routerClient,
     getSettingsSnapshot: () => provider?.getSnapshot()
   });
+  const showUsage = createUsageReporter({
+    secrets: context.secrets,
+    routerClient,
+    getSettingsSnapshot: () => provider?.getSnapshot()
+  });
   registerRuntimeCommands(context, {
     getSettingsSnapshot: () => provider?.getSnapshot(),
     configureVisionProxy,
-    testConnection
+    testConnection,
+    showUsage
   });
+  registerUsageChatParticipant(context, { showUsage });
   providerRegistration = vscode.lm.registerLanguageModelChatProvider('9router', provider);
   context.subscriptions.push(providerRegistration);
 

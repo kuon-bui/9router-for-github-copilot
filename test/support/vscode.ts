@@ -109,6 +109,14 @@ class LanguageModelError extends Error {
   }
 }
 
+class ThemeIcon {
+  public readonly id: string;
+
+  public constructor(id: string) {
+    this.id = id;
+  }
+}
+
 class OutputChannel {
   public readonly lines: string[] = [];
 
@@ -123,6 +131,43 @@ class OutputChannel {
   }
 }
 
+class WebviewPanel {
+  public readonly webview = {
+    html: ''
+  };
+  public readonly onDidDispose = (listener: () => void): Disposable => {
+    this.disposeListeners.add(listener);
+    return new Disposable(() => {
+      this.disposeListeners.delete(listener);
+    });
+  };
+  private readonly disposeListeners = new Set<() => void>();
+  public lastReveal: { viewColumn: unknown; preserveFocus: boolean } | undefined;
+  public readonly showOptions: unknown;
+
+  public constructor(
+    public readonly viewType: string,
+    public readonly title: string,
+    showOptions: unknown = undefined
+  ) {
+    this.showOptions = showOptions;
+  }
+
+  public reveal(viewColumn?: unknown, preserveFocus?: boolean): void {
+    this.lastReveal = {
+      viewColumn,
+      preserveFocus: preserveFocus === true
+    };
+  }
+
+  public dispose(): void {
+    for (const listener of this.disposeListeners) {
+      listener();
+    }
+    this.disposeListeners.clear();
+  }
+}
+
 const configurationValues = new Map<string, unknown>();
 const commandHandlers = new Map<string, (...args: unknown[]) => unknown>();
 let registeredProvider: unknown;
@@ -133,8 +178,15 @@ let selectedChatModels: unknown[] = [];
 const configurationUpdates: Array<{ key: string; value: unknown; target: unknown }> = [];
 const informationMessages: string[] = [];
 const errorMessages: string[] = [];
+const chatParticipants: Array<{
+  id: string;
+  handler: (...args: unknown[]) => unknown;
+  iconPath?: unknown;
+}> = [];
+const webviewPanels: WebviewPanel[] = [];
 
 export const ConfigurationTarget = { Global: 1 } as const;
+export const ViewColumn = { Active: -1, Beside: -2 } as const;
 
 export class LanguageModelChatMessage {
   public static User(content: unknown[]): LanguageModelChatMessage {
@@ -170,6 +222,17 @@ export const commands = {
 export const window = {
   createOutputChannel(): OutputChannel {
     return outputChannel;
+  },
+  createWebviewPanel(
+    viewType: string,
+    title: string,
+    showOptions: unknown,
+    _options?: unknown
+  ): WebviewPanel {
+    void _options;
+    const panel = new WebviewPanel(viewType, title, showOptions);
+    webviewPanels.push(panel);
+    return panel;
   },
   async showInputBox(): Promise<string | undefined> {
     return inputBoxValue;
@@ -224,6 +287,27 @@ export const lm = {
   }
 };
 
+export const chat = {
+  createChatParticipant(
+    id: string,
+    handler: (...args: unknown[]) => unknown
+  ): { iconPath?: unknown } & Disposable {
+    const participant = {
+      id,
+      handler,
+      iconPath: undefined as unknown,
+      dispose(): void {
+        const index = chatParticipants.findIndex((entry) => entry.id === id);
+        if (index >= 0) {
+          chatParticipants.splice(index, 1);
+        }
+      }
+    };
+    chatParticipants.push(participant);
+    return participant;
+  }
+};
+
 export function __setConfigurationValues(values: Record<string, unknown>): void {
   configurationValues.clear();
   for (const [key, value] of Object.entries(values)) {
@@ -263,8 +347,32 @@ export function __getErrorMessages(): string[] {
   return [...errorMessages];
 }
 
+export function __getWebviewPanels(): Array<{
+  viewType: string;
+  title: string;
+  html: string;
+  showOptions: unknown;
+  lastReveal: { viewColumn: unknown; preserveFocus: boolean } | undefined;
+}> {
+  return webviewPanels.map((panel) => ({
+    viewType: panel.viewType,
+    title: panel.title,
+    html: panel.webview.html,
+    showOptions: panel.showOptions,
+    lastReveal: panel.lastReveal
+  }));
+}
+
 export function __getRegisteredProvider(): unknown {
   return registeredProvider;
+}
+
+export function __getChatParticipants(): Array<{
+  id: string;
+  handler: (...args: unknown[]) => unknown;
+  iconPath?: unknown;
+}> {
+  return [...chatParticipants];
 }
 
 export function __getCommandHandler(command: string): ((...args: unknown[]) => unknown) | undefined {
@@ -303,6 +411,11 @@ export function __resetVscodeState(): void {
   configurationUpdates.length = 0;
   informationMessages.length = 0;
   errorMessages.length = 0;
+  chatParticipants.length = 0;
+  for (const panel of webviewPanels) {
+    panel.dispose();
+  }
+  webviewPanels.length = 0;
 }
 
 export {
@@ -313,5 +426,6 @@ export {
   LanguageModelThinkingPart,
   LanguageModelDataPart,
   LanguageModelToolCallPart,
-  LanguageModelToolResultPart
+  LanguageModelToolResultPart,
+  ThemeIcon
 };
