@@ -7,5 +7,5 @@ export function buildModelsUrl(baseUrl: string): string {
 }
 
 export function buildUsageUrl(baseUrl: string): string {
-  return `${baseUrl}/tools/usage`;
+  return `${baseUrl}/tools/usages`;
 }

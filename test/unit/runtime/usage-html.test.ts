@@ -15,8 +15,12 @@ describe('formatUsageHtml', () => {
     expect(html).toContain('weekly');
     expect(html).toContain('95 / 100');
     expect(html).toContain('5%');
+    expect(html).toContain('bar critical');
     expect(html).toContain('23 / 100');
     expect(html).toContain('77%');
+    expect(html).toContain('bar ok');
+    expect(html).toContain('width: 45px');
+    expect(html).toContain('width: 26px');
     expect(html).toContain('in 3h 34m');
     expect(html).toContain('Balance (USD)');
     expect(html).toContain('0 / 2.91');
@@ -163,6 +167,40 @@ describe('formatUsageHtml', () => {
     expect(html).toContain('0%');
     expect(html).toContain('bar critical');
     expect(html).toContain('in 19d 20h 14m');
+  });
+
+  it('marks mid remaining quotas as warn', () => {
+    const html = formatUsageHtml({
+      count: 1,
+      lastSweepAt: '2026-08-29T02:15:29.747Z',
+      entries: [
+        {
+          connectionId: 'conn-warn',
+          provider: 'codex',
+          name: 'mid@example.com',
+          authType: 'oauth',
+          status: 'ok',
+          plan: 'plus',
+          quotas: {
+            weekly: {
+              used: 40,
+              total: 100,
+              remaining: 60,
+              resetAt: '2026-09-04T00:42:13.000Z',
+              unlimited: false
+            }
+          },
+          message: null,
+          fetchedAt: '2026-08-29T02:15:28.016Z',
+          stale: false
+        }
+      ]
+    });
+
+    expect(html).toContain('40 / 100');
+    expect(html).toContain('60%');
+    expect(html).toContain('bar warn');
+    expect(html).toContain('remaining warn');
   });
 });
 

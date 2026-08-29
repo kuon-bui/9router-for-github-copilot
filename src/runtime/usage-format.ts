@@ -34,8 +34,18 @@ export function remainingPercent(used: number, total: number): number {
   return Math.max(0, Math.min(100, Math.round(((total - used) / total) * 100)));
 }
 
-export function quotaTone(percent: number): 'ok' | 'critical' {
-  return percent <= 0 ? 'critical' : 'ok';
+export type QuotaTone = 'ok' | 'warn' | 'critical';
+
+export function quotaTone(percent: number): QuotaTone {
+  if (percent > 70) {
+    return 'ok';
+  }
+
+  if (percent >= 30) {
+    return 'warn';
+  }
+
+  return 'critical';
 }
 
 export function quotaRemainingPercent(quota: RouterUsageQuota): number {

@@ -3,6 +3,7 @@ import {
   formatProviderName,
   formatResetLabel,
   quotaRemainingPercent,
+  quotaTone,
   remainingPercent
 } from '@/runtime/usage-format';
 
@@ -26,6 +27,15 @@ describe('usage-format', () => {
         unlimited: true
       })
     ).toBe(100);
+  });
+
+  it('maps remaining percent to quota tones', () => {
+    expect(quotaTone(100)).toBe('ok');
+    expect(quotaTone(71)).toBe('ok');
+    expect(quotaTone(70)).toBe('warn');
+    expect(quotaTone(30)).toBe('warn');
+    expect(quotaTone(29)).toBe('critical');
+    expect(quotaTone(0)).toBe('critical');
   });
 
   it('formats compact remaining reset windows', () => {

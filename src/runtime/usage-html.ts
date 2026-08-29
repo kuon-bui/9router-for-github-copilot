@@ -130,8 +130,10 @@ export function formatUsageHtml(
       --card: var(--vscode-editorWidget-background, color-mix(in srgb, var(--bg) 88%, #000));
       --border: var(--vscode-widget-border, color-mix(in srgb, var(--fg) 12%, transparent));
       --ok: #3dd68c;
+      --warn: #e3b341;
       --critical: #f85149;
       --track-ok: color-mix(in srgb, var(--ok) 22%, transparent);
+      --track-warn: color-mix(in srgb, var(--warn) 22%, transparent);
       --track-critical: color-mix(in srgb, var(--critical) 22%, transparent);
     }
     * { box-sizing: border-box; }
@@ -187,26 +189,26 @@ export function formatUsageHtml(
       min-width: 0;
     }
     .avatar {
-      width: 36px;
-      height: 36px;
+      width: 45px;
+      height: 45px;
       border-radius: 999px;
       display: grid;
       place-items: center;
       flex-shrink: 0;
       color: var(--fg);
-      font-size: 14px;
+      font-size: 18px;
       font-weight: 700;
       background: color-mix(in srgb, var(--fg) 9%, var(--card));
     }
     .avatar.provider-logo { position: relative; color: #111; background: #f4f4f4; }
-    .avatar.provider-logo span { font-size: 13px; font-weight: 700; }
+    .avatar.provider-logo span { font-size: 16px; font-weight: 700; }
     .avatar img {
       position: absolute;
       top: 50%;
       left: 50%;
       display: block;
-      width: 21px;
-      height: 21px;
+      width: 26px;
+      height: 26px;
       transform: translate(-50%, -50%);
     }
     .copy { min-width: 0; }
@@ -284,6 +286,7 @@ export function formatUsageHtml(
       flex-shrink: 0;
       background: var(--ok);
     }
+    .dot.warn { background: var(--warn); }
     .dot.critical { background: var(--critical); }
     .used {
       grid-area: used;
@@ -297,12 +300,14 @@ export function formatUsageHtml(
       border-radius: 999px;
       overflow: hidden;
       background: var(--track-ok);
-    }
+    }warn { background: var(--track-warn); }
     .bar.critical { background: var(--track-critical); }
     .bar .fill {
       height: 100%;
       border-radius: inherit;
       background: var(--ok);
+    }
+    .bar.warn .fill { background: var(--warn);   background: var(--ok);
     }
     .bar.critical .fill { background: var(--critical); }
     .remaining {
@@ -310,7 +315,8 @@ export function formatUsageHtml(
       justify-self: end;
       font-size: 12px;
       font-weight: 600;
-      font-variant-numeric: tabular-nums;
+      font-variwarn { color: var(--warn); }
+    .remaining.ant-numeric: tabular-nums;
       color: var(--ok);
     }
     .remaining.critical { color: var(--critical); }
