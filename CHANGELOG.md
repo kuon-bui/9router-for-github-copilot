@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.11.2](https://github.com/kuon-bui/9router-for-github-copilot/compare/v0.11.1...v0.11.2) (2026-08-30)
+
+
+### Bug Fixes
+
+* **quota:** update api get quota ([#43](https://github.com/kuon-bui/9router-for-github-copilot/issues/43)) ([c3c6f18](https://github.com/kuon-bui/9router-for-github-copilot/commit/c3c6f18fefe386c72af15ef3ef9ebde0f57fe4a2))
+
 ## [0.11.1](https://github.com/kuon-bui/9router-for-github-copilot/compare/v0.11.0...v0.11.1) (2026-08-29)
 
 
