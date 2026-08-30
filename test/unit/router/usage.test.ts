@@ -7,7 +7,7 @@ import { MOCK_USAGE_PAYLOAD } from '@test/support/usage-fixture';
 describe('buildUsageUrl', () => {
   it('appends /tools/usage to a normalized base url', () => {
     expect(buildUsageUrl('https://router.example.com')).toBe(
-      'https://router.example.com/tools/usages'
+      'https://router.example.com/tools/quotas'
     );
   });
 });
