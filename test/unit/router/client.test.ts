@@ -400,7 +400,7 @@ describe('createRouterClient', () => {
     });
 
     expect(fetchMock).toHaveBeenCalledWith(
-      'https://router.example.com/tools/usages',
+      'https://router.example.com/tools/quotas',
       expect.objectContaining({
         method: 'GET',
         headers: expect.objectContaining({ authorization: 'Bearer secret-token' })
