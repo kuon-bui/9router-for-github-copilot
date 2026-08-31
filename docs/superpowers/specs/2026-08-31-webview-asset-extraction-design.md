@@ -46,27 +46,33 @@ Secondary problems that follow from the same root cause:
    in each file.
 5. Tests assert against raw CSS substrings, for example
    `expect(html).toContain('width: 45px')`.
+6. The model editor's client script is ~250 lines of imperative DOM
+   synchronisation — `renderList`, `renderCatalogOptions`, `fillForm`,
+   `showView` — kept in step with the panel state by hand.
 
 ## Goal
 
-HTML and CSS live in their own files with their own tooling. No webview
-markup or styling is written as a string literal inside TypeScript.
+Webview markup, styling, and client code live in real files with real
+tooling. Nothing about the UI is written as a string literal inside
+TypeScript.
 
 ## Decisions
 
-These were settled during brainstorming and are not open in the plan:
+Settled during brainstorming. Not open in the plan:
 
 - Assets ship as real files inside the VSIX and reach the webview through
   `webview.asWebviewUri`, not through build-time inlining.
 - The usage panel moves to client-side rendering so its HTML can be a
   static file. It gains `enableScripts: true`.
-- Webview code lives in a new top-level `src/webview/` directory, which
-  requires an explicit update to `CODE_CONVENTION.md`.
-- Webview bundles are built with Vite. The extension host bundle stays on
-  esbuild.
-- Vite is used for building only. No dev server, no HMR.
-- `stylelint` is added so CI blocks the class of bug described above.
+- Webview code lives in a new top-level `src/webview/` directory.
+- **Vite builds everything** — the extension host bundle and both webview
+  bundles. `esbuild` is removed from `devDependencies`.
+- **The webview UI is React with Tailwind CSS v4.**
+- Tailwind's colour scale is remapped onto the host's `--vscode-*` custom
+  properties through `@theme`, so panels follow the user's theme.
 - `src/runtime/usage-markdown.ts` is deleted as dead code.
+- `CODE_CONVENTION.md` is updated in the same change — both its Repository
+  Structure section and its Decision Rules.
 
 ## Directory Layout
 
@@ -77,26 +83,34 @@ sandbox, not in the extension host.
 
 ```
 src/webview/
-  tsconfig.json                 lib ES2022 + DOM, types: []
+  tsconfig.json                 lib ES2022 + DOM, types: [], jsx: react-jsx
   css-modules.d.ts              declare module '*.css'
   shared/
-    tokens.css                  design tokens: --bg --fg --muted --ok --warn --critical
-    base.css                    reset, typography, shared button/chip/error rules
+    theme.css                   @theme mapping Tailwind tokens to --vscode-*
     protocol.ts                 message types for both sides of postMessage
     usage-format.ts             moved from src/runtime/usage-format.ts
     provider-icons.ts           moved from src/runtime/provider-icons.ts
   usage/
     index.html                  static shell with placeholders
-    usage.css
-    view-model.ts               buildUsageView(snapshot, nowMs), no DOM access
-    client.ts                   mounts the view model, handles postMessage
+    usage.css                   @import 'tailwindcss' + shared theme
+    main.tsx                    createRoot + postMessage subscription
+    UsagePanel.tsx
+    ConnectionCard.tsx
+    QuotaMeter.tsx
+    view-model.ts               buildUsageView(snapshot, nowMs) — pure, no DOM
   model-editor/
     index.html
     model-editor.css
+    main.tsx
+    ModelEditor.tsx             list/form view switch
+    ModelList.tsx
+    ModelForm.tsx
     draft-form.ts               sanitizeId, uniqueModelId, deriveDraftFromCatalogEntry
-    view-model.ts               buildModelListView(state)
-    client.ts
+    view-model.ts               buildModelListView(state) — pure, no DOM
 ```
+
+`view-model.ts` and `draft-form.ts` stay free of React and of the DOM. That
+is what keeps the test suite in the `node` environment; see Testing.
 
 `src/webview/shared/` is the only directory both sides import from. It must
 stay runtime-agnostic: no `vscode` import, no `node:*` import.
@@ -107,9 +121,9 @@ Added:
 
 - `src/runtime/webview-document.ts` — a pure function that assembles the
   final document string.
-- `scripts/webview-vite-config.mjs` — the shared Vite config factory.
-- `scripts/build-webviews.mjs` — one-shot webview build.
-- `scripts/watch.mjs` — the combined watch process described below.
+- `scripts/vite-config.mjs` — config factories for every build target.
+- `scripts/build.mjs` — one-shot build of all targets.
+- `scripts/watch.mjs` — watch mode for all targets.
 
 Deleted:
 
@@ -162,98 +176,112 @@ img-src ${cspSource} https://unpkg.com;
 ```
 
 This removes the `style-src 'unsafe-inline'` both panels rely on today.
-`img-src` keeps `https://unpkg.com` because provider brand logos are loaded
-from that CDN by `provider-icons.ts`; bundling those icons locally is out of
-scope for this change.
+Tailwind compiles to a real stylesheet file, so no inline style source is
+needed. `img-src` keeps `https://unpkg.com` because provider brand logos are
+loaded from that CDN by `provider-icons.ts`; vendoring those icons locally is
+out of scope.
 
-The `<script>` tag carries both the nonce and the `src`, so the nonce
-policy applies to an externally loaded file.
+React is bundled into the view's own `client.js`, which the `<script>` tag
+loads with both the nonce and the `src`, so the nonce policy applies to the
+externally loaded file.
 
 ## Build Pipeline
 
-### Two bundlers, on purpose
+### One bundler
 
-The extension host bundle stays on esbuild: one CLI line producing CJS for
-node20 with `vscode` external. Vite's library mode can produce the same
-output, but it buys nothing there.
+Vite builds all three targets: the extension host bundle and one bundle per
+webview.
 
-The webview bundles move to Vite. Vite 8 is already installed in this
-repository as a transitive dependency of `vitest@4` (`vite@8.1.4`, 2.3 MB),
-so promoting it to a direct devDependency pins what is already on disk
-rather than adding weight. Vite 8 bundles with Rolldown and ships
-Lightning CSS, so the CSS in this project finally passes through a real CSS
-parser instead of living in a TypeScript string.
+Vite 8 is already installed here as a transitive dependency of `vitest@4`
+(`vite@8.1.4`, 2.3 MB). It bundles with Rolldown and ships Lightning CSS, and
+no longer depends on esbuild — Vite 8's dependencies are `rolldown`,
+`lightningcss`, `postcss`, `picomatch`, and `tinyglobby`. Promoting Vite to a
+direct devDependency and dropping `esbuild` therefore removes a dependency
+rather than adding one.
 
-`vite` is added to `devDependencies` with an explicit version so the build
-does not silently follow whatever `vitest` happens to hoist.
-
-### Webview bundling
-
-`scripts/webview-vite-config.mjs` exports a factory:
+`scripts/vite-config.mjs` exports two factories:
 
 ```js
+export function createExtensionConfig({ watch = false } = {});
 export function createWebviewConfig(view, { watch = false } = {});
 ```
 
-It returns an inline Vite config for a single view:
+**Extension host target.** `build.lib` with `src/extension.ts` as entry,
+`formats: ['cjs']`, `fileName: () => 'extension.js'`, output directory
+`dist/src`, `build.ssr: true` so node builtins stay external and no
+browser-targeted transforms run, `build.target: 'node20'`, and
+`rollupOptions.external: ['vscode']`. This reproduces what the current
+esbuild CLI line produces.
 
-- `build.rollupOptions.input` is that view's `client.ts`, one entry only
-- `build.rollupOptions.output.format: 'iife'`
-- `entryFileNames: 'client.js'`, `assetFileNames: 'client.[ext]'`
-- `build.outDir: dist/webview/<view>`, `emptyOutDir: true`
-- `build.target: 'es2022'`, `build.modulePreload: false`
-- `css.transformer: 'lightningcss'` and
-  `build.cssMinify: 'lightningcss'`, set explicitly rather than relying on
-  whatever the Vite default is for this version
-- `resolve.alias` for `@` matching `vitest.config.ts`
-- sourcemap when `watch` is true, minify when it is false
+**Webview targets.** One config per view, `build.lib` with that view's
+`main.tsx` as entry, `formats: ['iife']`, `fileName: () => 'client.js'`,
+`assetFileNames: 'client.[ext]'`, output directory `dist/webview/<view>`,
+`build.target: 'es2022'`, `emptyOutDir: true`, plugins `[tailwindcss()]` from
+`@tailwindcss/vite`. Sourcemaps when `watch` is true, minify when it is not.
 
-`scripts/build-webviews.mjs` imports that factory and calls Vite's `build()`
-API once per view.
+`index.html` is copied verbatim to `dist/webview/<view>/index.html` by
+`scripts/build.mjs`.
 
-**One Vite build per view, each with a single entry.** This is deliberate.
-Rolldown cannot emit `iife` for a multi-entry build, and a multi-entry `es`
-build would hoist anything shared between the two views into a common chunk
-with a generated name — a third asset the panel would have to locate and
-pass through `asWebviewUri`. Building each view separately duplicates the
-few kilobytes of `shared/` code across two bundles and removes that whole
-class of fragility.
+### One Vite build per view
 
-**Vite's HTML entry pipeline is deliberately not used.** Given an
-`index.html` entry, Vite rewrites `<script src>` and `<link href>` to hashed,
-root-absolute paths and emits a processed HTML file. A webview cannot load
-that: its asset references must be absolute `vscode-webview://` URIs produced
-by `asWebviewUri` at runtime. So `index.html` stays a hand-written shell with
-the placeholders described above, and Vite only produces `client.js` and
-`client.css`. `index.html` is copied verbatim to
-`dist/webview/<view>/index.html` by `scripts/build-webviews.mjs`.
+This is deliberate. Rolldown cannot emit `iife` for a multi-entry build, and
+a multi-entry `es` build would hoist anything shared between the two views —
+React included — into a common chunk with a generated name. That chunk would
+be a third asset the panel has to locate and pass through `asWebviewUri`, and
+cross-chunk relative imports do not resolve under a `vscode-webview://`
+origin without also injecting a `<base href>`.
 
-The deterministic output names are what make this work. The panel can build
-`asWebviewUri` for `dist/webview/<view>/client.js` and `client.css` without
-reading a manifest.
+The cost is that React lands in both bundles — roughly 45 KB compressed each,
+so about 45 KB more than a shared-chunk layout would produce. The alternative
+costs generated chunk names, a `<base href>`, and the nonce-scoped
+`script-src`. Two fixed-name files per view is worth 45 KB.
 
-Each `client.ts` imports its own stylesheet:
+### Vite's HTML entry pipeline is not used
 
-```ts
-import './usage.css';
-```
+Given an `index.html` entry, Vite rewrites `<script src>` and `<link href>`
+to hashed paths and emits a processed HTML file. A webview cannot load that:
+asset references must be absolute `vscode-webview://` URIs produced by
+`asWebviewUri` at runtime, and Vite's emitted tags carry no nonce. So
+`index.html` stays a hand-written shell with placeholders, and Vite produces
+only `client.js` and `client.css` under fixed names. The panel builds
+`asWebviewUri` for those two paths without reading a manifest.
 
-and each view stylesheet imports the shared layer, which in turn imports the
-tokens:
+### React
+
+`react`, `react-dom`, `@types/react`, and `@types/react-dom` are added as
+devDependencies; they are bundled into `client.js`, so nothing ships at
+runtime through `package.json`. Exact versions are pinned at implementation
+time.
+
+`@vitejs/plugin-react` is **not** expected to be needed. Its main job is Fast
+Refresh, which a build-only pipeline does not use, and Vite reads
+`jsx: 'react-jsx'` from the tsconfig for the automatic runtime. If the
+automatic runtime is not picked up in practice, add the plugin — this is the
+one build assumption in this document that must be verified early rather than
+assumed.
+
+### Tailwind CSS v4
+
+`tailwindcss` and `@tailwindcss/vite` are added as devDependencies. Each
+view's stylesheet is its Tailwind entry:
 
 ```css
 /* usage.css */
-@import '../shared/base.css';
-
-/* shared/base.css */
-@import './tokens.css';
+@import 'tailwindcss';
+@import '../shared/theme.css';
+@source './**/*.tsx';
+@source '../shared/**/*.ts';
 ```
 
-Vite follows all of it through Lightning CSS, so it emits
-`dist/webview/<view>/client.js` and `dist/webview/<view>/client.css` with
-tokens and base rules already inlined. No manual copy step is needed for CSS.
+`css.transformer` is left at Vite's default. `@tailwindcss/vite` runs
+Lightning CSS internally; layering Vite's own `lightningcss` transformer on
+top is an untested combination and buys nothing.
 
 ### Type checking
+
+Vite and Rolldown strip types without checking them, so `tsc` remains the
+type-checking step and must stay in the `build` chain — once for the
+extension host, once for the webview code.
 
 `tsconfig.json` gains `"exclude": ["src/webview/**"]` so browser code is not
 type-checked with `node` and `vscode` types in scope.
@@ -262,6 +290,7 @@ type-checked with `node` and `vscode` types in scope.
 
 - `lib: ["ES2022", "DOM"]`
 - `types: []`
+- `jsx: "react-jsx"`, `jsxImportSource: "react"`
 - `strict`, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes` matching
   the root config
 - same `@/*` path mapping so shared modules resolve identically
@@ -270,25 +299,19 @@ The root `exclude` removes `src/webview/**` from the root config's own file
 set, but TypeScript still follows imports. `src/webview/shared/protocol.ts`
 is imported by `src/runtime/`, so it is checked under both configs. That is
 intentional: a shared module that only compiles with `node` or `vscode` types
-in scope is a module that does not belong in `shared/`. The view `client.ts`
-files are imported by neither, so they are checked only by the webview
-config.
+in scope is a module that does not belong in `shared/`. The `.tsx` files are
+imported by neither, so they are checked only by the webview config.
 
-Vite and Rolldown strip types without checking them, so `tsc -p
-src/webview/tsconfig.json` remains the type-checking step for browser code
-and must stay in the `build` chain.
-
-`client.ts` importing `./usage.css` is not something TypeScript understands
-on its own. `src/webview/css-modules.d.ts` declares `declare module '*.css';`
-to cover it. The `vite/client` reference types are not used, because they
-would require populating `types` in a config that deliberately sets
-`types: []`.
+`css-modules.d.ts` declares `declare module '*.css';` so `main.tsx` can
+import its stylesheet. The `vite/client` reference types are not used,
+because they would require populating `types` in a config that deliberately
+sets `types: []`.
 
 Webview modules import extension-side types with `import type` only.
 `buildUsageView` needs `RouterUsageSnapshot` from `@/router/usage`, but must
 not pull that module's parsing code into the client bundle. The eslint block
-below does not catch this, so it is a review point rather than an
-automated one.
+below does not catch this, so it is a review point rather than an automated
+one.
 
 ### Scripts
 
@@ -296,43 +319,39 @@ automated one.
 build: clean
        && tsc -p tsconfig.json
        && tsc -p src/webview/tsconfig.json
-       && node scripts/build-webviews.mjs
-       && esbuild src/extension.ts --bundle ... --outfile=dist/src/extension.js
+       && node scripts/build.mjs
 watch: node scripts/watch.mjs
-lint:css: stylelint "src/webview/**/*.css"
-lint: eslint . && pnpm run lint:css
+lint:  eslint .
 ```
-
-`pnpm run lint` gains the CSS pass, so the existing CI step at
-`.github/workflows/tag-build.yml:77` picks it up with no workflow change.
 
 ### Watch must keep the F5 flow working
 
 `.vscode/launch.json` runs the `watch` task before launching the extension
 host, and `.vscode/tasks.json` gates that background task on a problem
 matcher looking for `^\[watch\] build started` and `^\[watch\] build
-finished`. Those lines come from the esbuild CLI's `--watch` output today.
+finished`. Those lines come from the esbuild CLI's `--watch` output today and
+disappear with esbuild.
 
-The watch now drives two different bundlers — esbuild for the extension host
-and Vite for each webview. Running them as parallel CLI invocations from one
-npm script is not portable on Windows, which is the development platform
-here. Instead, `scripts/watch.mjs` is a single Node process that starts an
-esbuild context for the extension bundle and a Vite build in watch mode per
-view, then waits.
+`scripts/watch.mjs` is a single Node process that starts all three Vite
+builds in watch mode. It must print `[watch] build started` and `[watch]
+build finished` itself, from a small plugin on `buildStart`/`writeBundle`,
+with a counter so the "finished" line is printed only once every target has
+settled rather than once per target. Without those lines F5 hangs waiting for
+output that never arrives.
 
-That script must print `[watch] build started` and `[watch] build finished`
-itself, or F5 hangs waiting for a line that never arrives. The markers come
-from a small plugin registered on both sides — esbuild's `onStart`/`onEnd`
-and Vite's `buildStart`/`writeBundle` — with a counter so the "finished" line
-is printed only once every target has settled, not once per bundler.
+`.vscode/tasks.json` also needs its problem matcher updated. Its `owner` is
+`esbuild` and its error pattern is `^✘ \[ERROR\] (.*)$`, which is esbuild's
+output format. Rolldown reports errors differently, so that pattern would
+silently stop surfacing build errors in the Problems panel even while the
+background begin/end markers keep working. The matcher is retargeted at the
+format `scripts/watch.mjs` actually emits.
 
-`scripts/watch.mjs` and `scripts/build-webviews.mjs` both obtain their Vite
-options from `createWebviewConfig` in `scripts/webview-vite-config.mjs`, so
-the watch and release paths cannot drift.
+Both `scripts/build.mjs` and `scripts/watch.mjs` obtain their options from
+`scripts/vite-config.mjs`, so the two paths cannot drift.
 
-`.vscodeignore` needs no change. It already ships `dist/**` while excluding
-`dist/package.json`, `dist/test/**`, and `dist/vitest.config.js`, and it
-already excludes `src/**`.
+Unifying on one bundler is what makes this tractable: the marker plugin is
+written once against one plugin API, rather than bridging esbuild's
+`onStart`/`onEnd` and Vite's `buildStart`/`writeBundle`.
 
 ## Panel Wiring
 
@@ -359,12 +378,11 @@ editor already does.
 
 ## Usage Panel Rendering
 
-The usage panel moves from extension-side HTML generation to client-side
-rendering.
+The usage panel moves from extension-side HTML generation to a React app.
 
 Message flow:
 
-1. Client posts `{ type: 'ready' }` once its script runs.
+1. Client posts `{ type: 'ready' }` on mount.
 2. Extension posts `{ type: 'usage', snapshot, nowMs }`.
 3. Client renders.
 
@@ -373,12 +391,12 @@ client, so reset labels stay deterministic and testable.
 
 `RouterUsageSnapshot` survives `postMessage` unchanged: it is plain JSON
 data, and `RouterUsageQuota.resetAt` is already `string | null` rather than a
-`Date`. No serialisation layer is needed.
+`Date`. No serialisation step is needed.
 
 The refresh control keeps its current form: an anchor with
 `href="command:9routerCopilot.showUsage"`, with `enableCommandUris`
-unchanged on the panel. No new message type is introduced for refresh, and
-refresh behaviour does not change.
+unchanged. No new message type is introduced for refresh, and refresh
+behaviour does not change.
 
 ### View model boundary
 
@@ -420,67 +438,102 @@ interface QuotaView {
 }
 ```
 
-`client.ts` turns `UsageView` into DOM nodes and nothing else. It contains no
-formatting, no branching on quota state, and no string escaping — building
-nodes with `document.createElement` and `textContent` removes the need for
-manual escaping entirely.
+The components render `UsageView` and hold no formatting logic, no branching
+on quota state, and no escaping — JSX escapes text children by default, which
+removes the `escapeHtml` problem entirely.
 
 This split is what keeps the test suite free of a DOM environment. Every
 assertion in the current `usage-html.test.ts` maps onto a `UsageView` field.
 
 ## Model Editor Rendering
 
-The existing client script is split rather than rewritten. Its behaviour
-stays the same.
+The imperative client script is replaced by React components. Behaviour does
+not change.
 
-- `draft-form.ts` — the pure logic currently trapped in the string:
+- `draft-form.ts` — the pure logic currently trapped in the script string:
   `sanitizeId(value)`, `uniqueModelId(base, takenIds)` for the `-2`/`-3`
   suffix loop, and `deriveDraftFromCatalogEntry(entry, modelId, takenIds)`
-  which derives the display name, vision mode, and token limits.
+  which derives the display name, vision mode, and token limits. No React,
+  no DOM.
 - `view-model.ts` — `buildModelListView(state)` producing row labels and the
   chip list per row.
-- `client.ts` — DOM wiring, form read/fill, postMessage handling.
+- `ModelEditor.tsx` — holds the list/form view state and the
+  `editingSourceIndex`, subscribes to `postMessage`.
+- `ModelList.tsx`, `ModelForm.tsx` — presentation and form state.
 
-The list, form, and warning containers move into
-`src/webview/model-editor/index.html` unchanged, keeping every element id the
-client depends on.
+This is where React earns its place: `renderList`, `renderCatalogOptions`,
+`fillForm`, and `showView` all disappear, replaced by rendering from state.
 
 The dynamic `<option>` and thinking-effort checkbox markup currently built by
 `renderModelEditorHtml` from `THINKING_MODES` and `ENABLED_THINKING_MODES`
-moves to the client, which receives those lists in the `state` message. This
-removes the last piece of string-built markup from the extension side.
-
-`DEFAULT_MODEL_MAX_INPUT_TOKENS` and `DEFAULT_MODEL_MAX_OUTPUT_TOKENS` are
-currently interpolated into the script string. They move into the `state`
-message as well, so `src/config/defaults.ts` stays the single source.
+moves into the components, which receive those lists in the `state` message.
+`DEFAULT_MODEL_MAX_INPUT_TOKENS` and `DEFAULT_MODEL_MAX_OUTPUT_TOKENS`, today
+interpolated into the script string, move into the same message so
+`src/config/defaults.ts` stays the single source.
 
 Both additions widen the `state` payload, so `createModelEditorState` in
 `src/runtime/model-editor-view.ts` and its test at
 `test/unit/runtime/model-editor-view.test.ts` change alongside. The row and
 warning fields it already produces stay as they are.
 
-## CSS Consolidation
+`index.html` for this view shrinks to a shell with a single mount node. The
+element ids the old script queried no longer exist as a contract between two
+files.
 
-`src/webview/shared/tokens.css` holds the token set currently defined only in
-`usage-html.ts`: `--bg`, `--fg`, `--muted`, `--subtle`, `--card`, `--border`,
-`--ok`, `--warn`, `--critical`, and the three `--track-*` values.
+## Theming
 
-`src/webview/shared/base.css` holds the reset, body typography, and the
-button, chip, and error rules that both views need.
-
-The three corrupted rules at `usage-html.ts:303-319` are repaired during the
-move. Restored intent:
+VS Code injects hundreds of `--vscode-*` custom properties into the webview
+and changes them when the user changes theme. Panels must follow those, so
+Tailwind's own colour scale is not used. `src/webview/shared/theme.css` maps
+the host properties onto Tailwind tokens:
 
 ```css
-.bar.warn { background: var(--track-warn); }
-.bar.warn .fill { background: var(--warn); }
-.remaining { font-variant-numeric: tabular-nums; color: var(--ok); }
-.remaining.warn { color: var(--warn); }
+@theme {
+  --color-bg: var(--vscode-editor-background);
+  --color-fg: var(--vscode-editor-foreground);
+  --color-muted: var(--vscode-descriptionForeground);
+  --color-card: var(--vscode-editorWidget-background);
+  --color-border: var(--vscode-widget-border);
+  --color-input: var(--vscode-input-background);
+  --color-input-fg: var(--vscode-input-foreground);
+  --color-btn: var(--vscode-button-background);
+  --color-btn-fg: var(--vscode-button-foreground);
+  --color-btn-alt: var(--vscode-button-secondaryBackground);
+  --color-btn-alt-fg: var(--vscode-button-secondaryForeground);
+  --color-badge: var(--vscode-badge-background);
+  --color-badge-fg: var(--vscode-badge-foreground);
+  --color-err: var(--vscode-inputValidation-errorBorder);
+  --color-err-bg: var(--vscode-inputValidation-errorBackground);
+  --color-warn-border: var(--vscode-inputValidation-warningBorder);
+  --color-warn-bg: var(--vscode-inputValidation-warningBackground);
+  --color-ok: #3dd68c;
+  --color-warn: #e3b341;
+  --color-critical: #f85149;
+  --font-sans: var(--vscode-font-family);
+  --font-mono: var(--vscode-editor-font-family);
+}
 ```
 
-The model editor stylesheet is rewritten against the shared tokens rather
-than raw `var(--vscode-*)` values. Its visual result must not change; this is
-a substitution of equivalent values, not a redesign.
+Components then use `bg-card`, `text-muted`, `border-border`, and so on.
+
+Because the host swaps the underlying properties itself, no `dark:` variants
+and no `prefers-color-scheme` blocks are needed anywhere. Light and dark are
+handled by VS Code.
+
+The three quota tones (`--color-ok`, `--color-warn`, `--color-critical`) are
+fixed hex values because VS Code has no stable semantic property for a
+"healthy / warning / exhausted" meter. Their track backgrounds use Tailwind's
+opacity modifier (`bg-warn/20`) rather than the `color-mix` expressions the
+current CSS uses.
+
+The three corrupted rules at `usage-html.ts:303-319` disappear with the file.
+Restored intent, as utilities on the meter components:
+
+- track: `bg-ok/20`, `bg-warn/20`, `bg-critical/20` by tone
+- fill: `bg-ok`, `bg-warn`, `bg-critical` by tone
+- percent label: `tabular-nums` plus `text-ok`, `text-warn`, `text-critical`
+
+Neither panel's layout or visual result changes beyond this repair.
 
 ## Testing
 
@@ -499,13 +552,6 @@ New:
   reporting `100%` and an `N/A` reset, and the `in 3h 34m` reset label at the
   fixed `nowMs`.
 
-Rewritten:
-
-- `test/unit/runtime/model-editor-html.test.ts` becomes a test that reads
-  `src/webview/model-editor/index.html` and asserts every element id the
-  client queries is present. This preserves the existing guarantee that the
-  shell and the script agree on ids.
-
 Moved:
 
 - `test/unit/runtime/usage-format.test.ts` to `test/unit/webview/shared/`
@@ -514,32 +560,35 @@ Moved:
 Deleted:
 
 - `test/unit/runtime/usage-html.test.ts`, superseded by the view-model test.
+- `test/unit/runtime/model-editor-html.test.ts`. Its subject was the contract
+  between a hand-written HTML shell and a script that queried it by id. React
+  removes that contract, so the test has nothing left to guard.
 
-No DOM test environment is added. Every new test runs in the existing `node`
-environment because all logic under test is DOM-free by construction.
+No DOM test environment is added, and React components are not unit-tested.
+Everything under test is DOM-free by construction and runs in the existing
+`node` environment. Adding `happy-dom` and `@testing-library/react` for
+component tests is a deliberate follow-up if the components grow logic worth
+testing; it is not part of this change.
 
 `vitest.config.ts` needs no alias change; `@/webview/*` resolves through the
 existing `@` alias.
 
 ## Lint
 
-`eslint.config.js` gains a block for `src/webview/**/*.ts`:
+`eslint.config.js` gains a block for `src/webview/**/*.{ts,tsx}`:
 
 - browser globals: `document`, `window`, `HTMLElement`, `Element`, `Event`,
   `acquireVsCodeApi`
 - `no-restricted-imports` forbidding `vscode` and any `node:*` specifier
+- the TypeScript parser configured for `.tsx`
 
-`stylelint` and `stylelint-config-standard` are added as devDependencies with
-a `lint:css` script over `src/webview/**/*.css`.
+`stylelint` is **not** added. With Tailwind, each view's `.css` file is a
+handful of `@import`, `@theme`, and `@source` directives; there is no
+hand-written rule set left for it to check, and stylelint has no built-in
+understanding of Tailwind v4's at-rules.
 
-This overlaps with Lightning CSS, which now parses the same files during
-`vite build`. The overlap is intentional and the two are not equivalent. CSS
-is specified to recover from errors by discarding the rules it cannot parse,
-so a build can succeed while quietly dropping a mangled selector — which is
-exactly the failure mode this whole change exists to prevent. Stylelint
-reports it as an error instead of discarding it, and also covers convention
-issues a bundler has no opinion about, such as the duplicated `background`
-declaration in the corrupted `.bar.warn .fill` rule.
+This is a real consequence of the chosen stack and is recorded under Risks
+rather than papered over.
 
 ## Dead Code Removal
 
@@ -550,27 +599,39 @@ into `src/webview/shared/`. It is deleted.
 
 ## Convention Update
 
-`CODE_CONVENTION.md` must be updated in the same change:
+`CODE_CONVENTION.md` changes in the same commit.
 
-- add `src/webview/` to the Repository Structure block
-- add a boundary rule: `src/webview` owns webview markup, styling, and client
-  code; it must not import `vscode` or `node:*`, and must not contain routing
-  or transport logic
-- add a rule that `src/webview/shared` is the only directory imported by both
-  the extension host and the webview, and must stay runtime-agnostic
-- add a rule that webview markup and styling live in `.html` and `.css` files
-  and must not be written as string literals in TypeScript
+Repository Structure and Boundary rules:
 
-The convention states the repository structure is fixed unless the user
-approves a change. That approval was given during brainstorming on
-2026-08-31.
+- add `src/webview/` to the structure block
+- `src/webview` owns webview markup, styling, and client code; it must not
+  import `vscode` or `node:*`, and must not contain routing or transport
+  logic
+- `src/webview/shared` is the only directory imported by both the extension
+  host and the webview, and must stay runtime-agnostic
+- webview markup and styling live in `.tsx` and `.css` files and must not be
+  written as string literals in TypeScript
+
+Decision Rules:
+
+The existing rule *"choose the option that keeps the extension smaller"* is
+what React and Tailwind trade against. The rule is not deleted — it still
+governs the provider, router, and config layers, which are the thin-adapter
+core the convention exists to protect. It is scoped: the rule applies to the
+extension host and its runtime dependencies, and the configuration panels are
+explicitly exempted, because their cost is package size rather than adapter
+complexity.
+
+The Prohibited Patterns entry *"separate chat UI for the primary Copilot
+integration path"* is unaffected. These panels are configuration and
+diagnostics surfaces, not a chat UI, and the Copilot Chat integration path is
+untouched.
 
 ## Out of Scope
 
 - No layout or visual redesign of either panel beyond repairing the corrupted
-  CSS and substituting equivalent token values.
+  quota-meter styling.
 - No changes to `src/provider`, `src/router`, or `src/config`.
-- No CSS preprocessor.
 - No Vite dev server and no HMR. Serving the webview from
   `http://localhost:5173` during development would require
   `webview-document.ts` to branch on dev versus production and the dev CSP to
@@ -578,36 +639,53 @@ approves a change. That approval was given during brainstorming on
   socket. That reintroduces exactly the CSP looseness this change removes,
   inside the module whose job is to keep the policy tight. If HMR is wanted
   later it is a separate, deliberate change.
-- No UI framework. Adding lit or preact would contradict the
-  `CODE_CONVENTION.md` decision rule that favours keeping the extension
-  smaller.
+- No component tests, and therefore no DOM test environment.
+- No component library. React and Tailwind are the whole UI stack.
 - Provider brand logos continue to load from `https://unpkg.com`. Vendoring
   them locally is a separate change.
 
 ## Risks
 
+- **Package size roughly doubles.** The 0.11.2 VSIX is 100 KB. React bundled
+  into two view bundles adds roughly 90 KB compressed. This is the accepted
+  cost of the chosen UI stack; it is package size, not runtime weight, and
+  the extension host bundle is unaffected.
+- **Typo'd utility classes fail silently.** This change exists because broken
+  CSS shipped unnoticed. Tailwind does not fully close that hole: it moves
+  most styling into `className` strings, where `bg-editorr` produces no
+  style, no build error, no lint error, and no type error. What the change
+  does deliver is that no CSS is assembled by string concatenation any more,
+  and that a broken *rule* is now impossible. A wrong *class name* is not.
+  Mitigation is the Tailwind IntelliSense editor extension plus review;
+  `eslint-plugin-tailwindcss` should be evaluated once its v4 support is
+  confirmed.
+- **Three build assumptions must be smoke-tested before anything is built on
+  them.** The plan's first step is a throwaway spike that proves all three,
+  because each one, if wrong, changes the build config rather than the
+  application code:
+  1. `@tailwindcss/vite` works against a Rolldown-based Vite 8.
+  2. `.tsx` builds with the automatic JSX runtime without
+     `@vitejs/plugin-react`.
+  3. `build.lib` with `formats: ['cjs']` produces a working extension host
+     bundle with `vscode` external. `build.lib` and `build.ssr` may not
+     compose; if they do not, the node-target settings come from
+     `build.target: 'node20'` plus an explicit external list for node
+     builtins instead.
 - **Widening `localResourceRoots` on the model editor.** It is `[]` today,
   which is a deliberate lockdown. Scoping the new root to `dist/webview`
   only, and keeping `default-src 'none'`, holds the same posture for
   everything except the two asset files the panel needs.
 - **The usage panel gains scripts.** It runs with `enableScripts: false`
-  today. The mitigation is that the client builds DOM nodes through
-  `createElement` and `textContent` and never assigns `innerHTML`, so no
-  snapshot value can be interpreted as markup.
-- **Two bundlers in one repository.** esbuild builds the extension host, Vite
-  builds the webviews, so there are two config styles to understand. The
-  split is along a real boundary — node bundle versus browser bundle — and
-  `createWebviewConfig` keeps the Vite side to one file. If it starts costing
-  more than it returns, the webview side can fall back to esbuild without
-  touching anything in `src/`, because nothing in the source tree depends on
-  which bundler produced `client.js`.
+  today. The mitigation is that React escapes text children by default and no
+  component uses `dangerouslySetInnerHTML`, so no snapshot value can be
+  interpreted as markup.
 - **Vite version drift.** `vite` currently arrives through `vitest`. Pinning
   it as a direct devDependency means a `vitest` upgrade that moves its Vite
   range can produce a duplicate install. Renovate will surface the mismatch;
   the two must be bumped together.
-- **Missing asset at runtime.** If `scripts/build-webviews.mjs` fails to run,
-  the panel loads a shell pointing at files that do not exist and renders
-  blank. `pnpm build` chains the script before the extension bundle, and
+- **Missing asset at runtime.** If the webview build does not run, the panel
+  loads a shell pointing at files that do not exist and renders blank.
+  `pnpm build` chains `scripts/build.mjs` before finishing, and
   `vscode:prepublish` runs `pnpm build`, so a packaged VSIX cannot miss it.
 
 ## User-Visible Result
