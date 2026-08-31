@@ -1,5 +1,4 @@
-﻿import type { JSX } from 'react';
-/* eslint-disable no-unused-vars -- ESLint core misidentifies callback type parameters. */
+import type { JSX } from 'react';
 import { useState } from 'react';
 import { createDraftFromCatalog } from '@/config/model-draft';
 import { toRouterModelMetadata } from './view-model';

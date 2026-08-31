@@ -1,5 +1,4 @@
-﻿import type { JSX } from 'react';
-/* eslint-disable no-unused-vars -- ESLint core misidentifies callback type parameters. */
+import type { JSX } from 'react';
 import { buildModelListView } from './view-model';
 import type { ChipTone } from './view-model';
 import type { ModelEditorState } from '@/types/model-editor';
