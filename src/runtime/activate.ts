@@ -50,6 +50,7 @@ export async function activateExtension(
   const manageModels = createModelEditorOpener({
     secrets: context.secrets,
     routerClient,
+    extensionUri: context.extensionUri,
     getRuntimeSettings: () => loadRuntimeSettings(getExtensionConfiguration())
   });
 

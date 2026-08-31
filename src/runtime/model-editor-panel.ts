@@ -12,7 +12,7 @@ import {
   updateModelEntry
 } from '@/config/model-entry-edits';
 import { createModelEditorState } from './model-editor-view';
-import { createNonce, renderModelEditorHtml } from './model-editor-html';
+import { renderWebviewPanelHtml, webviewLocalResourceRoot } from './webview-assets';
 import type { RuntimeSettings } from '@/config/settings';
 import type { RouterClient } from '@/router/client';
 import type { RouterModelMetadata } from '@/router/model-catalog';
@@ -34,6 +34,7 @@ interface Dependencies {
   secrets: vscode.SecretStorage;
   routerClient: RouterClient;
   getRuntimeSettings: () => RuntimeSettings;
+  extensionUri: vscode.Uri;
 }
 
 interface PanelSession {
@@ -127,9 +128,17 @@ export function createModelEditorOpener(dependencies: Dependencies): ModelEditor
       MODEL_EDITOR_VIEW_TYPE,
       '9router Models',
       { viewColumn: vscode.ViewColumn.Active, preserveFocus: false },
-      { enableScripts: true, retainContextWhenHidden: true, localResourceRoots: [] }
+      {
+        enableScripts: true,
+        retainContextWhenHidden: true,
+        localResourceRoots: [webviewLocalResourceRoot(dependencies.extensionUri)]
+      }
     );
-    panel.webview.html = renderModelEditorHtml(createNonce());
+    panel.webview.html = await renderWebviewPanelHtml(
+      panel.webview,
+      dependencies.extensionUri,
+      'model-editor'
+    );
 
     const current: PanelSession = {
       panel,

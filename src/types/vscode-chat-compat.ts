@@ -28,5 +28,5 @@ export interface ModelConfigurationResponseOptions
  * explicit dependency keeps the capability check testable and lets the emitter degrade safely.
  */
 export interface ThinkingPartHost {
-  readonly LanguageModelThinkingPart?: typeof vscode.LanguageModelThinkingPart;
+  readonly LanguageModelThinkingPart?: new (value: string | string[]) => unknown;
 }

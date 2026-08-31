@@ -76,4 +76,4 @@ export function createWebviewConfig(view, { watch = false, counter, plugins = []
   };
 }
 
-export const WEBVIEW_VIEWS = ['usage'];
+export const WEBVIEW_VIEWS = ['usage', 'model-editor'];
