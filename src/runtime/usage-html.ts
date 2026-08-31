@@ -6,10 +6,10 @@ import {
   formatTimestamp,
   quotaRemainingPercent,
   quotaTone
-} from './usage-format';
-import { resolveProviderIcon } from './provider-icons';
+} from '@/webview/shared/usage-format';
+import { resolveProviderIcon } from '@/webview/shared/provider-icons';
 
-export { formatResetLabel } from './usage-format';
+export { formatResetLabel } from '@/webview/shared/usage-format';
 
 const REFRESH_COMMAND_HREF = 'command:9routerCopilot.showUsage';
 

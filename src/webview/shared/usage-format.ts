@@ -19,11 +19,7 @@ export function formatProviderName(provider: string): string {
 }
 
 export function formatAmount(value: number): string {
-  if (!Number.isFinite(value)) {
-    return '—';
-  }
-
-  return String(value);
+  return Number.isFinite(value) ? String(value) : '—';
 }
 
 export function remainingPercent(used: number, total: number): number {
@@ -41,11 +37,7 @@ export function quotaTone(percent: number): QuotaTone {
     return 'ok';
   }
 
-  if (percent >= 30) {
-    return 'warn';
-  }
-
-  return 'critical';
+  return percent >= 30 ? 'warn' : 'critical';
 }
 
 export function quotaRemainingPercent(quota: RouterUsageQuota): number {

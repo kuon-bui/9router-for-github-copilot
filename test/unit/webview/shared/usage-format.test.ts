@@ -5,7 +5,7 @@ import {
   quotaRemainingPercent,
   quotaTone,
   remainingPercent
-} from '@/runtime/usage-format';
+} from '@/webview/shared/usage-format';
 
 describe('usage-format', () => {
   it('title-cases provider names', () => {
@@ -18,15 +18,7 @@ describe('usage-format', () => {
     expect(remainingPercent(95, 100)).toBe(5);
     expect(remainingPercent(0, 2.91)).toBe(100);
     expect(remainingPercent(100, 100)).toBe(0);
-    expect(
-      quotaRemainingPercent({
-        used: 0,
-        total: 2.91,
-        remaining: null,
-        resetAt: null,
-        unlimited: true
-      })
-    ).toBe(100);
+    expect(quotaRemainingPercent({ used: 0, total: 2.91, remaining: null, resetAt: null, unlimited: true })).toBe(100);
   });
 
   it('maps remaining percent to quota tones', () => {
