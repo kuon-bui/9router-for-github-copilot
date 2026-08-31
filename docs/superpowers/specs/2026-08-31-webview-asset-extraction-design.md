@@ -136,6 +136,9 @@ Added:
 
 - `src/runtime/webview-document.ts` — a pure function that assembles the
   final document string.
+- `src/runtime/webview-assets.ts` — the only module that reads a shell from
+  disk and resolves `asWebviewUri` paths. Isolating the I/O here is what
+  keeps `webview-document.ts` pure and directly testable.
 - `scripts/vite-config.mjs` — config factories for every build target.
 - `scripts/build.mjs` — one-shot build of all targets.
 - `scripts/watch.mjs` — watch mode for all targets.
