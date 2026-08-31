@@ -1,6 +1,6 @@
 import type { RouterUsageSnapshot } from '@/router/usage';
 import type { ModelDraft } from '@/config/model-draft';
-import type { ModelEditorState } from '@/runtime/model-editor-view';
+import type { ModelEditorState } from '@/types/model-editor';
 
 export interface UsageStateMessage {
   readonly type: 'usage';

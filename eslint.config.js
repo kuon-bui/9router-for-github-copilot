@@ -90,7 +90,14 @@ module.exports = [
         'error',
         {
           paths: [{ name: 'vscode', message: 'Webview code runs in the browser sandbox.' }],
-          patterns: [{ group: ['node:*'], message: 'Webview code runs in the browser sandbox.' }]
+          patterns: [
+            { group: ['node:*'], message: 'Webview code runs in the browser sandbox.' },
+            {
+              group: ['@/runtime', '@/runtime/*'],
+              message:
+                'Webview code must consume browser-safe contracts, not extension runtime modules.'
+            }
+          ]
         }
       ]
     }

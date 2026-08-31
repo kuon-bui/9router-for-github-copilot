@@ -1,4 +1,9 @@
-import type { ModelEditorRow, ModelEditorState } from '@/runtime/model-editor-view';
+import type { RouterModelMetadata } from '@/router/model-catalog';
+import type {
+  ModelEditorCatalogEntry,
+  ModelEditorRow,
+  ModelEditorState
+} from '@/types/model-editor';
 
 export type ChipTone = 'plain' | 'warn' | 'bad';
 
@@ -34,4 +39,14 @@ export function buildModelListView(state: ModelEditorState): ModelRowView[] {
     idLabel: `${row.id ?? '(no id)'} -> ${row.modelId ?? '(no modelId)'}`,
     chips: buildChips(row)
   }));
+}
+
+export function toRouterModelMetadata(entry: ModelEditorCatalogEntry): RouterModelMetadata {
+  return {
+    id: entry.modelId,
+    ...(entry.ownedBy !== undefined ? { ownedBy: entry.ownedBy } : {}),
+    ...(entry.vision ? { vision: true as const } : {}),
+    ...(entry.contextWindow !== undefined ? { contextWindow: entry.contextWindow } : {}),
+    ...(entry.maxOutput !== undefined ? { maxOutput: entry.maxOutput } : {})
+  };
 }

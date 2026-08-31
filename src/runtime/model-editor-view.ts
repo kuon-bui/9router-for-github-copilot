@@ -10,8 +10,12 @@ import {
   VISION_MODES,
   isPositiveInteger
 } from '@/config/model-field-rules';
-import type { ModelSettingsIssueCode } from '@/config/model-settings';
 import type { RouterModelMetadata } from '@/router/model-catalog';
+import type {
+  ModelEditorRow,
+  ModelEditorState,
+  ModelSettingsIssueCode
+} from '@/types/model-editor';
 import type {
   EnabledThinkingMode,
   ThinkingMode,
@@ -24,42 +28,6 @@ const NOT_A_LIST_WARNING =
   '9router-copilot.models is not a list. Saving here replaces it with a new list.';
 const WORKSPACE_OVERRIDE_WARNING =
   'A workspace value for 9router-copilot.models overrides user settings. Changes saved here are written to user settings.';
-
-export interface ModelEditorRow {
-  sourceIndex: number;
-  valid: boolean;
-  id?: string;
-  name?: string;
-  modelId?: string;
-  serviceTier?: 'fast';
-  toolMode?: ToolMode;
-  visionMode?: VisionMode;
-  thinkingMode?: ThinkingMode;
-  thinkingEfforts?: EnabledThinkingMode[];
-  maxInputTokens?: number;
-  maxOutputTokens?: number;
-  issue?: { code: ModelSettingsIssueCode; message: string };
-  catalogStatus: 'matched' | 'missing';
-}
-
-export interface ModelEditorCatalogEntry {
-  modelId: string;
-  ownedBy?: string;
-  vision: boolean;
-  contextWindow?: number;
-  maxOutput?: number;
-  inUse: boolean;
-}
-
-export interface ModelEditorState {
-  models: ModelEditorRow[];
-  catalog: ModelEditorCatalogEntry[];
-  warnings: string[];
-  thinkingModes: ThinkingMode[];
-  thinkingEfforts: EnabledThinkingMode[];
-  defaultMaxInputTokens: number;
-  defaultMaxOutputTokens: number;
-}
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -176,15 +144,5 @@ export function createModelEditorState(input: {
     thinkingEfforts: [...ENABLED_THINKING_MODES],
     defaultMaxInputTokens: DEFAULT_MODEL_MAX_INPUT_TOKENS,
     defaultMaxOutputTokens: DEFAULT_MODEL_MAX_OUTPUT_TOKENS
-  };
-}
-
-export function toCatalogMetadata(entry: ModelEditorCatalogEntry): RouterModelMetadata {
-  return {
-    id: entry.modelId,
-    ...(entry.ownedBy !== undefined ? { ownedBy: entry.ownedBy } : {}),
-    ...(entry.vision ? { vision: true as const } : {}),
-    ...(entry.contextWindow !== undefined ? { contextWindow: entry.contextWindow } : {}),
-    ...(entry.maxOutput !== undefined ? { maxOutput: entry.maxOutput } : {})
   };
 }

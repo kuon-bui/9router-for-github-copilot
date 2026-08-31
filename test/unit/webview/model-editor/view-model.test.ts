@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildModelListView } from '@/webview/model-editor/view-model';
+import { buildModelListView, toRouterModelMetadata } from '@/webview/model-editor/view-model';
 
 const BASE_STATE = {
   catalog: [], warnings: [], thinkingModes: ['off' as const], thinkingEfforts: [],
@@ -24,5 +24,29 @@ describe('buildModelListView', () => {
   it('flags fast, missing catalog, and validation issue', () => {
     const [row] = buildModelListView({ ...BASE_STATE, models: [{ sourceIndex: 0, valid: false, id: 'agent', modelId: 'router/gone', serviceTier: 'fast', catalogStatus: 'missing', issue: { code: 'INVALID_ID', message: 'id is not usable' } }] });
     expect(row?.chips).toEqual([{ label: 'Fast', tone: 'plain' }, { label: 'tools: off', tone: 'plain' }, { label: 'vision: off', tone: 'plain' }, { label: 'thinking: off', tone: 'plain' }, { label: 'not in catalog', tone: 'warn' }, { label: 'id is not usable', tone: 'bad' }]);
+  });
+});
+
+describe('toRouterModelMetadata', () => {
+  it('drops editor-only metadata and absent optional fields', () => {
+    expect(
+      toRouterModelMetadata({
+        modelId: 'router/combo',
+        ownedBy: 'router',
+        vision: true,
+        contextWindow: 400_000,
+        maxOutput: 128_000,
+        inUse: true
+      })
+    ).toEqual({
+      id: 'router/combo',
+      ownedBy: 'router',
+      vision: true,
+      contextWindow: 400_000,
+      maxOutput: 128_000
+    });
+    expect(toRouterModelMetadata({ modelId: 'router/basic', vision: false, inUse: false })).toEqual({
+      id: 'router/basic'
+    });
   });
 });

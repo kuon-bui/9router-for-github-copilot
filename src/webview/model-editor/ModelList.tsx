@@ -2,7 +2,7 @@ import type { JSX } from 'react';
 /* eslint-disable no-unused-vars -- ESLint core misidentifies callback type parameters. */
 import { buildModelListView } from './view-model';
 import type { ChipTone } from './view-model';
-import type { ModelEditorState } from '@/runtime/model-editor-view';
+import type { ModelEditorState } from '@/types/model-editor';
 
 const CHIP_CLASS: Record<ChipTone, string> = { plain: 'bg-badge text-badge-fg', warn: 'bg-warn-bg text-fg', bad: 'bg-err-bg text-err-fg' };
 

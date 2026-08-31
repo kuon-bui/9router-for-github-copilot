@@ -2,9 +2,9 @@ import type { JSX } from 'react';
 /* eslint-disable no-unused-vars -- ESLint core misidentifies callback type parameters. */
 import { useState } from 'react';
 import { createDraftFromCatalog } from '@/config/model-draft';
-import { toCatalogMetadata } from '@/runtime/model-editor-view';
+import { toRouterModelMetadata } from './view-model';
 import type { ModelDraft } from '@/config/model-draft';
-import type { ModelEditorRow, ModelEditorState } from '@/runtime/model-editor-view';
+import type { ModelEditorRow, ModelEditorState } from '@/types/model-editor';
 
 interface ModelFormProps {
   readonly state: ModelEditorState;
@@ -34,7 +34,7 @@ export function ModelForm(props: ModelFormProps): JSX.Element {
     const entry = props.state.catalog.find((item) => item.modelId === modelId);
     if (!entry) return;
     const takenIds = props.state.models.filter((model) => model.id !== undefined && model.sourceIndex !== props.row?.sourceIndex).map((model) => model.id as string);
-    setDraft(createDraftFromCatalog(toCatalogMetadata(entry), { takenIds }));
+    setDraft(createDraftFromCatalog(toRouterModelMetadata(entry), { takenIds }));
   };
   const toggleEffort = (effort: ModelDraft['thinkingEfforts'][number]): void => patch({ thinkingEfforts: draft.thinkingEfforts.includes(effort) ? draft.thinkingEfforts.filter((item) => item !== effort) : [...draft.thinkingEfforts, effort] });
   const setFast = (fast: boolean): void => setDraft((current) => ({ id: current.id, name: current.name, modelId: current.modelId, toolMode: current.toolMode, visionMode: current.visionMode, thinkingMode: current.thinkingMode, thinkingEfforts: current.thinkingEfforts, maxInputTokens: current.maxInputTokens, maxOutputTokens: current.maxOutputTokens, ...(fast ? { serviceTier: 'fast' as const } : {}) }));

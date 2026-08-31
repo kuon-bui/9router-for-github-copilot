@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { ModelForm } from './ModelForm';
 import { ModelList } from './ModelList';
 import type { ModelDraft } from '@/config/model-draft';
-import type { ModelEditorState } from '@/runtime/model-editor-view';
+import type { ModelEditorState } from '@/types/model-editor';
 import type { ModelEditorHostMessage, VsCodeApi } from '@/webview/shared/protocol';
 
 const EMPTY_STATE: ModelEditorState = { models: [], catalog: [], warnings: [], thinkingModes: [], thinkingEfforts: [], defaultMaxInputTokens: 0, defaultMaxOutputTokens: 0 };
