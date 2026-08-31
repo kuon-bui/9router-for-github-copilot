@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { getApiKey } from '@/config/secret-store';
+import { isUsableRuntimeSettings } from '@/config/settings';
 import { NineRouterError } from '@/router/errors';
 import { toVisionModels } from '@/router/model-catalog';
 import { createAbortSignalFromToken } from '@/provider/cancellation';
@@ -184,7 +185,7 @@ async function pickNineRouterModel(
   }
 
   const runtime = dependencies.getRuntimeSettings();
-  if (!isValidRuntime(runtime)) {
+  if (!isUsableRuntimeSettings(runtime)) {
     throw new NineRouterError(
       'CONFIGURATION_ERROR',
       '9router runtime settings are invalid. Check diagnostics for details.'
@@ -442,18 +443,5 @@ async function updateSetting(
         }
       }
     );
-  }
-}
-
-function isValidRuntime(runtime: RuntimeSettings): boolean {
-  if (!Number.isFinite(runtime.requestTimeoutMs) || runtime.requestTimeoutMs <= 0) {
-    return false;
-  }
-
-  try {
-    const url = new URL(runtime.baseUrl);
-    return url.protocol === 'http:' || url.protocol === 'https:';
-  } catch {
-    return false;
   }
 }

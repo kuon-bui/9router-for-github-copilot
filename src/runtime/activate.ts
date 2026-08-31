@@ -10,6 +10,7 @@ import { NineRouterChatProvider } from '@/provider/provider';
 import { registerCommands } from './commands';
 import { registerUsageChatParticipant } from './chat-participant';
 import { createVisionProxyConfigurator } from './vision-configuration';
+import { createModelEditorOpener } from './model-editor-panel';
 import { createConnectionTester } from './test-connection';
 import { createUsageReporter } from './show-usage';
 import type { RouterClient } from '@/router/client';
@@ -46,6 +47,12 @@ export async function activateExtension(
     getRuntimeSettings: () => loadRuntimeSettings(getExtensionConfiguration())
   });
 
+  const manageModels = createModelEditorOpener({
+    secrets: context.secrets,
+    routerClient,
+    getRuntimeSettings: () => loadRuntimeSettings(getExtensionConfiguration())
+  });
+
   provider = createProvider(
     context,
     routerClient,
@@ -65,6 +72,7 @@ export async function activateExtension(
   registerRuntimeCommands(context, {
     getSettingsSnapshot: () => provider?.getSnapshot(),
     configureVisionProxy,
+    manageModels,
     testConnection,
     showUsage
   });

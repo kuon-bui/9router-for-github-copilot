@@ -3,8 +3,34 @@ import { constants } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import manifest from '@root/package.json';
+import { DEFAULT_REQUEST_TIMEOUT_MS } from '@/config/defaults';
 
 describe('release guardrails', () => {
+  it('contributes the documented 60 second request timeout default', () => {
+    const properties = manifest.contributes.configuration.properties as Record<string, unknown>;
+    const timeout = properties['9router-copilot.requestTimeoutMs'] as { default: number };
+
+    expect(timeout.default).toBe(DEFAULT_REQUEST_TIMEOUT_MS);
+  });
+
+  it('contributes the manage models command', () => {
+    const commands = manifest.contributes.commands as Array<{ command: string; title: string }>;
+
+    expect(commands).toContainEqual({
+      command: '9routerCopilot.manageModels',
+      title: '9router: Manage Models'
+    });
+  });
+
+  it('contributes the add model command', () => {
+    const commands = manifest.contributes.commands as Array<{ command: string; title: string }>;
+
+    expect(commands).toContainEqual({
+      command: '9routerCopilot.addModel',
+      title: '9router: Add Model'
+    });
+  });
+
   it('contributes one ordered dynamic model setting with a safe agent default', () => {
     const properties = manifest.contributes.configuration.properties as Record<string, unknown>;
     const models = properties['9router-copilot.models'] as {
