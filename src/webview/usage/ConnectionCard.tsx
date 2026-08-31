@@ -25,7 +25,7 @@ export function ConnectionCard({ card }: { card: UsageCardView }): JSX.Element {
   return <article className="min-w-0 rounded-2xl border border-border bg-card px-[18px] pb-3 pt-4">
     <header className="flex items-start justify-between gap-3">
       <div className="flex min-w-0 items-center gap-2.5"><Avatar card={card} /><div className="min-w-0"><div className="text-[15px] font-bold tracking-tight">{card.provider}</div><div className="truncate text-xs text-muted">{card.account}</div><div className="mt-px truncate text-[11px] text-muted">{card.plan}</div></div></div>
-      <div className="flex shrink-0 items-center gap-1.5">{card.chips.map((chip) => <span key={chip} className="rounded-full border border-border px-[7px] py-0.5 text-[10px] uppercase tracking-wide text-muted">{chip}</span>)}<RefreshButton /></div>
+      <div className="flex shrink-0 items-center gap-1.5">{card.chips.map((chip) => <span key={chip} className="ui-chip border border-border uppercase tracking-wide text-muted">{chip}</span>)}<RefreshButton /></div>
     </header>
     {card.message !== undefined && <p className="mt-3 border-l-[3px] border-critical bg-critical/10 px-2.5 py-2 text-muted">{card.message}</p>}
     <p className="mb-1 mt-3.5 text-xs text-muted">{card.quotaCountLabel}</p>
