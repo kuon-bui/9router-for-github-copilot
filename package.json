@@ -251,7 +251,7 @@
   },
   "scripts": {
     "clean": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\"",
-    "build": "pnpm run clean && tsc -p tsconfig.json && node scripts/build.mjs",
+    "build": "pnpm run clean && tsc -p tsconfig.json && tsc -p src/webview/tsconfig.json && node scripts/build.mjs",
     "watch": "node scripts/watch.mjs",
     "lint": "eslint .",
     "test:unit": "vitest run test/unit",
@@ -262,12 +262,18 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@tailwindcss/vite": "^4.3.3",
     "@types/node": "^26.1.1",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.5",
     "@types/vscode": "^1.125.0",
     "@typescript-eslint/eslint-plugin": "^8.64.0",
     "@typescript-eslint/parser": "^8.64.0",
     "@vscode/vsce": "^3.9.2",
     "eslint": "^10.7.0",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "tailwindcss": "^4.3.3",
     "typescript": "^5.6.3",
     "vite": "^8.2.2",
     "vitest": "^4.1.10"

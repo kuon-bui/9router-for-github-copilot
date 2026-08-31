@@ -1,5 +1,6 @@
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
+import tailwindcss from '@tailwindcss/vite';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -53,7 +54,7 @@ export function createWebviewConfig(view, { watch = false, counter, plugins = []
     root,
     configFile: false,
     logLevel: 'info',
-    plugins: [...plugins, ...(counter ? [watchMarkerPlugin(counter)] : [])],
+    plugins: [tailwindcss(), ...plugins, ...(counter ? [watchMarkerPlugin(counter)] : [])],
     resolve: { alias: { '@': resolve(root, 'src') } },
     build: {
       target: 'es2022',
@@ -75,4 +76,4 @@ export function createWebviewConfig(view, { watch = false, counter, plugins = []
   };
 }
 
-export const WEBVIEW_VIEWS = [];
+export const WEBVIEW_VIEWS = ['usage'];

@@ -1,0 +1,5 @@
+@import 'tailwindcss';
+@import '../shared/theme.css';
+@source './**/*.tsx';
+@source './index.html';
+@source '../shared/**/*.ts';
