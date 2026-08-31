@@ -54,6 +54,7 @@ export function createWebviewConfig(view, { watch = false, counter, plugins = []
     root,
     configFile: false,
     logLevel: 'info',
+    define: { 'process.env.NODE_ENV': JSON.stringify(watch ? 'development' : 'production') },
     plugins: [tailwindcss(), ...plugins, ...(counter ? [watchMarkerPlugin(counter)] : [])],
     resolve: { alias: { '@': resolve(root, 'src') } },
     build: {
