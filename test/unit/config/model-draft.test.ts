@@ -4,7 +4,8 @@ import {
   createUniqueModelId,
   sanitizeModelId,
   suggestDisplayName,
-  toSettingsEntry
+  toSettingsEntry,
+  validateDraft
 } from '@/config/model-draft';
 
 describe('sanitizeModelId', () => {
@@ -134,5 +135,99 @@ describe('toSettingsEntry', () => {
 
     expect(entry.serviceTier).toBe('fast');
     expect(entry.thinkingEfforts).toEqual(['low', 'high']);
+  });
+});
+
+describe('validateDraft', () => {
+  const validInput = {
+    id: 'agent',
+    name: 'Agent',
+    modelId: 'router/combo',
+    toolMode: 'auto',
+    visionMode: 'off',
+    thinkingMode: 'off',
+    thinkingEfforts: [],
+    maxInputTokens: 264_000,
+    maxOutputTokens: 264_000
+  };
+
+  it('returns a typed draft when every field is valid', () => {
+    const result = validateDraft(validInput, { takenIds: ['other'] });
+
+    expect(result.errors).toEqual([]);
+    expect(result.draft).toEqual(validInput);
+  });
+
+  it('keeps a fast service tier', () => {
+    const result = validateDraft({ ...validInput, serviceTier: 'fast' }, { takenIds: [] });
+
+    expect(result.errors).toEqual([]);
+    expect(result.draft?.serviceTier).toBe('fast');
+  });
+
+  it('rejects a non-object payload', () => {
+    expect(validateDraft(null, { takenIds: [] })).toEqual({
+      errors: [{ field: 'draft', message: 'Model entry must be an object.' }]
+    });
+  });
+
+  it('reports every invalid field at once', () => {
+    const result = validateDraft(
+      {
+        id: 'Bad Id',
+        name: '   ',
+        modelId: 'router/combo(high)',
+        serviceTier: 'slow',
+        toolMode: 'maybe',
+        visionMode: 'sometimes',
+        thinkingMode: 'turbo',
+        thinkingEfforts: ['low', 'low'],
+        maxInputTokens: 0,
+        maxOutputTokens: 1.5
+      },
+      { takenIds: [] }
+    );
+
+    expect(result.draft).toBeUndefined();
+    expect(result.errors.map((error) => error.field).sort()).toEqual([
+      'id',
+      'maxInputTokens',
+      'maxOutputTokens',
+      'modelId',
+      'name',
+      'serviceTier',
+      'thinkingEfforts',
+      'thinkingMode',
+      'toolMode',
+      'visionMode'
+    ]);
+    expect(result.errors.find((error) => error.field === 'id')?.message).toBe(
+      'Model id must match [a-z0-9][a-z0-9._-]*.'
+    );
+    expect(result.errors.find((error) => error.field === 'modelId')?.message).toBe(
+      'modelId must be a non-empty base 9router model id without a thinking suffix.'
+    );
+  });
+
+  it('rejects an id already used by another entry', () => {
+    const result = validateDraft(validInput, { takenIds: ['agent'] });
+
+    expect(result.errors).toEqual([
+      { field: 'id', message: 'Model id "agent" is duplicated.' }
+    ]);
+  });
+
+  it('requires thinking efforts to include a non-off thinking mode', () => {
+    const result = validateDraft(
+      { ...validInput, thinkingMode: 'high', thinkingEfforts: ['low'] },
+      { takenIds: [] }
+    );
+
+    expect(result.errors).toEqual([
+      {
+        field: 'thinkingEfforts',
+        message: 'thinkingEfforts must include the configured non-off thinkingMode.'
+      }
+    ]);
   });
 });
