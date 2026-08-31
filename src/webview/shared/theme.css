@@ -1,0 +1,26 @@
+@theme {
+  --color-bg: var(--vscode-editor-background);
+  --color-fg: var(--vscode-editor-foreground);
+  --color-muted: var(--vscode-descriptionForeground);
+  --color-card: var(--vscode-editorWidget-background);
+  --color-border: var(--vscode-widget-border);
+  --color-panel-border: var(--vscode-panel-border);
+  --color-input: var(--vscode-input-background);
+  --color-input-fg: var(--vscode-input-foreground);
+  --color-btn: var(--vscode-button-background);
+  --color-btn-fg: var(--vscode-button-foreground);
+  --color-btn-alt: var(--vscode-button-secondaryBackground);
+  --color-btn-alt-fg: var(--vscode-button-secondaryForeground);
+  --color-badge: var(--vscode-badge-background);
+  --color-badge-fg: var(--vscode-badge-foreground);
+  --color-err: var(--vscode-inputValidation-errorBorder);
+  --color-err-bg: var(--vscode-inputValidation-errorBackground);
+  --color-err-fg: var(--vscode-errorForeground);
+  --color-warn-border: var(--vscode-inputValidation-warningBorder);
+  --color-warn-bg: var(--vscode-inputValidation-warningBackground);
+  --color-ok: #3dd68c;
+  --color-warn: #e3b341;
+  --color-critical: #f85149;
+  --font-sans: var(--vscode-font-family);
+  --font-mono: var(--vscode-editor-font-family);
+}

@@ -9,6 +9,7 @@ import {
   __setConfigurationValues,
   __setWarningResponse
 } from '@test/support/vscode';
+import { Uri } from '@test/support/vscode';
 import { NineRouterError } from '@/router/errors';
 import {
   __resetModelEditorPanelForTests,
@@ -42,6 +43,7 @@ function createDependencies(
     routerClient: {
       listModels: overrides.listModels ?? (async () => [{ id: 'router/combo' }])
     } as unknown as RouterClient,
+    extensionUri: Uri.file('/ext'),
     getRuntimeSettings: () => runtime
   };
 }
@@ -74,19 +76,22 @@ describe('createModelEditorOpener', () => {
 
     const panels = __getWebviewPanelObjects();
     expect(panels).toHaveLength(1);
-    expect(panels[0]?.webview.html).toContain('id="model-list"');
+    expect(panels[0]?.webview.html).toContain('id="root"');
+    expect(panels[0]?.webview.html).toContain('ui.css');
+    expect(panels[0]?.webview.html).toContain('preact.js');
+    expect(panels[0]?.webview.html).toContain('client.js');
 
     await panels[0]?.webview.receiveMessage({ type: 'ready' });
 
     expect(panels[0]?.webview.postedMessages).toEqual([
-      {
+      expect.objectContaining({
         type: 'state',
-        state: {
+        state: expect.objectContaining({
           models: [],
           catalog: [{ modelId: 'router/combo', vision: false, inUse: false }],
           warnings: []
-        }
-      }
+        })
+      })
     ]);
   });
 

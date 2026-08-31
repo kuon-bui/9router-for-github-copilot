@@ -48,6 +48,10 @@ describe('createModelEditorState', () => {
       }
     ]);
     expect(state.warnings).toEqual([]);
+    expect(state.thinkingModes).toEqual(['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max']);
+    expect(state.thinkingEfforts).toEqual(['minimal', 'low', 'medium', 'high', 'xhigh', 'max']);
+    expect(state.defaultMaxInputTokens).toBe(264_000);
+    expect(state.defaultMaxOutputTokens).toBe(264_000);
   });
 
   it('keeps rejected entries visible with their parser issue', () => {

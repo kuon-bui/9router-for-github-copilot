@@ -11,11 +11,13 @@ import {
   __getInformationMessages,
   __getOutputLines,
   __getWebviewPanels,
+  __getWebviewPanelObjects,
   __resetVscodeState,
   __getConfigurationUpdates,
   __setConfigurationValues,
   __setQuickPickValues,
-  ConfigurationTarget
+  ConfigurationTarget,
+  Uri
 } from '@test/support/vscode';
 
 describe('9routerCopilot.showDiagnostics', () => {
@@ -30,6 +32,7 @@ describe('9routerCopilot.showDiagnostics', () => {
     registerCommands(
       {
         subscriptions,
+        extensionUri: Uri.file('/ext'),
         secrets: {
           get: async () => undefined,
           store: async () => undefined,
@@ -113,6 +116,7 @@ describe('9routerCopilot.showDiagnostics', () => {
     registerCommands(
       {
         subscriptions,
+        extensionUri: Uri.file('/ext'),
         secrets: {
           get: async () => undefined,
           store: async () => undefined,
@@ -142,6 +146,7 @@ describe('9routerCopilot.showDiagnostics', () => {
     registerCommands(
       {
         subscriptions: [],
+        extensionUri: Uri.file('/ext'),
         secrets: {
           get: async () => undefined,
           store: async () => undefined,
@@ -164,6 +169,7 @@ describe('9routerCopilot.showDiagnostics', () => {
     registerCommands(
       {
         subscriptions: [],
+        extensionUri: Uri.file('/ext'),
         secrets: {
           get: async () => undefined,
           store: async () => undefined,
@@ -218,6 +224,7 @@ describe('9routerCopilot.showDiagnostics', () => {
     registerCommands(
       {
         subscriptions: [],
+        extensionUri: Uri.file('/ext'),
         secrets: {
           get: async () => undefined,
           store: async () => undefined,
@@ -240,10 +247,24 @@ describe('9routerCopilot.showDiagnostics', () => {
         preserveFocus: false
       }
     });
-    expect(panels[0]?.html).toContain('session');
-    expect(panels[0]?.html).toContain('5%');
-    expect(panels[0]?.html).toContain('plus · oauth');
-    expect(panels[0]?.html).toContain('Codex');
+    expect(panels[0]?.html).toContain('id="root"');
+    expect(panels[0]?.html).toContain('vscode-webview://mock/ext/dist/webview/shared/ui.css');
+    expect(panels[0]?.html).toContain('vscode-webview://mock/ext/dist/webview/shared/preact.js');
+    expect(panels[0]?.html).toContain('vscode-webview://mock/ext/dist/webview/usage/client.js');
+    const panel = __getWebviewPanelObjects()[0];
+    expect(panel).toBeDefined();
+    await panel?.webview.receiveMessage({ type: 'ready' });
+    expect(panel?.webview.postedMessages).toEqual([
+      expect.objectContaining({
+        type: 'usage',
+        snapshot: expect.objectContaining({ count: 2 }),
+        nowMs: expect.any(Number)
+      })
+    ]);
+    await __getCommandHandler('9routerCopilot.showUsage')?.();
+    expect(__getWebviewPanels()).toHaveLength(1);
+    expect(panel?.lastReveal).toEqual({ viewColumn: -1, preserveFocus: false });
+    expect(panel?.webview.postedMessages).toHaveLength(2);
     expect(__getInformationMessages()).toEqual([]);
     expect(__getErrorMessages()).toEqual([]);
   });
@@ -252,6 +273,7 @@ describe('9routerCopilot.showDiagnostics', () => {
     registerCommands(
       {
         subscriptions: [],
+        extensionUri: Uri.file('/ext'),
         secrets: {
           get: async () => undefined,
           store: async () => undefined,
@@ -294,6 +316,7 @@ describe('9routerCopilot.showDiagnostics', () => {
     registerCommands(
       {
         subscriptions: [],
+        extensionUri: Uri.file('/ext'),
         secrets: {
           get: async () => undefined,
           store: async () => undefined,
@@ -336,6 +359,7 @@ describe('9routerCopilot.showDiagnostics', () => {
     registerCommands(
       {
         subscriptions: [],
+        extensionUri: Uri.file('/ext'),
         secrets: {
           get: async () => undefined,
           store: async () => undefined,

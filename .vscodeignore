@@ -5,6 +5,7 @@
 .worktrees/**
 .superpowers/**
 docs/**
+scripts/**
 test/**
 node_modules/**
 .pnpm-store/**

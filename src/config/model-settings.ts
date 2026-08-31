@@ -22,22 +22,9 @@ import type {
   ToolMode,
   VisionMode
 } from '@/types/product-model';
+import type { ModelSettingsIssueCode } from '@/types/model-editor';
 
-export type ModelSettingsIssueCode =
-  | 'INVALID_MODELS_SETTING'
-  | 'INVALID_MODEL_ENTRY'
-  | 'UNKNOWN_MODEL_FIELD'
-  | 'INVALID_MODEL_ID'
-  | 'DUPLICATE_MODEL_ID'
-  | 'INVALID_MODEL_NAME'
-  | 'INVALID_MODEL_MAPPING'
-  | 'INVALID_SERVICE_TIER'
-  | 'INVALID_TOOL_MODE'
-  | 'INVALID_VISION_MODE'
-  | 'INVALID_THINKING_MODE'
-  | 'INVALID_THINKING_EFFORTS'
-  | 'INVALID_MAX_INPUT_TOKENS'
-  | 'INVALID_MAX_OUTPUT_TOKENS';
+export type { ModelSettingsIssueCode } from '@/types/model-editor';
 
 export interface ModelSettingsIssue {
   scope: 'model';

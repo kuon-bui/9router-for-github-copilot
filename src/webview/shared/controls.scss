@@ -1,0 +1,100 @@
+button,
+input,
+select {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+  border: 1px solid var(--vscode-button-border, transparent);
+  border-radius: 2px;
+  background: var(--vscode-button-secondaryBackground);
+  color: var(--vscode-button-secondaryForeground);
+  padding: 4px 10px;
+
+  &:disabled {
+    cursor: default;
+    opacity: 0.5;
+  }
+}
+
+.ui-button {
+  cursor: pointer;
+  border: 1px solid var(--vscode-button-border, transparent);
+  border-radius: 2px;
+  background: var(--vscode-button-secondaryBackground);
+  color: var(--vscode-button-secondaryForeground);
+  padding: 4px 10px;
+
+  &:disabled {
+    cursor: default;
+    opacity: 0.5;
+  }
+}
+
+.ui-button-primary {
+  background: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+}
+
+.ui-field {
+  border: 1px solid var(--vscode-input-border, transparent);
+  border-radius: 2px;
+  background: var(--vscode-input-background);
+  color: var(--vscode-input-foreground);
+  padding: 3px 6px;
+}
+
+.ui-alert {
+  border-radius: 2px;
+  border-style: solid;
+  border-width: 1px;
+  padding: 6px 8px;
+  font-size: 12px;
+}
+
+.ui-alert-warning {
+  border-color: var(--vscode-inputValidation-warningBorder);
+  background: var(--vscode-inputValidation-warningBackground);
+  color: var(--vscode-editor-foreground);
+}
+
+.ui-alert-error {
+  border-color: var(--vscode-inputValidation-errorBorder);
+  background: var(--vscode-inputValidation-errorBackground);
+  color: var(--vscode-errorForeground);
+}
+
+.ui-chip {
+  border-radius: 9999px;
+  padding: 1px 6px;
+  font-size: 11px;
+}
+
+label {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 12px;
+}
+
+fieldset {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 4px 0;
+  border: 1px solid var(--vscode-panel-border);
+  border-radius: 2px;
+  padding: 6px 8px;
+
+  label {
+    display: inline-flex;
+    flex-direction: row;
+    gap: 4px;
+  }
+}
+
+legend {
+  color: var(--vscode-descriptionForeground);
+  font-size: 11px;
+}

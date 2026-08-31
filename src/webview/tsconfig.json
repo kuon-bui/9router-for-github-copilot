@@ -1,0 +1,26 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": ["ES2022", "DOM"],
+    "types": [],
+    "jsx": "react-jsx",
+    "jsxImportSource": "react",
+    "noEmit": true,
+    "paths": {
+      "@/*": ["../*"],
+      "react": ["../../node_modules/preact/compat/"],
+      "react/jsx-runtime": ["../../node_modules/preact/jsx-runtime"],
+      "react/jsx-dev-runtime": ["../../node_modules/preact/jsx-dev-runtime"],
+      "react-dom": ["../../node_modules/preact/compat/"],
+      "react-dom/client": ["../../node_modules/preact/compat/client"]
+    },
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true
+  },
+  "include": ["./**/*.ts", "./**/*.tsx"]
+}

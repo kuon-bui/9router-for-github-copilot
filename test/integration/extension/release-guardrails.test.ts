@@ -247,7 +247,7 @@ describe('release guardrails', () => {
   it('bundles source aliases before packaging', () => {
     expect(manifest.main).toBe('./dist/src/extension.js');
     expect(manifest.scripts.build).toContain('tsc -p tsconfig.json');
-    expect(manifest.scripts.build).toContain('esbuild src/extension.ts --bundle');
+    expect(manifest.scripts.build).toContain('node scripts/build.mjs');
     expect(manifest.scripts['vscode:prepublish']).toBe('pnpm run build');
   });
 

@@ -5,7 +5,8 @@ import {
   __getWebviewPanelObjects,
   __resetVscodeState,
   __setConfigurationDefaults,
-  __setConfigurationValues
+  __setConfigurationValues,
+  Uri
 } from '@test/support/vscode';
 import { NineRouterError } from '@/router/errors';
 import { registerCommands } from '@/runtime/commands';
@@ -13,6 +14,7 @@ import { registerCommands } from '@/runtime/commands';
 function createContext() {
   return {
     subscriptions: [] as Array<{ dispose: () => void }>,
+    extensionUri: Uri.file('/ext'),
     secrets: {
       get: async () => 'test-key',
       store: async () => undefined,

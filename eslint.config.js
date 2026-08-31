@@ -24,6 +24,7 @@ module.exports = [
     ignores: [
       'dist/**',
       'node_modules/**',
+      'scripts/**',
       '*.vsix',
       // Vendored from microsoft/vscode; keep it in sync with upstream rather than reformatting it.
       'src/types/vscode.proposed.*.d.ts'
@@ -37,12 +38,13 @@ module.exports = [
     }
   },
   {
-    files: ['**/*.ts'],
+    files: ['**/*.ts', '**/*.tsx'],
     languageOptions: {
       parser: tsParser,
       parserOptions: {
         ecmaVersion: 2022,
-        sourceType: 'module'
+        sourceType: 'module',
+        ecmaFeatures: { jsx: true }
       },
       globals: sharedGlobals
     },
@@ -61,6 +63,44 @@ module.exports = [
       'no-console': 'error',
       'no-unused-vars': 'off',
       'require-yield': 'off'
+    }
+  },
+  {
+    files: ['src/webview/**/*.ts', 'src/webview/**/*.tsx'],
+    languageOptions: {
+      parser: tsParser,
+      parserOptions: {
+        ecmaVersion: 2022,
+        sourceType: 'module',
+        ecmaFeatures: { jsx: true }
+      },
+      globals: {
+        document: 'readonly',
+        window: 'readonly',
+        Element: 'readonly',
+        HTMLElement: 'readonly',
+        HTMLInputElement: 'readonly',
+        HTMLSelectElement: 'readonly',
+        Event: 'readonly',
+        MessageEvent: 'readonly',
+        acquireVsCodeApi: 'readonly'
+      }
+    },
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [{ name: 'vscode', message: 'Webview code runs in the browser sandbox.' }],
+          patterns: [
+            { group: ['node:*'], message: 'Webview code runs in the browser sandbox.' },
+            {
+              group: ['@/runtime', '@/runtime/*'],
+              message:
+                'Webview code must consume browser-safe contracts, not extension runtime modules.'
+            }
+          ]
+        }
+      ]
     }
   }
 ];

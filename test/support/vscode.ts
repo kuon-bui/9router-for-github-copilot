@@ -131,10 +131,42 @@ class OutputChannel {
   }
 }
 
+interface MockUri {
+  readonly scheme: string;
+  readonly fsPath: string;
+  readonly path: string;
+  toString(): string;
+}
+
+function createUri(fsPath: string): MockUri {
+  return {
+    scheme: 'file',
+    fsPath,
+    path: fsPath,
+    toString: () => `file://${fsPath}`
+  };
+}
+
+export const Uri = {
+  file: createUri,
+  joinPath(base: MockUri, ...segments: string[]): MockUri {
+    return createUri([base.fsPath, ...segments].join('/'));
+  }
+};
+
 class Webview {
   public html = '';
   public readonly postedMessages: unknown[] = [];
+  public readonly cspSource = 'vscode-webview://mock';
   private readonly messageListeners = new Set<(message: unknown) => void>();
+
+  public asWebviewUri(uri: MockUri): MockUri {
+    return {
+      ...uri,
+      scheme: 'vscode-webview',
+      toString: () => `vscode-webview://mock${uri.fsPath}`
+    };
+  }
 
   public readonly onDidReceiveMessage = (listener: (message: unknown) => void): Disposable => {
     this.messageListeners.add(listener);
@@ -214,6 +246,14 @@ const configurationListeners = new Set<
 const warningMessages: string[] = [];
 let warningResponse: string | undefined;
 let warningResponseSet = false;
+const DEFAULT_WEBVIEW_SHELL = [
+  '<meta http-equiv="Content-Security-Policy" content="{{csp}}">',
+  '<link rel="stylesheet" href="{{styleUri}}">',
+  '<div id="root"></div>',
+  '<script nonce="{{nonce}}" src="{{runtimeScriptUri}}"></script>',
+  '<script nonce="{{nonce}}" src="{{scriptUri}}"></script>'
+].join('\n');
+let webviewShell = DEFAULT_WEBVIEW_SHELL;
 
 export const ConfigurationTarget = { Global: 1 } as const;
 export const ViewColumn = { Active: -1, Beside: -2 } as const;
@@ -286,6 +326,11 @@ export const window = {
 };
 
 export const workspace = {
+  fs: {
+    async readFile(_uri: MockUri): Promise<Uint8Array> {
+      return new TextEncoder().encode(webviewShell);
+    }
+  },
   getConfiguration(): {
     get: <T>(key: string) => T | undefined;
     inspect: <T>(key: string) => {
@@ -430,6 +475,10 @@ export function __setWarningResponse(value: string | undefined): void {
   warningResponseSet = true;
 }
 
+export function __setWebviewShell(html: string): void {
+  webviewShell = html;
+}
+
 export function __getWarningMessages(): string[] {
   return [...warningMessages];
 }
@@ -509,6 +558,7 @@ export function __resetVscodeState(): void {
   warningMessages.length = 0;
   warningResponse = undefined;
   warningResponseSet = false;
+  webviewShell = DEFAULT_WEBVIEW_SHELL;
   for (const panel of webviewPanels) {
     panel.dispose();
   }
