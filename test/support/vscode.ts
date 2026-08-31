@@ -131,10 +131,32 @@ class OutputChannel {
   }
 }
 
-class WebviewPanel {
-  public readonly webview = {
-    html: ''
+class Webview {
+  public html = '';
+  public readonly postedMessages: unknown[] = [];
+  private readonly messageListeners = new Set<(message: unknown) => void>();
+
+  public readonly onDidReceiveMessage = (listener: (message: unknown) => void): Disposable => {
+    this.messageListeners.add(listener);
+    return new Disposable(() => {
+      this.messageListeners.delete(listener);
+    });
   };
+
+  public async postMessage(message: unknown): Promise<boolean> {
+    this.postedMessages.push(message);
+    return true;
+  }
+
+  public async receiveMessage(message: unknown): Promise<void> {
+    for (const listener of [...this.messageListeners]) {
+      await listener(message);
+    }
+  }
+}
+
+class WebviewPanel {
+  public readonly webview = new Webview();
   public readonly onDidDispose = (listener: () => void): Disposable => {
     this.disposeListeners.add(listener);
     return new Disposable(() => {
@@ -184,6 +206,14 @@ const chatParticipants: Array<{
   iconPath?: unknown;
 }> = [];
 const webviewPanels: WebviewPanel[] = [];
+const configurationDefaults = new Map<string, unknown>();
+const configurationWorkspaceValues = new Map<string, unknown>();
+const configurationListeners = new Set<
+  (event: { affectsConfiguration: (section: string) => boolean }) => void
+>();
+const warningMessages: string[] = [];
+let warningResponse: string | undefined;
+let warningResponseSet = false;
 
 export const ConfigurationTarget = { Global: 1 } as const;
 export const ViewColumn = { Active: -1, Beside: -2 } as const;
@@ -247,17 +277,40 @@ export const window = {
   async showErrorMessage(message: string): Promise<string | undefined> {
     errorMessages.push(message);
     return undefined;
+  },
+  async showWarningMessage(message: string, ...items: unknown[]): Promise<string | undefined> {
+    warningMessages.push(message);
+    const actions = items.filter((item): item is string => typeof item === 'string');
+    return warningResponseSet ? warningResponse : actions[0];
   }
 };
 
 export const workspace = {
   getConfiguration(): {
     get: <T>(key: string) => T | undefined;
+    inspect: <T>(key: string) => {
+      defaultValue?: T;
+      globalValue?: T;
+      workspaceValue?: T;
+    };
     update: (key: string, value: unknown, target: unknown) => Promise<void>;
   } {
     return {
       get<T>(key: string): T | undefined {
         return configurationValues.get(key) as T | undefined;
+      },
+      inspect<T>(key: string): { defaultValue?: T; globalValue?: T; workspaceValue?: T } {
+        return {
+          ...(configurationDefaults.has(key)
+            ? { defaultValue: configurationDefaults.get(key) as T }
+            : {}),
+          ...(configurationValues.has(key)
+            ? { globalValue: configurationValues.get(key) as T }
+            : {}),
+          ...(configurationWorkspaceValues.has(key)
+            ? { workspaceValue: configurationWorkspaceValues.get(key) as T }
+            : {})
+        };
       },
       async update(key: string, value: unknown, target: unknown): Promise<void> {
         configurationValues.set(key, value);
@@ -266,8 +319,10 @@ export const workspace = {
     };
   },
   onDidChangeConfiguration(listener: (event: { affectsConfiguration: (section: string) => boolean }) => void): Disposable {
-    void listener;
-    return new Disposable();
+    configurationListeners.add(listener);
+    return new Disposable(() => {
+      configurationListeners.delete(listener);
+    });
   }
 };
 
@@ -347,6 +402,42 @@ export function __getErrorMessages(): string[] {
   return [...errorMessages];
 }
 
+export function __setConfigurationDefaults(values: Record<string, unknown>): void {
+  configurationDefaults.clear();
+  for (const [key, value] of Object.entries(values)) {
+    configurationDefaults.set(key, value);
+  }
+}
+
+export function __setConfigurationWorkspaceValues(values: Record<string, unknown>): void {
+  configurationWorkspaceValues.clear();
+  for (const [key, value] of Object.entries(values)) {
+    configurationWorkspaceValues.set(key, value);
+  }
+}
+
+export function __fireConfigurationChange(section: string): void {
+  const event = {
+    affectsConfiguration: (candidate: string) => section.startsWith(candidate)
+  };
+  for (const listener of [...configurationListeners]) {
+    listener(event);
+  }
+}
+
+export function __setWarningResponse(value: string | undefined): void {
+  warningResponse = value;
+  warningResponseSet = true;
+}
+
+export function __getWarningMessages(): string[] {
+  return [...warningMessages];
+}
+
+export function __getWebviewPanelObjects(): WebviewPanel[] {
+  return [...webviewPanels];
+}
+
 export function __getWebviewPanels(): Array<{
   viewType: string;
   title: string;
@@ -412,6 +503,12 @@ export function __resetVscodeState(): void {
   informationMessages.length = 0;
   errorMessages.length = 0;
   chatParticipants.length = 0;
+  configurationDefaults.clear();
+  configurationWorkspaceValues.clear();
+  configurationListeners.clear();
+  warningMessages.length = 0;
+  warningResponse = undefined;
+  warningResponseSet = false;
   for (const panel of webviewPanels) {
     panel.dispose();
   }

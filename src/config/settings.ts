@@ -62,6 +62,19 @@ export interface SettingsSnapshot {
   issues: SettingsIssue[];
 }
 
+export function isUsableRuntimeSettings(runtime: RuntimeSettings): boolean {
+  if (!Number.isFinite(runtime.requestTimeoutMs) || runtime.requestTimeoutMs <= 0) {
+    return false;
+  }
+
+  try {
+    const url = new URL(runtime.baseUrl);
+    return url.protocol === 'http:' || url.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
 export function normalizeBaseUrl(input: string): string {
   return input.trim().replace(/\/v1\/*$|\/+$/, '');
 }
