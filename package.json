@@ -17,7 +17,8 @@
     "languageModelThinkingPart"
   ],
   "categories": [
-    "Other"
+    "AI",
+    "Chat"
   ],
   "main": "./dist/src/extension.js",
   "activationEvents": [
