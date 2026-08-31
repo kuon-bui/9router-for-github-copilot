@@ -62,6 +62,9 @@ These were settled during brainstorming and are not open in the plan:
   static file. It gains `enableScripts: true`.
 - Webview code lives in a new top-level `src/webview/` directory, which
   requires an explicit update to `CODE_CONVENTION.md`.
+- Webview bundles are built with Vite. The extension host bundle stays on
+  esbuild.
+- Vite is used for building only. No dev server, no HMR.
 - `stylelint` is added so CI blocks the class of bug described above.
 - `src/runtime/usage-markdown.ts` is deleted as dead code.
 
@@ -75,6 +78,7 @@ sandbox, not in the extension host.
 ```
 src/webview/
   tsconfig.json                 lib ES2022 + DOM, types: []
+  css-modules.d.ts              declare module '*.css'
   shared/
     tokens.css                  design tokens: --bg --fg --muted --ok --warn --critical
     base.css                    reset, typography, shared button/chip/error rules
@@ -103,6 +107,9 @@ Added:
 
 - `src/runtime/webview-document.ts` — a pure function that assembles the
   final document string.
+- `scripts/webview-vite-config.mjs` — the shared Vite config factory.
+- `scripts/build-webviews.mjs` — one-shot webview build.
+- `scripts/watch.mjs` — the combined watch process described below.
 
 Deleted:
 
@@ -164,15 +171,66 @@ policy applies to an externally loaded file.
 
 ## Build Pipeline
 
+### Two bundlers, on purpose
+
+The extension host bundle stays on esbuild: one CLI line producing CJS for
+node20 with `vscode` external. Vite's library mode can produce the same
+output, but it buys nothing there.
+
+The webview bundles move to Vite. Vite 8 is already installed in this
+repository as a transitive dependency of `vitest@4` (`vite@8.1.4`, 2.3 MB),
+so promoting it to a direct devDependency pins what is already on disk
+rather than adding weight. Vite 8 bundles with Rolldown and ships
+Lightning CSS, so the CSS in this project finally passes through a real CSS
+parser instead of living in a TypeScript string.
+
+`vite` is added to `devDependencies` with an explicit version so the build
+does not silently follow whatever `vitest` happens to hoist.
+
 ### Webview bundling
 
-New file `scripts/build-webviews.mjs`, using the esbuild JavaScript API.
-For each directory under `src/webview/` other than `shared/`:
+`scripts/webview-vite-config.mjs` exports a factory:
 
-- entry point is that directory's `client.ts`
-- `bundle: true`, `format: 'iife'`, `target: 'es2022'`
-- output directory `dist/webview/<view>/`
-- minify when not in watch mode, sourcemap when in watch mode
+```js
+export function createWebviewConfig(view, { watch = false } = {});
+```
+
+It returns an inline Vite config for a single view:
+
+- `build.rollupOptions.input` is that view's `client.ts`, one entry only
+- `build.rollupOptions.output.format: 'iife'`
+- `entryFileNames: 'client.js'`, `assetFileNames: 'client.[ext]'`
+- `build.outDir: dist/webview/<view>`, `emptyOutDir: true`
+- `build.target: 'es2022'`, `build.modulePreload: false`
+- `css.transformer: 'lightningcss'` and
+  `build.cssMinify: 'lightningcss'`, set explicitly rather than relying on
+  whatever the Vite default is for this version
+- `resolve.alias` for `@` matching `vitest.config.ts`
+- sourcemap when `watch` is true, minify when it is false
+
+`scripts/build-webviews.mjs` imports that factory and calls Vite's `build()`
+API once per view.
+
+**One Vite build per view, each with a single entry.** This is deliberate.
+Rolldown cannot emit `iife` for a multi-entry build, and a multi-entry `es`
+build would hoist anything shared between the two views into a common chunk
+with a generated name — a third asset the panel would have to locate and
+pass through `asWebviewUri`. Building each view separately duplicates the
+few kilobytes of `shared/` code across two bundles and removes that whole
+class of fragility.
+
+**Vite's HTML entry pipeline is deliberately not used.** Given an
+`index.html` entry, Vite rewrites `<script src>` and `<link href>` to hashed,
+root-absolute paths and emits a processed HTML file. A webview cannot load
+that: its asset references must be absolute `vscode-webview://` URIs produced
+by `asWebviewUri` at runtime. So `index.html` stays a hand-written shell with
+the placeholders described above, and Vite only produces `client.js` and
+`client.css`. `index.html` is copied verbatim to
+`dist/webview/<view>/index.html` by `scripts/build-webviews.mjs`.
+
+The deterministic output names are what make this work. The panel can build
+`asWebviewUri` for `dist/webview/<view>/client.js` and `client.css` without
+reading a manifest.
 
 Each `client.ts` imports its own stylesheet:
 
@@ -191,11 +249,9 @@ tokens:
 @import './tokens.css';
 ```
 
-esbuild follows all of it, so it emits `dist/webview/<view>/client.js` and
-`dist/webview/<view>/client.css` with tokens and base rules already folded
-in. No manual copy step is needed for CSS.
-
-`index.html` is copied verbatim to `dist/webview/<view>/index.html`.
+Vite follows all of it through Lightning CSS, so it emits
+`dist/webview/<view>/client.js` and `dist/webview/<view>/client.css` with
+tokens and base rules already inlined. No manual copy step is needed for CSS.
 
 ### Type checking
 
@@ -217,6 +273,16 @@ intentional: a shared module that only compiles with `node` or `vscode` types
 in scope is a module that does not belong in `shared/`. The view `client.ts`
 files are imported by neither, so they are checked only by the webview
 config.
+
+Vite and Rolldown strip types without checking them, so `tsc -p
+src/webview/tsconfig.json` remains the type-checking step for browser code
+and must stay in the `build` chain.
+
+`client.ts` importing `./usage.css` is not something TypeScript understands
+on its own. `src/webview/css-modules.d.ts` declares `declare module '*.css';`
+to cover it. The `vite/client` reference types are not used, because they
+would require populating `types` in a config that deliberately sets
+`types: []`.
 
 Webview modules import extension-side types with `import type` only.
 `buildUsageView` needs `RouterUsageSnapshot` from `@/router/usage`, but must
@@ -247,16 +313,22 @@ host, and `.vscode/tasks.json` gates that background task on a problem
 matcher looking for `^\[watch\] build started` and `^\[watch\] build
 finished`. Those lines come from the esbuild CLI's `--watch` output today.
 
-Because the watch now has to drive two builds — the extension bundle and the
-webview bundles — chaining two CLI invocations in one npm script is not
-portable on Windows, which is the development platform here. Instead,
-`scripts/watch.mjs` runs a single Node process that creates one esbuild
-context per target and calls `watch()` on each.
+The watch now drives two different bundlers — esbuild for the extension host
+and Vite for each webview. Running them as parallel CLI invocations from one
+npm script is not portable on Windows, which is the development platform
+here. Instead, `scripts/watch.mjs` is a single Node process that starts an
+esbuild context for the extension bundle and a Vite build in watch mode per
+view, then waits.
 
 That script must print `[watch] build started` and `[watch] build finished`
-itself, via an esbuild plugin on `onStart`/`onEnd`, or F5 hangs waiting for a
-line that never arrives. `scripts/build-webviews.mjs` and `scripts/watch.mjs`
-share their esbuild option construction so the two paths cannot drift.
+itself, or F5 hangs waiting for a line that never arrives. The markers come
+from a small plugin registered on both sides — esbuild's `onStart`/`onEnd`
+and Vite's `buildStart`/`writeBundle` — with a counter so the "finished" line
+is printed only once every target has settled, not once per bundler.
+
+`scripts/watch.mjs` and `scripts/build-webviews.mjs` both obtain their Vite
+options from `createWebviewConfig` in `scripts/webview-vite-config.mjs`, so
+the watch and release paths cannot drift.
 
 `.vscodeignore` needs no change. It already ships `dist/**` while excluding
 `dist/package.json`, `dist/test/**`, and `dist/vitest.config.js`, and it
@@ -458,9 +530,16 @@ existing `@` alias.
 - `no-restricted-imports` forbidding `vscode` and any `node:*` specifier
 
 `stylelint` and `stylelint-config-standard` are added as devDependencies with
-a `lint:css` script over `src/webview/**/*.css`. This is the check that would
-have caught the corrupted rules, so it is part of the change rather than a
-follow-up.
+a `lint:css` script over `src/webview/**/*.css`.
+
+This overlaps with Lightning CSS, which now parses the same files during
+`vite build`. The overlap is intentional and the two are not equivalent. CSS
+is specified to recover from errors by discarding the rules it cannot parse,
+so a build can succeed while quietly dropping a mangled selector — which is
+exactly the failure mode this whole change exists to prevent. Stylelint
+reports it as an error instead of discarding it, and also covers convention
+issues a bundler has no opinion about, such as the duplicated `background`
+declaration in the corrupted `.bar.warn .fill` rule.
 
 ## Dead Code Removal
 
@@ -492,6 +571,13 @@ approves a change. That approval was given during brainstorming on
   CSS and substituting equivalent token values.
 - No changes to `src/provider`, `src/router`, or `src/config`.
 - No CSS preprocessor.
+- No Vite dev server and no HMR. Serving the webview from
+  `http://localhost:5173` during development would require
+  `webview-document.ts` to branch on dev versus production and the dev CSP to
+  admit `http://localhost:5173` plus `ws://localhost:5173` for the HMR
+  socket. That reintroduces exactly the CSP looseness this change removes,
+  inside the module whose job is to keep the policy tight. If HMR is wanted
+  later it is a separate, deliberate change.
 - No UI framework. Adding lit or preact would contradict the
   `CODE_CONVENTION.md` decision rule that favours keeping the extension
   smaller.
@@ -508,6 +594,17 @@ approves a change. That approval was given during brainstorming on
   today. The mitigation is that the client builds DOM nodes through
   `createElement` and `textContent` and never assigns `innerHTML`, so no
   snapshot value can be interpreted as markup.
+- **Two bundlers in one repository.** esbuild builds the extension host, Vite
+  builds the webviews, so there are two config styles to understand. The
+  split is along a real boundary — node bundle versus browser bundle — and
+  `createWebviewConfig` keeps the Vite side to one file. If it starts costing
+  more than it returns, the webview side can fall back to esbuild without
+  touching anything in `src/`, because nothing in the source tree depends on
+  which bundler produced `client.js`.
+- **Vite version drift.** `vite` currently arrives through `vitest`. Pinning
+  it as a direct devDependency means a `vitest` upgrade that moves its Vite
+  range can produce a duplicate install. Renovate will surface the mismatch;
+  the two must be bumped together.
 - **Missing asset at runtime.** If `scripts/build-webviews.mjs` fails to run,
   the panel loads a shell pointing at files that do not exist and renders
   blank. `pnpm build` chains the script before the extension bundle, and
