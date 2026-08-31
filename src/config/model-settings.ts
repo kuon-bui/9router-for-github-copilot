@@ -5,7 +5,16 @@ import {
   DEFAULT_MODEL_TOOL_MODE,
   DEFAULT_MODEL_VISION_MODE
 } from './defaults';
-import { ENABLED_THINKING_MODES, THINKING_MODES } from '@/types/product-model';
+import {
+  ALLOWED_MODEL_FIELDS,
+  ENABLED_THINKING_MODE_SET,
+  MODEL_ID_PATTERN,
+  THINKING_MODE_SET,
+  THINKING_SUFFIX_PATTERN,
+  TOOL_MODES,
+  VISION_MODES,
+  isPositiveInteger
+} from './model-field-rules';
 import type {
   ConfiguredModel,
   EnabledThinkingMode,
@@ -13,28 +22,6 @@ import type {
   ToolMode,
   VisionMode
 } from '@/types/product-model';
-
-const MODEL_ID_PATTERN = /^[a-z0-9][a-z0-9._-]*$/;
-const THINKING_SUFFIX_PATTERN = new RegExp(
-  `\\((?:${THINKING_MODES.join('|')})\\)$`,
-  'i'
-);
-const ALLOWED_FIELDS = new Set([
-  'id',
-  'name',
-  'modelId',
-  'serviceTier',
-  'toolMode',
-  'visionMode',
-  'thinkingMode',
-  'thinkingEfforts',
-  'maxInputTokens',
-  'maxOutputTokens'
-]);
-const TOOL_MODES = new Set<ToolMode>(['auto', 'off']);
-const VISION_MODES = new Set<VisionMode>(['native', 'proxy', 'off']);
-const THINKING_MODE_SET = new Set<string>(THINKING_MODES);
-const ENABLED_THINKING_MODE_SET = new Set<string>(ENABLED_THINKING_MODES);
 
 export type ModelSettingsIssueCode =
   | 'INVALID_MODELS_SETTING'
@@ -82,10 +69,6 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 
   const prototype = Object.getPrototypeOf(value) as unknown;
   return prototype === Object.prototype || prototype === null;
-}
-
-function isPositiveInteger(value: unknown): value is number {
-  return typeof value === 'number' && Number.isSafeInteger(value) && value > 0;
 }
 
 function countCandidateIds(input: unknown[]): Map<string, number> {
@@ -151,7 +134,7 @@ export function parseModelSettings(input: unknown): ParsedModelSettings {
 
     const candidateId = typeof item.id === 'string' ? item.id : undefined;
     const id = candidateId && MODEL_ID_PATTERN.test(candidateId) ? candidateId : undefined;
-    const unknownField = Object.keys(item).find((field) => !ALLOWED_FIELDS.has(field));
+    const unknownField = Object.keys(item).find((field) => !ALLOWED_MODEL_FIELDS.has(field));
     if (unknownField) {
       reject(
         sourceIndex,
