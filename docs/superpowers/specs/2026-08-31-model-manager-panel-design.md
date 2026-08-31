@@ -56,18 +56,18 @@ Five modules are added. Logic lives in pure modules; the panel module stays thin
 | --- | --- | --- |
 | `src/config/model-field-rules.ts` | Single source of truth for field rules: `MODEL_ID_PATTERN`, `THINKING_SUFFIX_PATTERN`, tool/vision/thinking mode sets | none |
 | `src/config/model-draft.ts` | `createDraftFromCatalog`, `sanitizeModelId`, `suggestDisplayName`, `validateDraft`, `toSettingsEntry` | field rules, `RouterModelMetadata` |
-| `src/config/models-writer.ts` | `addModelEntry`, `updateModelEntry`, `removeModelEntry`, `moveModelEntry` over the raw settings array | none |
-| `src/runtime/model-manager-view.ts` | Builds `ModelManagerViewState` from raw entries, `parseModelSettings` issues, catalog metadata, and scope warnings | model settings, model catalog |
-| `src/runtime/model-manager-panel.ts` and `src/runtime/model-manager-html.ts` | Panel lifecycle, message dispatch, settings writes; static HTML shell with a nonced inline script | vscode |
+| `src/config/model-entry-edits.ts` | `addModelEntry`, `updateModelEntry`, `removeModelEntry`, `moveModelEntry` over the raw settings array | none |
+| `src/runtime/model-editor-view.ts` | Builds `ModelEditorState` from raw entries, `parseModelSettings` issues, catalog metadata, and scope warnings | model settings, model catalog |
+| `src/runtime/model-editor-panel.ts` and `src/runtime/model-editor-html.ts` | Panel lifecycle, message dispatch, settings writes; static HTML shell with a nonced inline script | vscode |
 
 `src/config/model-settings.ts` is refactored to import from `model-field-rules.ts` instead of declaring the same constants locally. Behavior is unchanged and existing tests must stay green.
 
-The HTML shell is static: it contains the layout, the form controls, and the inline script, but no user data. The list is built in the webview from the state message. A full re-render of the document is not possible without destroying an open draft, so rendering the list client-side is what keeps the Save/Cancel form workable. The testable logic therefore lives in `model-manager-view.ts`, not in the HTML module.
+The HTML shell is static: it contains the layout, the form controls, and the inline script, but no user data. The list is built in the webview from the state message. A full re-render of the document is not possible without destroying an open draft, so rendering the list client-side is what keeps the Save/Cancel form workable. The testable logic therefore lives in `model-editor-view.ts`, not in the HTML module.
 
 ## Open Flow
 
 1. `getApiKey` returns nothing: throw `NineRouterError('AUTHENTICATION_ERROR', '9router API key is not configured')`.
-2. Runtime settings fail `isValidRuntime`: throw `NineRouterError('CONFIGURATION_ERROR', ...)`.
+2. Runtime settings fail the shared `isUsableRuntimeSettings` guard, extracted from `vision-configuration.ts` into `src/config/settings.ts`: throw `NineRouterError('CONFIGURATION_ERROR', ...)`.
 3. Call `routerClient.listModels` with a `CancellationTokenSource` and `createAbortSignalFromToken`.
 4. Any failure in steps 1 to 3 leaves the panel closed. The command handler reports it with `showErrorMessage`, including the request id when the error is a `NineRouterError`, matching the `testConnection` handler.
 5. On success, create or reveal the module-level singleton panel with `enableScripts: true`, `retainContextWhenHidden: true`, `localResourceRoots: []`, and `enableCommandUris` left off.
@@ -79,7 +79,7 @@ Every mutation follows the same path:
 ```
 webview postMessage
   -> host re-reads the raw models array from configuration
-  -> models-writer applies the mutation by sourceIndex
+  -> model-entry-edits applies the mutation by sourceIndex
   -> settings.update('models', next, ConfigurationTarget.Global)
   -> onDidChangeConfiguration fires
   -> host builds view state and posts { type: 'state' }
@@ -90,7 +90,7 @@ The host never trusts webview-held state as the write base; it re-reads configur
 ## View State
 
 ```ts
-interface CatalogEntry {
+interface ModelEditorCatalogEntry {
   modelId: string;
   ownedBy?: string;
   vision: boolean;
@@ -99,7 +99,7 @@ interface CatalogEntry {
   inUse: boolean;
 }
 
-interface ModelRow {
+interface ModelEditorRow {
   sourceIndex: number;
   valid: boolean;
   id?: string;
@@ -116,9 +116,9 @@ interface ModelRow {
   catalogStatus: 'matched' | 'missing';
 }
 
-interface ModelManagerViewState {
-  models: ModelRow[];
-  catalog: CatalogEntry[];
+interface ModelEditorState {
+  models: ModelEditorRow[];
+  catalog: ModelEditorCatalogEntry[];
   warnings: string[];
 }
 ```
@@ -168,7 +168,9 @@ Prefilled values are ordinary form values. The user may overwrite any of them be
 
 ## Settings Scope
 
-The panel writes to `ConfigurationTarget.Global`. When `inspect().workspaceValue` is present, a workspace value overrides what the panel writes; the panel surfaces this through a warning banner and still writes to the user scope. Automatically switching scopes is rejected because it would modify files shared through the repository.
+The panel reads and writes the user scope only. It reads `configuration.inspect('models').globalValue`, falling back to `defaultValue` when the user has never written the setting, and never the merged `get()` value; it writes with `ConfigurationTarget.Global`. Reading the merged value would let a workspace list become the base of a user-scope write.
+
+When `inspect().workspaceValue` is present, that workspace value overrides what the panel writes; the panel surfaces this through a warning banner and still writes to the user scope. Automatically switching scopes is rejected because it would modify files shared through the repository.
 
 ## Webview Security
 
@@ -193,10 +195,10 @@ The panel writes to `ConfigurationTarget.Global`. When `inspect().workspaceValue
 Test-driven, run through `pnpm test`.
 
 - `test/unit/config/model-draft.test.ts`: prefill from catalog, including vision to native, `contextWindow - maxOutput`, and the `264000` fallbacks; id sanitization such as `cx/gpt-5.6-sol` to `cx-gpt-5.6-sol`; collision suffixes; one case per validation failure.
-- `test/unit/config/models-writer.test.ts`: add, update, remove, and move preserve unrelated entries byte-for-byte, including rejected ones; boundary moves are no-ops; non-array input.
-- `test/unit/runtime/model-manager-view.test.ts`: issues map onto the correct row by `sourceIndex`; `catalogStatus`; `inUse`; workspace-override warning.
-- `test/unit/runtime/model-manager-html.test.ts`: CSP present, nonce matches the script tag, no settings data embedded.
-- `test/unit/runtime/model-manager-panel.test.ts`: each message produces the expected `settings.update` payload; catalog failure creates no panel; a second open reveals the singleton.
+- `test/unit/config/model-entry-edits.test.ts`: add, update, remove, and move preserve unrelated entries byte-for-byte, including rejected ones; boundary moves are no-ops; non-array input.
+- `test/unit/runtime/model-editor-view.test.ts`: issues map onto the correct row by `sourceIndex`; `catalogStatus`; `inUse`; workspace-override warning.
+- `test/unit/runtime/model-editor-html.test.ts`: CSP present, nonce matches the script tag, no settings data embedded.
+- `test/unit/runtime/model-editor-panel.test.ts`: each message produces the expected `settings.update` payload; catalog failure creates no panel; a second open reveals the singleton.
 - `test/integration/extension/manage-models-command.test.ts`: the command is registered and opens the panel.
 - `test/integration/extension/release-guardrails.test.ts`: assert `9routerCopilot.manageModels` is contributed.
 
@@ -204,11 +206,11 @@ Test-driven, run through `pnpm test`.
 
 ## Files Touched
 
-- Added: `src/config/model-field-rules.ts`, `src/config/model-draft.ts`, `src/config/models-writer.ts`, `src/runtime/model-manager-view.ts`, `src/runtime/model-manager-panel.ts`, `src/runtime/model-manager-html.ts`
-- Modified: `package.json` (command contribution), `src/config/model-settings.ts` (import shared rules), `src/runtime/commands.ts`, `src/runtime/activate.ts`, `test/support/vscode.ts`, `README.md`
+- Added: `src/config/model-field-rules.ts`, `src/config/model-draft.ts`, `src/config/model-entry-edits.ts`, `src/runtime/model-editor-view.ts`, `src/runtime/model-editor-panel.ts`, `src/runtime/model-editor-html.ts`
+- Modified: `package.json` (command contribution), `src/config/model-settings.ts` (import shared rules), `src/config/settings.ts` (export `isUsableRuntimeSettings`), `src/runtime/vision-configuration.ts` (use the shared guard), `src/runtime/commands.ts`, `src/runtime/activate.ts`, `test/support/vscode.ts`, `README.md`
 
 ## Risks
 
-- The inline webview script is the largest untested surface in the design. It is kept deliberately thin: dispatch messages, build rows from state, hold the draft. Anything that decides something moves into `model-manager-view.ts` or `model-draft.ts`.
+- The inline webview script is the largest untested surface in the design. It is kept deliberately thin: dispatch messages, build rows from state, hold the draft. Anything that decides something moves into `model-editor-view.ts` or `model-draft.ts`.
 - Extracting shared field rules touches validated production code. The existing `model-settings` tests are the guardrail and must pass unchanged.
 - Refusing to open without a catalog means the panel cannot repair settings while 9router is unreachable. `settings.json` remains the fallback, and this trade was chosen deliberately for a simpler first version.
