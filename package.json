@@ -9,6 +9,7 @@
   },
   "version": "0.11.2",
   "license": "MIT",
+  "icon": "media/icon.png",
   "engines": {
     "vscode": "^1.133.0"
   },
@@ -58,6 +59,7 @@
         "id": "9router-copilot.9router",
         "name": "9router",
         "fullName": "9router",
+        "iconPath": "media/icon.png",
         "description": "9router command",
         "commands": [
           {
