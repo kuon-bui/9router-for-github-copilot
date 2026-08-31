@@ -60,6 +60,7 @@ Use this structure unless the user explicitly approves a change:
 ```text
 src/
   runtime/
+  webview/
   provider/
   router/
   config/
@@ -73,6 +74,17 @@ src/
 
 - owns activation, command wiring, lifecycle wiring, and provider registration
 - must not contain request adaptation or routing policy
+
+`src/webview`
+
+- owns webview markup, styling, and client-side rendering
+- runs in the webview browser sandbox, not the extension host
+- must not import `vscode` or any `node:*` module, directly or transitively
+- must not duplicate logic that already exists on the extension side; import the runtime-agnostic module instead
+- `src/webview/shared` holds modules only the webview and its own panel need
+
+Webview markup and styling live in `.tsx` and `.css` files. They must never be
+written as string literals in TypeScript.
 
 `src/provider`
 
@@ -323,7 +335,7 @@ The following patterns are not allowed:
 
 When multiple implementation options are available, choose the option that:
 
-- keeps the extension smaller
+- keeps the extension smaller — this governs the extension host and its runtime dependencies, which are the thin adapter this convention exists to protect. Configuration and diagnostics panels under `src/webview` are exempt: their cost is package size, not adapter complexity.
 - keeps routing intelligence in `9router`
 - preserves native Copilot Chat UX
 - minimizes secret exposure
