@@ -3,6 +3,14 @@ import { getApiKey } from '@/config/secret-store';
 import { isUsableRuntimeSettings } from '@/config/settings';
 import { NineRouterError } from '@/router/errors';
 import { createAbortSignalFromToken } from '@/provider/cancellation';
+import { toSettingsEntry, validateDraft } from '@/config/model-draft';
+import {
+  addModelEntry,
+  moveModelEntry,
+  readModelEntries,
+  removeModelEntry,
+  updateModelEntry
+} from '@/config/model-entry-edits';
 import { createModelEditorState } from './model-editor-view';
 import { createNonce, renderModelEditorHtml } from './model-editor-html';
 import type { RuntimeSettings } from '@/config/settings';
@@ -132,19 +140,169 @@ export function createModelEditorOpener(dependencies: Dependencies): ModelEditor
   };
 }
 
+function readEntryId(entry: unknown): string | undefined {
+  if (typeof entry !== 'object' || entry === null || Array.isArray(entry)) {
+    return undefined;
+  }
+
+  const { id } = entry as { id?: unknown };
+  return typeof id === 'string' ? id : undefined;
+}
+
+function isInRange(
+  entries: readonly unknown[],
+  sourceIndex: unknown
+): sourceIndex is number {
+  return (
+    typeof sourceIndex === 'number' &&
+    Number.isSafeInteger(sourceIndex) &&
+    sourceIndex >= 0 &&
+    sourceIndex < entries.length
+  );
+}
+
+async function writeEntries(current: PanelSession, entries: unknown[]): Promise<void> {
+  try {
+    await vscode.workspace
+      .getConfiguration(SECTION)
+      .update(MODELS_KEY, entries, vscode.ConfigurationTarget.Global);
+  } catch {
+    throw new NineRouterError(
+      'CONFIGURATION_ERROR',
+      `Failed to update ${SECTION}.${MODELS_KEY}.`,
+      { details: { phase: 'model-editor', settingsKey: `${SECTION}.${MODELS_KEY}` } }
+    );
+  }
+
+  await postState(current);
+}
+
+async function postError(current: PanelSession, message: string): Promise<void> {
+  await current.panel.webview.postMessage({ type: 'error', message });
+}
+
+async function handleSaveModel(
+  message: { sourceIndex?: unknown; draft?: unknown },
+  current: PanelSession
+): Promise<void> {
+  const entries = readModelEntries(readGlobalEntries());
+  const rawIndex = message.sourceIndex;
+  const isEdit = rawIndex !== null && rawIndex !== undefined;
+  if (isEdit && !isInRange(entries, rawIndex)) {
+    await postError(current, 'That model no longer exists. Reopen the panel and try again.');
+    return;
+  }
+
+  const editIndex = isEdit ? (rawIndex as number) : undefined;
+  const takenIds = entries
+    .map((entry, index) => (index === editIndex ? undefined : readEntryId(entry)))
+    .filter((id): id is string => id !== undefined);
+  const validation = validateDraft(message.draft, { takenIds });
+  if (!validation.draft) {
+    await postError(current, validation.errors.map((error) => error.message).join(' '));
+    return;
+  }
+
+  const entry = toSettingsEntry(validation.draft);
+  await writeEntries(
+    current,
+    editIndex === undefined
+      ? addModelEntry(entries, entry)
+      : updateModelEntry(entries, editIndex, entry)
+  );
+}
+
+async function handleRemoveModel(
+  message: { sourceIndex?: unknown },
+  current: PanelSession
+): Promise<void> {
+  const entries = readModelEntries(readGlobalEntries());
+  const sourceIndex = message.sourceIndex;
+  if (!isInRange(entries, sourceIndex)) {
+    return;
+  }
+
+  const label = readEntryId(entries[sourceIndex]) ?? 'this model';
+  const confirmation = await vscode.window.showWarningMessage(
+    `Delete ${label} from the Copilot model picker?`,
+    { modal: true },
+    'Delete'
+  );
+  if (confirmation !== 'Delete') {
+    return;
+  }
+
+  await writeEntries(current, removeModelEntry(entries, sourceIndex));
+}
+
+async function handleMoveModel(
+  message: { sourceIndex?: unknown; direction?: unknown },
+  current: PanelSession
+): Promise<void> {
+  const entries = readModelEntries(readGlobalEntries());
+  const sourceIndex = message.sourceIndex;
+  const direction =
+    message.direction === 'up' || message.direction === 'down'
+      ? message.direction
+      : undefined;
+  if (direction === undefined || !isInRange(entries, sourceIndex)) {
+    return;
+  }
+
+  const next = moveModelEntry(entries, sourceIndex, direction);
+  if (next.every((entry, index) => entry === entries[index])) {
+    return;
+  }
+
+  await writeEntries(current, next);
+}
+
 async function handleMessage(
   message: unknown,
   current: PanelSession,
   dependencies: Dependencies
 ): Promise<void> {
-  void dependencies;
   if (typeof message !== 'object' || message === null) {
     return;
   }
 
-  const { type } = message as { type?: unknown };
-  if (type === 'ready') {
-    await postState(current);
+  const payload = message as {
+    type?: unknown;
+    sourceIndex?: unknown;
+    direction?: unknown;
+    draft?: unknown;
+  };
+
+  try {
+    if (payload.type === 'ready') {
+      await postState(current);
+      return;
+    }
+    if (payload.type === 'saveModel') {
+      await handleSaveModel(payload, current);
+      return;
+    }
+    if (payload.type === 'removeModel') {
+      await handleRemoveModel(payload, current);
+      return;
+    }
+    if (payload.type === 'moveModel') {
+      await handleMoveModel(payload, current);
+      return;
+    }
+    if (payload.type === 'refreshCatalog') {
+      const cancellation = new vscode.CancellationTokenSource();
+      try {
+        current.catalog = await fetchCatalog(dependencies, cancellation.token);
+        await postState(current);
+      } finally {
+        cancellation.dispose();
+      }
+    }
+  } catch (error) {
+    const failure =
+      error instanceof NineRouterError ? error.message : 'Unexpected model editor error';
+    await postError(current, failure);
   }
 }
 

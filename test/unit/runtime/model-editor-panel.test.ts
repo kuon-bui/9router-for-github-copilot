@@ -2,10 +2,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   __createCancellationToken,
   __fireConfigurationChange,
+  __getConfigurationUpdates,
   __getWebviewPanelObjects,
   __resetVscodeState,
   __setConfigurationDefaults,
-  __setConfigurationValues
+  __setConfigurationValues,
+  __setWarningResponse
 } from '@test/support/vscode';
 import { NineRouterError } from '@/router/errors';
 import {
@@ -124,5 +126,116 @@ describe('createModelEditorOpener', () => {
 
     const last = panel?.webview.postedMessages.at(-1) as { state: { models: unknown[] } };
     expect(last.state.models).toHaveLength(1);
+  });
+});
+
+const draft = {
+  id: 'agent',
+  name: 'Agent',
+  modelId: 'router/combo',
+  toolMode: 'auto',
+  visionMode: 'off',
+  thinkingMode: 'off',
+  thinkingEfforts: [],
+  maxInputTokens: 264_000,
+  maxOutputTokens: 264_000
+};
+
+async function openPanel() {
+  const open = createModelEditorOpener(createDependencies());
+  const token = __createCancellationToken();
+  await open(token.value);
+  const panel = __getWebviewPanelObjects()[0];
+  if (!panel) {
+    throw new Error('panel was not created');
+  }
+  return panel;
+}
+
+describe('model editor mutations', () => {
+  beforeEach(() => {
+    __resetVscodeState();
+    __resetModelEditorPanelForTests();
+    __setConfigurationDefaults({ models: [] });
+    __setConfigurationValues({ models: [] });
+  });
+
+  afterEach(() => {
+    __resetModelEditorPanelForTests();
+  });
+
+  it('appends a validated draft', async () => {
+    const panel = await openPanel();
+
+    await panel.webview.receiveMessage({ type: 'saveModel', sourceIndex: null, draft });
+
+    expect(__getConfigurationUpdates()).toEqual([
+      { key: 'models', value: [draft], target: 1 }
+    ]);
+  });
+
+  it('overwrites the entry at a given index', async () => {
+    __setConfigurationValues({ models: [{ id: 'old', name: 'Old', modelId: 'router/combo' }] });
+    const panel = await openPanel();
+
+    await panel.webview.receiveMessage({ type: 'saveModel', sourceIndex: 0, draft });
+
+    expect(__getConfigurationUpdates().at(-1)?.value).toEqual([draft]);
+  });
+
+  it('rejects an invalid draft without writing settings', async () => {
+    const panel = await openPanel();
+
+    await panel.webview.receiveMessage({
+      type: 'saveModel',
+      sourceIndex: null,
+      draft: { ...draft, id: 'Bad Id' }
+    });
+
+    expect(__getConfigurationUpdates()).toEqual([]);
+    expect(panel.webview.postedMessages.at(-1)).toMatchObject({ type: 'error' });
+  });
+
+  it('rejects a duplicate id against the other entries', async () => {
+    __setConfigurationValues({ models: [draft] });
+    const panel = await openPanel();
+
+    await panel.webview.receiveMessage({ type: 'saveModel', sourceIndex: null, draft });
+
+    expect(__getConfigurationUpdates()).toEqual([]);
+    expect(panel.webview.postedMessages.at(-1)).toMatchObject({ type: 'error' });
+  });
+
+  it('deletes only after a modal confirmation', async () => {
+    __setConfigurationValues({ models: [draft] });
+    __setWarningResponse(undefined);
+    const panel = await openPanel();
+
+    await panel.webview.receiveMessage({ type: 'removeModel', sourceIndex: 0 });
+    expect(__getConfigurationUpdates()).toEqual([]);
+
+    __setWarningResponse('Delete');
+    await panel.webview.receiveMessage({ type: 'removeModel', sourceIndex: 0 });
+    expect(__getConfigurationUpdates().at(-1)?.value).toEqual([]);
+  });
+
+  it('moves an entry within the list', async () => {
+    const second = { ...draft, id: 'second' };
+    __setConfigurationValues({ models: [draft, second] });
+    const panel = await openPanel();
+
+    await panel.webview.receiveMessage({ type: 'moveModel', sourceIndex: 1, direction: 'up' });
+
+    expect(__getConfigurationUpdates().at(-1)?.value).toEqual([second, draft]);
+  });
+
+  it('ignores out-of-range indexes', async () => {
+    __setConfigurationValues({ models: [draft] });
+    const panel = await openPanel();
+
+    await panel.webview.receiveMessage({ type: 'moveModel', sourceIndex: 9, direction: 'up' });
+    await panel.webview.receiveMessage({ type: 'saveModel', sourceIndex: 9, draft });
+
+    expect(__getConfigurationUpdates()).toEqual([]);
   });
 });
