@@ -4,6 +4,7 @@ import { createNonce, renderWebviewDocument } from '@/runtime/webview-document';
 const SHELL = [
   '<meta http-equiv="Content-Security-Policy" content="{{csp}}">',
   '<link rel="stylesheet" href="{{styleUri}}">',
+  '<script nonce="{{nonce}}" src="{{runtimeScriptUri}}"></script>',
   '<script nonce="{{nonce}}" src="{{scriptUri}}"></script>'
 ].join('\n');
 
@@ -11,6 +12,7 @@ function render(shell: string): string {
   return renderWebviewDocument({
     shell,
     styleUri: 'https://host/client.css',
+    runtimeScriptUri: 'https://host/react.js',
     scriptUri: 'https://host/client.js',
     cspSource: 'vscode-webview://host',
     nonce: 'abc123'
@@ -38,6 +40,7 @@ describe('renderWebviewDocument', () => {
     const html = render(SHELL);
 
     expect(html).toContain('href="https://host/client.css"');
+    expect(html).toContain('src="https://host/react.js"');
     expect(html).toContain('src="https://host/client.js"');
     expect(html).toContain('nonce="abc123"');
     expect(html).not.toContain('{{');

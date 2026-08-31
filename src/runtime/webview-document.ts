@@ -5,6 +5,7 @@ const PLACEHOLDER_PATTERN = /\{\{(\w+)\}\}/g;
 export interface WebviewDocumentInput {
   readonly shell: string;
   readonly styleUri: string;
+  readonly runtimeScriptUri: string;
   readonly scriptUri: string;
   readonly cspSource: string;
   readonly nonce: string;
@@ -28,6 +29,7 @@ export function renderWebviewDocument(input: WebviewDocumentInput): string {
   const values: Record<string, string> = {
     csp: buildCsp(input.cspSource, input.nonce),
     styleUri: input.styleUri,
+    runtimeScriptUri: input.runtimeScriptUri,
     scriptUri: input.scriptUri,
     nonce: input.nonce
   };

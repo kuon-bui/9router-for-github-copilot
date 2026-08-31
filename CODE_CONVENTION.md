@@ -87,6 +87,7 @@ src/
 - panel layout and domain-specific visuals stay beside panel components
 - host/webview message shapes use neutral contracts under `src/types`
 - generic React UI primitives require at least two behaviorally identical consumers; CSS reuse is preferred first
+- React/runtime packages ship once as `dist/webview/shared/react.js`; panel IIFEs externalize those packages and load the shared vendor before `client.js`
 
 Webview markup and styling live in `.tsx` and `.css` files. They must never be
 written as string literals in TypeScript.

@@ -2,7 +2,12 @@ import { build } from 'vite';
 import { cp, watch as watchDir } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
-import { WEBVIEW_VIEWS, createExtensionConfig, createWebviewConfig } from './vite-config.mjs';
+import {
+  WEBVIEW_VIEWS,
+  createExtensionConfig,
+  createReactVendorConfig,
+  createWebviewConfig
+} from './vite-config.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const counter = { pending: 0 };
@@ -15,6 +20,7 @@ async function copyShell(view) {
 }
 
 await build(createExtensionConfig({ watch: true, counter }));
+await build(createReactVendorConfig({ watch: true, counter }));
 
 for (const view of WEBVIEW_VIEWS) {
   await copyShell(view);

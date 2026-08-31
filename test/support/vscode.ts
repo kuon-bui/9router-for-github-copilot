@@ -250,6 +250,7 @@ const DEFAULT_WEBVIEW_SHELL = [
   '<meta http-equiv="Content-Security-Policy" content="{{csp}}">',
   '<link rel="stylesheet" href="{{styleUri}}">',
   '<div id="root"></div>',
+  '<script nonce="{{nonce}}" src="{{runtimeScriptUri}}"></script>',
   '<script nonce="{{nonce}}" src="{{scriptUri}}"></script>'
 ].join('\n');
 let webviewShell = DEFAULT_WEBVIEW_SHELL;

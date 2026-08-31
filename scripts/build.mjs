@@ -2,11 +2,17 @@ import { build } from 'vite';
 import { cp } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
-import { WEBVIEW_VIEWS, createExtensionConfig, createWebviewConfig } from './vite-config.mjs';
+import {
+  WEBVIEW_VIEWS,
+  createExtensionConfig,
+  createReactVendorConfig,
+  createWebviewConfig
+} from './vite-config.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
 await build(createExtensionConfig({}));
+await build(createReactVendorConfig({}));
 
 for (const view of WEBVIEW_VIEWS) {
   await build(createWebviewConfig(view, {}));
