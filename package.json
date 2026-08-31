@@ -52,6 +52,10 @@
       {
         "command": "9routerCopilot.configureVisionProxy",
         "title": "9router: Configure Vision Proxy"
+      },
+      {
+        "command": "9routerCopilot.manageModels",
+        "title": "9router: Manage Models"
       }
     ],
     "chatParticipants": [

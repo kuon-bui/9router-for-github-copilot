@@ -5,6 +5,7 @@ import { NineRouterError } from '@/router/errors';
 import { showUsagePanel } from './usage-panel';
 import type { SettingsSnapshot } from '@/config/settings';
 import type { VisionProxyConfigurator } from './vision-configuration';
+import type { ModelEditorOpener } from './model-editor-panel';
 import type { ConnectionTester } from './test-connection';
 import type { UsageReporter } from './show-usage';
 
@@ -16,6 +17,7 @@ interface FastTierQuickPickItem extends vscode.QuickPickItem {
 interface CommandDependencies {
   getSettingsSnapshot?: () => SettingsSnapshot | undefined;
   configureVisionProxy?: VisionProxyConfigurator;
+  manageModels?: ModelEditorOpener;
   testConnection?: ConnectionTester;
   showUsage?: UsageReporter;
 }
@@ -73,6 +75,24 @@ export function registerCommands(
           error instanceof NineRouterError ? error.message : 'Unexpected connection error';
         await vscode.window.showErrorMessage(
           `9router connection failed: ${message}${requestId ? ` Request ID: ${requestId}.` : ''}`
+        );
+      } finally {
+        cancellation.dispose();
+      }
+    })
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand('9routerCopilot.manageModels', async () => {
+      const cancellation = new vscode.CancellationTokenSource();
+      try {
+        await dependencies.manageModels?.(cancellation.token);
+      } catch (error) {
+        const requestId = error instanceof NineRouterError ? error.requestId : undefined;
+        const message =
+          error instanceof NineRouterError ? error.message : 'Unexpected model editor error';
+        await vscode.window.showErrorMessage(
+          `9router model setup failed: ${message}${requestId ? ` Request ID: ${requestId}.` : ''}`
         );
       } finally {
         cancellation.dispose();

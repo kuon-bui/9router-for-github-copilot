@@ -5,6 +5,15 @@ import { describe, expect, it } from 'vitest';
 import manifest from '@root/package.json';
 
 describe('release guardrails', () => {
+  it('contributes the manage models command', () => {
+    const commands = manifest.contributes.commands as Array<{ command: string; title: string }>;
+
+    expect(commands).toContainEqual({
+      command: '9routerCopilot.manageModels',
+      title: '9router: Manage Models'
+    });
+  });
+
   it('contributes one ordered dynamic model setting with a safe agent default', () => {
     const properties = manifest.contributes.configuration.properties as Record<string, unknown>;
     const models = properties['9router-copilot.models'] as {
