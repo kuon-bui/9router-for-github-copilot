@@ -13,9 +13,9 @@
       "command": "pnpm run watch",
       "isBackground": true,
       "problemMatcher": {
-        "owner": "esbuild",
+        "owner": "vite",
         "pattern": {
-          "regexp": "^✘ \\[ERROR\\] (.*)$",
+          "regexp": "^\\s*(?:error|✗)\\s+(.*)$",
           "message": 1
         },
         "background": {

@@ -24,6 +24,7 @@ module.exports = [
     ignores: [
       'dist/**',
       'node_modules/**',
+      'scripts/**',
       '*.vsix',
       // Vendored from microsoft/vscode; keep it in sync with upstream rather than reformatting it.
       'src/types/vscode.proposed.*.d.ts'
