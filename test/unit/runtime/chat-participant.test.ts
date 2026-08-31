@@ -9,7 +9,8 @@ import {
   __createCancellationToken,
   __getChatParticipants,
   __getWebviewPanels,
-  __resetVscodeState
+  __resetVscodeState,
+  Uri
 } from '@test/support/vscode';
 import { MOCK_USAGE_PAYLOAD } from '@test/support/usage-fixture';
 
@@ -24,7 +25,7 @@ describe('registerUsageChatParticipant', () => {
     const markdown: string[] = [];
     const progress: string[] = [];
 
-    registerUsageChatParticipant({ subscriptions: [] }, { showUsage });
+    registerUsageChatParticipant({ subscriptions: [], extensionUri: Uri.file('/ext') }, { showUsage });
 
     const participants = __getChatParticipants();
     expect(participants).toHaveLength(1);
@@ -51,7 +52,7 @@ describe('registerUsageChatParticipant', () => {
       viewColumn: -2,
       preserveFocus: false
     });
-    expect(__getWebviewPanels()[0]?.html).toContain('test@gmail.com');
+    expect(__getWebviewPanels()[0]?.html).toContain('id="root"');
     expect(markdown).toEqual(['Opened the Usage dashboard.']);
     expect(markdown.join('\n')).not.toContain('## Usage');
     expect(markdown.join('\n')).not.toContain('Balance (USD)');
@@ -62,7 +63,7 @@ describe('registerUsageChatParticipant', () => {
     const showUsage = vi.fn();
     const markdown: string[] = [];
 
-    registerUsageChatParticipant({ subscriptions: [] }, { showUsage });
+    registerUsageChatParticipant({ subscriptions: [], extensionUri: Uri.file('/ext') }, { showUsage });
     await __getChatParticipants()[0]?.handler(
       { command: undefined },
       {},
@@ -83,7 +84,7 @@ describe('registerUsageChatParticipant', () => {
     const markdown: string[] = [];
 
     registerUsageChatParticipant(
-      { subscriptions: [] },
+      { subscriptions: [], extensionUri: Uri.file('/ext') },
       {
         showUsage: async () => {
           throw new NineRouterError('AUTHENTICATION_ERROR', '9router API key is not configured', {

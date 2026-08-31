@@ -6,7 +6,7 @@ import type { UsageReporter } from './show-usage';
 export const NINE_ROUTER_CHAT_PARTICIPANT_ID = '9router-copilot.9router';
 
 export function registerUsageChatParticipant(
-  context: Pick<vscode.ExtensionContext, 'subscriptions'>,
+  context: Pick<vscode.ExtensionContext, 'subscriptions' | 'extensionUri'>,
   dependencies: {
     showUsage?: UsageReporter;
   }
@@ -29,7 +29,7 @@ export function registerUsageChatParticipant(
       stream.progress('Fetching 9router usage…');
       try {
         const snapshot = await dependencies.showUsage(token);
-        showUsagePanel(snapshot, { viewColumn: vscode.ViewColumn.Beside });
+        await showUsagePanel(context.extensionUri, snapshot, { viewColumn: vscode.ViewColumn.Beside });
         stream.markdown('Opened the Usage dashboard.');
       } catch (error) {
         const requestId = error instanceof NineRouterError ? error.requestId : undefined;

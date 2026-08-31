@@ -46,7 +46,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 export function registerCommands(
-  context: Pick<vscode.ExtensionContext, 'subscriptions' | 'secrets'>,
+  context: Pick<vscode.ExtensionContext, 'subscriptions' | 'secrets' | 'extensionUri'>,
   dependencies: CommandDependencies = {}
 ): void {
   context.subscriptions.push(
@@ -122,7 +122,7 @@ export function registerCommands(
           return;
         }
 
-        showUsagePanel(snapshot);
+        await showUsagePanel(context.extensionUri, snapshot);
       } catch (error) {
         const requestId = error instanceof NineRouterError ? error.requestId : undefined;
         const message =
