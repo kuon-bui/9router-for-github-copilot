@@ -33,10 +33,14 @@ lint rule, or test caught it.
 
 Secondary problems that follow from the same root cause:
 
-1. The model editor's client script contains real logic — `sanitizeId`,
-   the `-2`/`-3` duplicate-id suffix loop, and the catalog prefill that
-   derives `maxInputTokens` from `contextWindow - maxOutput`. None of it
-   is covered by tests, because it is a string.
+1. The model editor's client script re-implements logic that already exists
+   and is already tested. `sanitizeId`, the `-2`/`-3` duplicate-id suffix
+   loop, the display-name derivation, and the catalog prefill that derives
+   `maxInputTokens` from `contextWindow - maxOutput` are all duplicates of
+   `sanitizeModelId`, `createUniqueModelId`, `suggestDisplayName`, and
+   `createDraftFromCatalog` in `src/config/model-draft.ts`, which
+   `test/unit/config/model-draft.test.ts` covers. The copy inside the string
+   is the one with no coverage, and the two are free to drift.
 2. `escapeHtml` exists as a private function inside `usage-html.ts` only.
    `model-editor-html.ts` interpolates without escaping.
 3. The two views use unrelated styling systems: `usage-html.ts` defines
@@ -105,15 +109,26 @@ src/webview/
     ModelEditor.tsx             list/form view switch
     ModelList.tsx
     ModelForm.tsx
-    draft-form.ts               sanitizeId, uniqueModelId, deriveDraftFromCatalogEntry
     view-model.ts               buildModelListView(state) — pure, no DOM
 ```
 
-`view-model.ts` and `draft-form.ts` stay free of React and of the DOM. That
-is what keeps the test suite in the `node` environment; see Testing.
+Both `view-model.ts` files stay free of React and of the DOM. That is what
+keeps the test suite in the `node` environment; see Testing.
 
-`src/webview/shared/` is the only directory both sides import from. It must
-stay runtime-agnostic: no `vscode` import, no `node:*` import.
+`src/webview/shared/` holds modules that only the webview and its own panel
+need. It is not, however, the only thing the webview may import.
+
+The real boundary is **runtime-agnostic or not**. A webview module may import
+any module in `src/` that carries no `vscode` and no `node:*` dependency —
+`@/config/model-draft` and `@/types/product-model` qualify, and the model
+editor reuses the former rather than duplicating it. Two mechanisms enforce
+this and both are needed:
+
+- eslint `no-restricted-imports` on `src/webview/**` catches a *direct*
+  import of `vscode` or `node:*`.
+- `tsc -p src/webview/tsconfig.json` catches *transitive* ones, because
+  `types: []` leaves no `vscode` module declaration to resolve against, so
+  any value import of it anywhere in the reachable graph fails to compile.
 
 ### Extension side
 
@@ -450,11 +465,16 @@ assertion in the current `usage-html.test.ts` maps onto a `UsageView` field.
 The imperative client script is replaced by React components. Behaviour does
 not change.
 
-- `draft-form.ts` — the pure logic currently trapped in the script string:
-  `sanitizeId(value)`, `uniqueModelId(base, takenIds)` for the `-2`/`-3`
-  suffix loop, and `deriveDraftFromCatalogEntry(entry, modelId, takenIds)`
-  which derives the display name, vision mode, and token limits. No React,
-  no DOM.
+- The duplicated draft logic in the script is deleted, not moved. `ModelForm`
+  imports `createDraftFromCatalog` and `createUniqueModelId` from
+  `@/config/model-draft`, which already implements and tests exactly this
+  behaviour. The catalog prefill then runs the same code path the extension
+  host uses, and cannot drift from it.
+- `createDraftFromCatalog` takes a `RouterModelMetadata`, while the webview
+  holds `ModelEditorCatalogEntry` — the two differ in that the entry names
+  the field `modelId` rather than `id` and carries `vision: boolean` rather
+  than `vision?: true`. `src/runtime/model-editor-view.ts` gains an exported
+  `toCatalogMetadata(entry)` to bridge them, next to the type it converts.
 - `view-model.ts` — `buildModelListView(state)` producing row labels and the
   chip list per row.
 - `ModelEditor.tsx` — holds the list/form view state and the
@@ -539,9 +559,6 @@ Neither panel's layout or visual result changes beyond this repair.
 
 New:
 
-- `test/unit/webview/model-editor/draft-form.test.ts` — `sanitizeId`
-  normalisation, the duplicate-id suffix loop including its `100` ceiling,
-  and catalog-derived draft values. This logic has no coverage today.
 - `test/unit/runtime/webview-document.test.ts` — the generated CSP string,
   placeholder substitution, and the throw paths for a leftover or unknown
   placeholder.
@@ -551,6 +568,16 @@ New:
   `critical`, `23 / 100` at `77%` with tone `ok`, the unlimited balance quota
   reporting `100%` and an `N/A` reset, and the `in 3h 34m` reset label at the
   fixed `nowMs`.
+
+Extended:
+
+- `test/unit/runtime/model-editor-view.test.ts` — covers the widened `state`
+  payload and the new `toCatalogMetadata`.
+
+No new test is written for the model editor's draft logic. Deleting the
+duplicate brings that behaviour under `test/unit/config/model-draft.test.ts`,
+which already covers id sanitisation, the suffix loop and its `100` ceiling,
+display-name derivation, and the derived-input fallback.
 
 Moved:
 
@@ -607,8 +634,9 @@ Repository Structure and Boundary rules:
 - `src/webview` owns webview markup, styling, and client code; it must not
   import `vscode` or `node:*`, and must not contain routing or transport
   logic
-- `src/webview/shared` is the only directory imported by both the extension
-  host and the webview, and must stay runtime-agnostic
+- `src/webview` may import any module in `src/` that is runtime-agnostic, and
+  must not duplicate logic that already exists on the extension side;
+  `src/webview/shared` holds modules only the webview and its own panel need
 - webview markup and styling live in `.tsx` and `.css` files and must not be
   written as string literals in TypeScript
 
