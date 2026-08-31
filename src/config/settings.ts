@@ -63,7 +63,9 @@ export interface SettingsSnapshot {
 }
 
 export function isUsableRuntimeSettings(runtime: RuntimeSettings): boolean {
-  if (!Number.isFinite(runtime.requestTimeoutMs) || runtime.requestTimeoutMs <= 0) {
+  // Zero disables extension-level timeouts, so it stays valid here exactly as it does
+  // in buildSettingsSnapshot. Only negative or non-finite values are unusable.
+  if (!Number.isFinite(runtime.requestTimeoutMs) || runtime.requestTimeoutMs < 0) {
     return false;
   }
 

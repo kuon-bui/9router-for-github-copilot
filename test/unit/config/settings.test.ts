@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { DEFAULT_VISION_PROXY_PROMPT } from '@/config/defaults';
 import {
   buildSettingsSnapshot,
+  isUsableRuntimeSettings,
   isVisionProxyConfigured,
   loadRuntimeSettings,
   normalizeBaseUrl,
@@ -343,5 +344,37 @@ describe('buildSettingsSnapshot', () => {
     expect(snapshot.state).toBe('valid');
     expect(snapshot.runtime?.visionProxyModelId).toBe('router/vision');
     expect(snapshot.publishedModels[0]?.capabilities.imageInput).toBe(true);
+  });
+});
+
+describe('isUsableRuntimeSettings', () => {
+  const runtime = {
+    baseUrl: 'https://router.example.com',
+    requestTimeoutMs: 60_000,
+    debugMode: 'minimal' as const,
+    visionProxySource: undefined,
+    visionProxyModelId: '',
+    visionProxyPrompt: 'prompt'
+  };
+
+  it('accepts a zero timeout because zero disables extension-level timeouts', () => {
+    expect(isUsableRuntimeSettings({ ...runtime, requestTimeoutMs: 0 })).toBe(true);
+  });
+
+  it('accepts a positive timeout', () => {
+    expect(isUsableRuntimeSettings(runtime)).toBe(true);
+  });
+
+  it('rejects timeouts the settings snapshot also rejects', () => {
+    expect(isUsableRuntimeSettings({ ...runtime, requestTimeoutMs: -1 })).toBe(false);
+    expect(isUsableRuntimeSettings({ ...runtime, requestTimeoutMs: Number.NaN })).toBe(false);
+  });
+
+  it('rejects unusable base urls', () => {
+    expect(isUsableRuntimeSettings({ ...runtime, baseUrl: 'not-a-url' })).toBe(false);
+    expect(isUsableRuntimeSettings({ ...runtime, baseUrl: '' })).toBe(false);
+    expect(isUsableRuntimeSettings({ ...runtime, baseUrl: 'ftp://router.example.com' })).toBe(
+      false
+    );
   });
 });

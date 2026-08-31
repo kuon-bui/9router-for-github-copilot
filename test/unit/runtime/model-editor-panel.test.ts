@@ -82,6 +82,18 @@ describe('createModelEditorOpener', () => {
     ]);
   });
 
+  it('opens with the shipped default timeout of zero, which disables timeouts', async () => {
+    const open = createModelEditorOpener({
+      ...createDependencies(),
+      getRuntimeSettings: () => ({ ...runtime, requestTimeoutMs: 0 })
+    });
+    const token = __createCancellationToken();
+
+    await open(token.value);
+
+    expect(__getWebviewPanelObjects()).toHaveLength(1);
+  });
+
   it('reveals the existing panel instead of creating a second one', async () => {
     const open = createModelEditorOpener(createDependencies());
     const token = __createCancellationToken();

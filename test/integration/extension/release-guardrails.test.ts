@@ -3,8 +3,16 @@ import { constants } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import manifest from '@root/package.json';
+import { DEFAULT_REQUEST_TIMEOUT_MS } from '@/config/defaults';
 
 describe('release guardrails', () => {
+  it('contributes the documented 60 second request timeout default', () => {
+    const properties = manifest.contributes.configuration.properties as Record<string, unknown>;
+    const timeout = properties['9router-copilot.requestTimeoutMs'] as { default: number };
+
+    expect(timeout.default).toBe(DEFAULT_REQUEST_TIMEOUT_MS);
+  });
+
   it('contributes the manage models command', () => {
     const commands = manifest.contributes.commands as Array<{ command: string; title: string }>;
 
