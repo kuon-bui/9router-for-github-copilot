@@ -77,7 +77,8 @@ describe('createModelEditorOpener', () => {
     const panels = __getWebviewPanelObjects();
     expect(panels).toHaveLength(1);
     expect(panels[0]?.webview.html).toContain('id="root"');
-    expect(panels[0]?.webview.html).toContain('react.js');
+    expect(panels[0]?.webview.html).toContain('ui.css');
+    expect(panels[0]?.webview.html).toContain('preact.js');
     expect(panels[0]?.webview.html).toContain('client.js');
 
     await panels[0]?.webview.receiveMessage({ type: 'ready' });

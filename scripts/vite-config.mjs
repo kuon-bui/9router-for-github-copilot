@@ -34,7 +34,7 @@ export function createExtensionConfig({ watch = false, counter } = {}) {
       target: 'node20',
       outDir: resolve(root, 'dist/src'),
       emptyOutDir: false,
-      minify: false,
+      minify: !watch,
       sourcemap: watch,
       lib: {
         entry: resolve(root, 'src/extension.ts'),
@@ -49,7 +49,15 @@ export function createExtensionConfig({ watch = false, counter } = {}) {
   };
 }
 
-const REACT_EXTERNALS = [
+const PREACT_ALIASES = {
+  react: 'preact/compat',
+  'react-dom': 'preact/compat',
+  'react-dom/client': 'preact/compat/client',
+  'react/jsx-runtime': 'preact/jsx-runtime',
+  'react/jsx-dev-runtime': 'preact/jsx-dev-runtime'
+};
+
+const PANEL_EXTERNALS = [
   'react',
   'react-dom',
   'react-dom/client',
@@ -57,7 +65,7 @@ const REACT_EXTERNALS = [
   'react/jsx-dev-runtime'
 ];
 
-const REACT_GLOBALS = {
+const PANEL_GLOBALS = {
   react: 'React',
   'react-dom': 'ReactDOM',
   'react-dom/client': 'ReactDOMClient',
@@ -65,15 +73,20 @@ const REACT_GLOBALS = {
   'react/jsx-dev-runtime': 'JSXDevRuntime'
 };
 
-/** Shared React runtime for every webview panel IIFE. */
-export function createReactVendorConfig({ watch = false, counter } = {}) {
+/** Shared Preact runtime for every webview panel IIFE. */
+export function createPreactVendorConfig({ watch = false, counter } = {}) {
   return {
     root,
     configFile: false,
     logLevel: 'info',
     define: { 'process.env.NODE_ENV': JSON.stringify(watch ? 'development' : 'production') },
     plugins: counter ? [watchMarkerPlugin(counter)] : [],
-    resolve: { alias: { '@': resolve(root, 'src') } },
+    resolve: {
+      alias: {
+        '@': resolve(root, 'src'),
+        ...PREACT_ALIASES
+      }
+    },
     build: {
       target: 'es2022',
       outDir: resolve(root, 'dist/webview/shared'),
@@ -81,10 +94,45 @@ export function createReactVendorConfig({ watch = false, counter } = {}) {
       minify: true,
       sourcemap: watch,
       lib: {
-        entry: resolve(root, 'src/webview/shared/react-runtime.ts'),
+        entry: resolve(root, 'src/webview/shared/preact-runtime.ts'),
         formats: ['iife'],
-        name: 'NineRouterReactVendor',
-        fileName: () => 'react.js'
+        name: 'NineRouterPreactVendor',
+        fileName: () => 'preact.js'
+      },
+      watch: watch ? {} : null
+    }
+  };
+}
+
+/** Shared Tailwind + SCSS styles for every webview panel. */
+export function createSharedStylesConfig({ watch = false, counter } = {}) {
+  return {
+    root,
+    configFile: false,
+    logLevel: 'info',
+    plugins: [tailwindcss(), ...(counter ? [watchMarkerPlugin(counter)] : [])],
+    css: {
+      preprocessorOptions: {
+        scss: {
+          api: 'modern-compiler'
+        }
+      }
+    },
+    build: {
+      target: 'es2022',
+      outDir: resolve(root, 'dist/webview/shared'),
+      emptyOutDir: false,
+      minify: true,
+      sourcemap: watch,
+      lib: {
+        entry: resolve(root, 'src/webview/shared/ui.ts'),
+        formats: ['es'],
+        fileName: () => 'ui.js'
+      },
+      rollupOptions: {
+        output: {
+          assetFileNames: 'ui.[ext]'
+        }
       },
       watch: watch ? {} : null
     }
@@ -97,13 +145,18 @@ export function createWebviewConfig(view, { watch = false, counter, plugins = []
     configFile: false,
     logLevel: 'info',
     define: { 'process.env.NODE_ENV': JSON.stringify(watch ? 'development' : 'production') },
-    plugins: [tailwindcss(), ...plugins, ...(counter ? [watchMarkerPlugin(counter)] : [])],
-    resolve: { alias: { '@': resolve(root, 'src') } },
+    plugins: [...plugins, ...(counter ? [watchMarkerPlugin(counter)] : [])],
+    resolve: {
+      alias: {
+        '@': resolve(root, 'src'),
+        ...PREACT_ALIASES
+      }
+    },
     build: {
       target: 'es2022',
       outDir: resolve(root, `dist/webview/${view}`),
       emptyOutDir: true,
-      minify: false,
+      minify: !watch,
       sourcemap: watch,
       lib: {
         entry: resolve(root, `src/webview/${view}/main.tsx`),
@@ -112,10 +165,9 @@ export function createWebviewConfig(view, { watch = false, counter, plugins = []
         fileName: () => 'client.js'
       },
       rollupOptions: {
-        external: REACT_EXTERNALS,
+        external: PANEL_EXTERNALS,
         output: {
-          assetFileNames: 'client.[ext]',
-          globals: REACT_GLOBALS
+          globals: PANEL_GLOBALS
         }
       },
       watch: watch ? {} : null

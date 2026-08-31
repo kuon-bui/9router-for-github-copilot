@@ -3,7 +3,6 @@ import { StrictMode, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { UsagePanel } from './UsagePanel';
 import { buildUsageView } from './view-model';
-import './usage.css';
 import type { UsageHostMessage } from '@/webview/shared/protocol';
 import type { UsageView } from './view-model';
 

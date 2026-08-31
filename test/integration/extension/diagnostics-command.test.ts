@@ -248,7 +248,8 @@ describe('9routerCopilot.showDiagnostics', () => {
       }
     });
     expect(panels[0]?.html).toContain('id="root"');
-    expect(panels[0]?.html).toContain('vscode-webview://mock/ext/dist/webview/shared/react.js');
+    expect(panels[0]?.html).toContain('vscode-webview://mock/ext/dist/webview/shared/ui.css');
+    expect(panels[0]?.html).toContain('vscode-webview://mock/ext/dist/webview/shared/preact.js');
     expect(panels[0]?.html).toContain('vscode-webview://mock/ext/dist/webview/usage/client.js');
     const panel = __getWebviewPanelObjects()[0];
     expect(panel).toBeDefined();

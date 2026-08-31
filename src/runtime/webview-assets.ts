@@ -29,9 +29,9 @@ export async function renderWebviewPanelHtml(
 
   return renderWebviewDocument({
     shell,
-    styleUri: webview.asWebviewUri(vscode.Uri.joinPath(root, 'client.css')).toString(),
+    styleUri: webview.asWebviewUri(vscode.Uri.joinPath(sharedRoot, 'ui.css')).toString(),
     runtimeScriptUri: webview
-      .asWebviewUri(vscode.Uri.joinPath(sharedRoot, 'react.js'))
+      .asWebviewUri(vscode.Uri.joinPath(sharedRoot, 'preact.js'))
       .toString(),
     scriptUri: webview.asWebviewUri(vscode.Uri.joinPath(root, 'client.js')).toString(),
     cspSource: webview.cspSource,

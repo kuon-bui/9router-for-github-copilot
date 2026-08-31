@@ -1,0 +1,9 @@
+@import 'tailwindcss';
+@import './theme.css';
+@import './controls.scss';
+
+@source '../usage/**/*.tsx';
+@source '../usage/index.html';
+@source '../model-editor/**/*.tsx';
+@source '../model-editor/index.html';
+@source './**/*.ts';

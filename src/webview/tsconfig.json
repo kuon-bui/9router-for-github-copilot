@@ -9,7 +9,12 @@
     "jsxImportSource": "react",
     "noEmit": true,
     "paths": {
-      "@/*": ["../*"]
+      "@/*": ["../*"],
+      "react": ["../../node_modules/preact/compat/"],
+      "react/jsx-runtime": ["../../node_modules/preact/jsx-runtime"],
+      "react/jsx-dev-runtime": ["../../node_modules/preact/jsx-dev-runtime"],
+      "react-dom": ["../../node_modules/preact/compat/"],
+      "react-dom/client": ["../../node_modules/preact/compat/client"]
     },
     "strict": true,
     "noUncheckedIndexedAccess": true,

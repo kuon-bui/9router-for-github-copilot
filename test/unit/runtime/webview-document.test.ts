@@ -11,8 +11,8 @@ const SHELL = [
 function render(shell: string): string {
   return renderWebviewDocument({
     shell,
-    styleUri: 'https://host/client.css',
-    runtimeScriptUri: 'https://host/react.js',
+    styleUri: 'https://host/ui.css',
+    runtimeScriptUri: 'https://host/preact.js',
     scriptUri: 'https://host/client.js',
     cspSource: 'vscode-webview://host',
     nonce: 'abc123'
@@ -39,8 +39,8 @@ describe('renderWebviewDocument', () => {
   it('substitutes every asset placeholder', () => {
     const html = render(SHELL);
 
-    expect(html).toContain('href="https://host/client.css"');
-    expect(html).toContain('src="https://host/react.js"');
+    expect(html).toContain('href="https://host/ui.css"');
+    expect(html).toContain('src="https://host/preact.js"');
     expect(html).toContain('src="https://host/client.js"');
     expect(html).toContain('nonce="abc123"');
     expect(html).not.toContain('{{');

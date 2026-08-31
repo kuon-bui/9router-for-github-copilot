@@ -83,14 +83,16 @@ src/
 - must not import `src/runtime`, directly or transitively
 - must not duplicate logic that already exists on the extension side; import the runtime-agnostic module instead
 - `src/webview/shared` holds modules only the webview and its own panel need
-- shared VS Code tokens and native control presentation live in `src/webview/shared/*.css`
-- panel layout and domain-specific visuals stay beside panel components
+- shared VS Code tokens live in `src/webview/shared/theme.css`; custom control styles live in `src/webview/shared/*.scss` and compile into `dist/webview/shared/ui.css`
+- panel layout and domain-specific visuals stay beside panel components when they cannot share
 - host/webview message shapes use neutral contracts under `src/types`
-- generic React UI primitives require at least two behaviorally identical consumers; CSS reuse is preferred first
-- React/runtime packages ship once as `dist/webview/shared/react.js`; panel IIFEs externalize those packages and load the shared vendor before `client.js`
+- generic React-compatible UI primitives require at least two behaviorally identical consumers; CSS reuse is preferred first
+- Preact ships once as `dist/webview/shared/preact.js` via `preact/compat`; panel IIFEs keep React import paths, externalize them, and load the shared vendor before `client.js`
+- shared styles ship once as `dist/webview/shared/ui.css`; shells load that stylesheet instead of per-panel Tailwind copies
 
-Webview markup and styling live in `.tsx` and `.css` files. They must never be
-written as string literals in TypeScript.
+Webview markup lives in `.tsx` files. Custom styles are authored as `.scss` and
+compiled to CSS by the webview build. They must never be written as string
+literals in TypeScript.
 
 `src/provider`
 

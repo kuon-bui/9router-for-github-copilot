@@ -97,7 +97,7 @@ export function ModelForm(props: ModelFormProps): JSX.Element {
           id="field-catalog"
           className="ui-field"
           value={draft.modelId}
-          onChange={(event) => prefill(event.target.value)}
+          onChange={(event) => prefill(event.currentTarget.value)}
         >
           <option value="">Select a 9router model</option>
           {props.state.catalog.map((entry) => (
@@ -113,9 +113,9 @@ export function ModelForm(props: ModelFormProps): JSX.Element {
           className="ui-field"
           type="text"
           autoComplete="off"
-          spellCheck={false}
+          spellcheck={false}
           value={draft.id}
-          onChange={(event) => patch({ id: event.target.value })}
+          onChange={(event) => patch({ id: event.currentTarget.value })}
         />
 
         <label htmlFor="field-name">Display name</label>
@@ -125,7 +125,7 @@ export function ModelForm(props: ModelFormProps): JSX.Element {
           type="text"
           autoComplete="off"
           value={draft.name}
-          onChange={(event) => patch({ name: event.target.value })}
+          onChange={(event) => patch({ name: event.currentTarget.value })}
         />
 
         <label htmlFor="field-model-id">9router model id</label>
@@ -134,16 +134,16 @@ export function ModelForm(props: ModelFormProps): JSX.Element {
           className="ui-field"
           type="text"
           autoComplete="off"
-          spellCheck={false}
+          spellcheck={false}
           value={draft.modelId}
-          onChange={(event) => patch({ modelId: event.target.value })}
+          onChange={(event) => patch({ modelId: event.currentTarget.value })}
         />
 
         <label className="inline-flex flex-row items-center gap-1">
           <input
             type="checkbox"
             checked={draft.serviceTier === 'fast'}
-            onChange={(event) => setFast(event.target.checked)}
+            onChange={(event) => setFast(event.currentTarget.checked)}
           />
           Fast tier
         </label>
@@ -184,7 +184,7 @@ export function ModelForm(props: ModelFormProps): JSX.Element {
           className="ui-field"
           value={draft.thinkingMode}
           onChange={(event) =>
-            patch({ thinkingMode: event.target.value as ModelDraft['thinkingMode'] })
+            patch({ thinkingMode: event.currentTarget.value as ModelDraft['thinkingMode'] })
           }
         >
           {props.state.thinkingModes.map((mode) => (
@@ -216,7 +216,7 @@ export function ModelForm(props: ModelFormProps): JSX.Element {
           min={1}
           step={1}
           value={draft.maxInputTokens}
-          onChange={(event) => patch({ maxInputTokens: Number(event.target.value) })}
+          onChange={(event) => patch({ maxInputTokens: Number(event.currentTarget.value) })}
         />
 
         <label htmlFor="field-max-output-tokens">Max output tokens</label>
@@ -227,7 +227,7 @@ export function ModelForm(props: ModelFormProps): JSX.Element {
           min={1}
           step={1}
           value={draft.maxOutputTokens}
-          onChange={(event) => patch({ maxOutputTokens: Number(event.target.value) })}
+          onChange={(event) => patch({ maxOutputTokens: Number(event.currentTarget.value) })}
         />
 
         <div className="mt-3 flex justify-end gap-2">

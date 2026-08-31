@@ -11,11 +11,11 @@ button {
   background: var(--vscode-button-secondaryBackground);
   color: var(--vscode-button-secondaryForeground);
   padding: 4px 10px;
-}
 
-button:disabled {
-  cursor: default;
-  opacity: 0.5;
+  &:disabled {
+    cursor: default;
+    opacity: 0.5;
+  }
 }
 
 .ui-button {
@@ -25,11 +25,11 @@ button:disabled {
   background: var(--vscode-button-secondaryBackground);
   color: var(--vscode-button-secondaryForeground);
   padding: 4px 10px;
-}
 
-.ui-button:disabled {
-  cursor: default;
-  opacity: 0.5;
+  &:disabled {
+    cursor: default;
+    opacity: 0.5;
+  }
 }
 
 .ui-button-primary {
@@ -68,5 +68,33 @@ button:disabled {
 .ui-chip {
   border-radius: 9999px;
   padding: 1px 6px;
+  font-size: 11px;
+}
+
+label {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 12px;
+}
+
+fieldset {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 4px 0;
+  border: 1px solid var(--vscode-panel-border);
+  border-radius: 2px;
+  padding: 6px 8px;
+
+  label {
+    display: inline-flex;
+    flex-direction: row;
+    gap: 4px;
+  }
+}
+
+legend {
+  color: var(--vscode-descriptionForeground);
   font-size: 11px;
 }
