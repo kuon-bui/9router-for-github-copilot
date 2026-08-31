@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createModelEditorState } from '@/runtime/model-editor-view';
+import { createModelEditorState, toCatalogMetadata } from '@/runtime/model-editor-view';
 
 const catalog = [
   { id: 'router/combo' },
@@ -48,6 +48,10 @@ describe('createModelEditorState', () => {
       }
     ]);
     expect(state.warnings).toEqual([]);
+    expect(state.thinkingModes).toEqual(['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max']);
+    expect(state.thinkingEfforts).toEqual(['minimal', 'low', 'medium', 'high', 'xhigh', 'max']);
+    expect(state.defaultMaxInputTokens).toBe(264_000);
+    expect(state.defaultMaxOutputTokens).toBe(264_000);
   });
 
   it('keeps rejected entries visible with their parser issue', () => {
@@ -117,5 +121,29 @@ describe('createModelEditorState', () => {
     expect(state.warnings).toEqual([
       'A workspace value for 9router-copilot.models overrides user settings. Changes saved here are written to user settings.'
     ]);
+  });
+});
+
+describe('toCatalogMetadata', () => {
+  it('drops editor-only metadata and absent optional fields', () => {
+    expect(
+      toCatalogMetadata({
+        modelId: 'router/combo',
+        ownedBy: 'router',
+        vision: true,
+        contextWindow: 400_000,
+        maxOutput: 128_000,
+        inUse: true
+      })
+    ).toEqual({
+      id: 'router/combo',
+      ownedBy: 'router',
+      vision: true,
+      contextWindow: 400_000,
+      maxOutput: 128_000
+    });
+    expect(toCatalogMetadata({ modelId: 'router/basic', vision: false, inUse: false })).toEqual({
+      id: 'router/basic'
+    });
   });
 });

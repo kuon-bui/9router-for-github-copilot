@@ -1,5 +1,9 @@
 import { parseModelSettings } from '@/config/model-settings';
 import {
+  DEFAULT_MODEL_MAX_INPUT_TOKENS,
+  DEFAULT_MODEL_MAX_OUTPUT_TOKENS
+} from '@/config/defaults';
+import {
   ENABLED_THINKING_MODE_SET,
   THINKING_MODE_SET,
   TOOL_MODES,
@@ -14,6 +18,7 @@ import type {
   ToolMode,
   VisionMode
 } from '@/types/product-model';
+import { ENABLED_THINKING_MODES, THINKING_MODES } from '@/types/product-model';
 
 const NOT_A_LIST_WARNING =
   '9router-copilot.models is not a list. Saving here replaces it with a new list.';
@@ -50,6 +55,10 @@ export interface ModelEditorState {
   models: ModelEditorRow[];
   catalog: ModelEditorCatalogEntry[];
   warnings: string[];
+  thinkingModes: ThinkingMode[];
+  thinkingEfforts: EnabledThinkingMode[];
+  defaultMaxInputTokens: number;
+  defaultMaxOutputTokens: number;
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
@@ -162,6 +171,20 @@ export function createModelEditorState(input: {
       ...(model.maxOutput !== undefined ? { maxOutput: model.maxOutput } : {}),
       inUse: configuredModelIds.has(model.id)
     })),
-    warnings
+    warnings,
+    thinkingModes: [...THINKING_MODES],
+    thinkingEfforts: [...ENABLED_THINKING_MODES],
+    defaultMaxInputTokens: DEFAULT_MODEL_MAX_INPUT_TOKENS,
+    defaultMaxOutputTokens: DEFAULT_MODEL_MAX_OUTPUT_TOKENS
+  };
+}
+
+export function toCatalogMetadata(entry: ModelEditorCatalogEntry): RouterModelMetadata {
+  return {
+    id: entry.modelId,
+    ...(entry.ownedBy !== undefined ? { ownedBy: entry.ownedBy } : {}),
+    ...(entry.vision ? { vision: true as const } : {}),
+    ...(entry.contextWindow !== undefined ? { contextWindow: entry.contextWindow } : {}),
+    ...(entry.maxOutput !== undefined ? { maxOutput: entry.maxOutput } : {})
   };
 }
