@@ -1,4 +1,8 @@
 import { randomBytes } from 'node:crypto';
+import {
+  DEFAULT_MODEL_MAX_INPUT_TOKENS,
+  DEFAULT_MODEL_MAX_OUTPUT_TOKENS
+} from '@/config/defaults';
 import { ENABLED_THINKING_MODES, THINKING_MODES } from '@/types/product-model';
 
 const STYLES = `
@@ -36,8 +40,12 @@ button.primary { background: var(--vscode-button-background); color: var(--vscod
 `;
 
 const CLIENT_SCRIPT = `
+const DEFAULT_INPUT_TOKENS = ${DEFAULT_MODEL_MAX_INPUT_TOKENS};
+const DEFAULT_OUTPUT_TOKENS = ${DEFAULT_MODEL_MAX_OUTPUT_TOKENS};
 const vscodeApi = acquireVsCodeApi();
 let state = { models: [], catalog: [], warnings: [] };
+let pendingSave = false;
+let editingSourceIndex = null;
 
 function element(tag, className, text) {
   const node = document.createElement(tag);
@@ -117,8 +125,15 @@ window.addEventListener('message', function (event) {
     renderWarnings();
     renderList();
     renderCatalogOptions();
+    if (pendingSave) {
+      pendingSave = false;
+      closeForm();
+    }
   }
-  if (message.type === 'error') { showError(String(message.message)); }
+  if (message.type === 'error') {
+    pendingSave = false;
+    showError(String(message.message));
+  }
 });
 
 document.getElementById('refresh-catalog').addEventListener('click', function () {
@@ -127,8 +142,154 @@ document.getElementById('refresh-catalog').addEventListener('click', function ()
 
 vscodeApi.postMessage({ type: 'ready' });
 
-function openForm() {}
-function renderCatalogOptions() {}
+function renderCatalogOptions() {
+  const select = document.getElementById('field-catalog');
+  const previous = select.value;
+  select.replaceChildren();
+  const blank = element('option', '', 'Select a 9router model');
+  blank.value = '';
+  select.append(blank);
+  for (const entry of state.catalog) {
+    const option = element(
+      'option',
+      '',
+      entry.modelId + (entry.inUse ? ' (in use)' : '') + (entry.vision ? ' - vision' : '')
+    );
+    option.value = entry.modelId;
+    select.append(option);
+  }
+  select.value = previous;
+}
+
+function setRadio(name, value) {
+  const inputs = document.querySelectorAll('input[name="' + name + '"]');
+  inputs.forEach(function (input) { input.checked = input.value === value; });
+}
+
+function readRadio(name, fallback) {
+  const checked = document.querySelector('input[name="' + name + '"]:checked');
+  return checked ? checked.value : fallback;
+}
+
+function setCheckboxGroup(name, values) {
+  const inputs = document.querySelectorAll('input[name="' + name + '"]');
+  inputs.forEach(function (input) { input.checked = values.indexOf(input.value) >= 0; });
+}
+
+function readCheckboxGroup(name) {
+  const values = [];
+  document.querySelectorAll('input[name="' + name + '"]:checked').forEach(function (input) {
+    values.push(input.value);
+  });
+  return values;
+}
+
+function clearFieldErrors() {
+  document.querySelectorAll('.field-error').forEach(function (node) { node.textContent = ''; });
+}
+
+function fillForm(draft) {
+  document.getElementById('field-id').value = draft.id || '';
+  document.getElementById('field-name').value = draft.name || '';
+  document.getElementById('field-model-id').value = draft.modelId || '';
+  document.getElementById('field-service-tier').checked = draft.serviceTier === 'fast';
+  setRadio('toolMode', draft.toolMode || 'off');
+  setRadio('visionMode', draft.visionMode || 'off');
+  document.getElementById('field-thinking-mode').value = draft.thinkingMode || 'off';
+  setCheckboxGroup('thinkingEfforts', draft.thinkingEfforts || []);
+  document.getElementById('field-max-input-tokens').value = String(draft.maxInputTokens || DEFAULT_INPUT_TOKENS);
+  document.getElementById('field-max-output-tokens').value = String(draft.maxOutputTokens || DEFAULT_OUTPUT_TOKENS);
+}
+
+function sanitizeId(value) {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/g, '-')
+    .replace(/-{2,}/g, '-')
+    .replace(/^[^a-z0-9]+/, '')
+    .replace(/[-._]+$/, '');
+}
+
+function prefillFromCatalog(modelId) {
+  const matches = state.catalog.filter(function (item) { return item.modelId === modelId; });
+  const entry = matches[0];
+  if (!entry) { return; }
+  const separator = modelId.lastIndexOf('/');
+  const maxOutput = entry.maxOutput || DEFAULT_OUTPUT_TOKENS;
+  const derivedInput = entry.contextWindow ? entry.contextWindow - maxOutput : 0;
+  const taken = state.models
+    .filter(function (row) { return row.id && row.sourceIndex !== editingSourceIndex; })
+    .map(function (row) { return row.id; });
+  const base = sanitizeId(modelId);
+  let id = base;
+  let suffix = 2;
+  while (id && taken.indexOf(id) >= 0 && suffix <= 100) {
+    id = base + '-' + suffix;
+    suffix += 1;
+  }
+  fillForm({
+    id: id,
+    name: separator >= 0 ? modelId.slice(separator + 1) : modelId,
+    modelId: modelId,
+    toolMode: 'auto',
+    visionMode: entry.vision ? 'native' : 'off',
+    thinkingMode: 'off',
+    thinkingEfforts: [],
+    maxInputTokens: derivedInput > 0 ? derivedInput : DEFAULT_INPUT_TOKENS,
+    maxOutputTokens: maxOutput
+  });
+}
+
+function openForm(sourceIndex) {
+  editingSourceIndex = sourceIndex === undefined ? null : sourceIndex;
+  clearFieldErrors();
+  showError('');
+  renderCatalogOptions();
+  const rows = state.models.filter(function (item) { return item.sourceIndex === editingSourceIndex; });
+  const row = rows[0];
+  document.getElementById('form-title').textContent = row ? 'Edit model' : 'Add model';
+  document.getElementById('field-catalog').value = row && row.modelId ? row.modelId : '';
+  fillForm(row || { toolMode: 'auto', visionMode: 'off', thinkingMode: 'off', thinkingEfforts: [] });
+  document.getElementById('model-form').hidden = false;
+}
+
+function closeForm() {
+  editingSourceIndex = null;
+  document.getElementById('model-form').hidden = true;
+}
+
+function readDraft() {
+  const draft = {
+    id: document.getElementById('field-id').value.trim(),
+    name: document.getElementById('field-name').value.trim(),
+    modelId: document.getElementById('field-model-id').value.trim(),
+    toolMode: readRadio('toolMode', 'off'),
+    visionMode: readRadio('visionMode', 'off'),
+    thinkingMode: document.getElementById('field-thinking-mode').value,
+    thinkingEfforts: readCheckboxGroup('thinkingEfforts'),
+    maxInputTokens: Number(document.getElementById('field-max-input-tokens').value),
+    maxOutputTokens: Number(document.getElementById('field-max-output-tokens').value)
+  };
+  if (document.getElementById('field-service-tier').checked) { draft.serviceTier = 'fast'; }
+  return draft;
+}
+
+document.getElementById('add-model').addEventListener('click', function () { openForm(); });
+document.getElementById('form-cancel').addEventListener('click', closeForm);
+document.getElementById('field-catalog').addEventListener('change', function (event) {
+  if (event.target.value) { prefillFromCatalog(event.target.value); }
+});
+document.getElementById('model-form').addEventListener('submit', function (event) {
+  event.preventDefault();
+  clearFieldErrors();
+  pendingSave = true;
+  vscodeApi.postMessage({
+    type: 'saveModel',
+    sourceIndex: editingSourceIndex,
+    draft: readDraft()
+  });
+});
 `;
 
 export function createNonce(): string {

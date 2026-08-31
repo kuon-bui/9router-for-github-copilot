@@ -53,3 +53,18 @@ describe('renderModelEditorHtml', () => {
     expect(html).not.toContain('="undefined"');
   });
 });
+
+describe('client script behaviour', () => {
+  const html = renderModelEditorHtml('abc123');
+
+  it('wires the form to the save message contract', () => {
+    expect(html).toContain("type: 'saveModel'");
+    expect(html).toContain('editingSourceIndex');
+    expect(html).toContain('prefillFromCatalog');
+  });
+
+  it('has no stubbed handlers left', () => {
+    expect(html).not.toContain('function openForm() {}');
+    expect(html).not.toContain('function renderCatalogOptions() {}');
+  });
+});
