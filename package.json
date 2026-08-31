@@ -56,6 +56,10 @@
       {
         "command": "9routerCopilot.manageModels",
         "title": "9router: Manage Models"
+      },
+      {
+        "command": "9routerCopilot.addModel",
+        "title": "9router: Add Model"
       }
     ],
     "chatParticipants": [

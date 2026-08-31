@@ -46,6 +46,14 @@ function createDependencies(
   };
 }
 
+function readMessageTypes(
+  panel: ReturnType<typeof __getWebviewPanelObjects>[number] | undefined
+): unknown[] {
+  return (panel?.webview.postedMessages ?? []).map(
+    (message) => (message as { type?: unknown }).type
+  );
+}
+
 describe('createModelEditorOpener', () => {
   beforeEach(() => {
     __resetVscodeState();
@@ -102,6 +110,43 @@ describe('createModelEditorOpener', () => {
     await open(token.value);
 
     expect(__getWebviewPanelObjects()).toHaveLength(1);
+  });
+
+  it('asks a fresh panel for the add form once the first state has landed', async () => {
+    const open = createModelEditorOpener(createDependencies());
+    const token = __createCancellationToken();
+
+    await open(token.value, { initialView: 'form' });
+
+    const panel = __getWebviewPanelObjects()[0];
+    await panel?.webview.receiveMessage({ type: 'ready' });
+
+    expect(readMessageTypes(panel)).toEqual(['state', 'showForm']);
+  });
+
+  it('asks an already open panel for the add form', async () => {
+    const open = createModelEditorOpener(createDependencies());
+    const token = __createCancellationToken();
+
+    await open(token.value);
+    const panel = __getWebviewPanelObjects()[0];
+    await panel?.webview.receiveMessage({ type: 'ready' });
+
+    await open(token.value, { initialView: 'form' });
+
+    expect(readMessageTypes(panel)).toEqual(['state', 'state', 'showForm']);
+  });
+
+  it('leaves the panel on the list view without an initial view', async () => {
+    const open = createModelEditorOpener(createDependencies());
+    const token = __createCancellationToken();
+
+    await open(token.value);
+    const panel = __getWebviewPanelObjects()[0];
+    await panel?.webview.receiveMessage({ type: 'ready' });
+    await open(token.value);
+
+    expect(readMessageTypes(panel)).toEqual(['state', 'state']);
   });
 
   it('refuses to open without an API key', async () => {

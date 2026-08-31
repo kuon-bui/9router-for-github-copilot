@@ -21,7 +21,14 @@ const MODEL_EDITOR_VIEW_TYPE = '9routerCopilot.models';
 const SECTION = '9router-copilot';
 const MODELS_KEY = 'models';
 
-export type ModelEditorOpener = (token: vscode.CancellationToken) => Promise<void>;
+export interface ModelEditorOpenOptions {
+  readonly initialView?: 'form';
+}
+
+export type ModelEditorOpener = (
+  token: vscode.CancellationToken,
+  options?: ModelEditorOpenOptions
+) => Promise<void>;
 
 interface Dependencies {
   secrets: vscode.SecretStorage;
@@ -33,6 +40,9 @@ interface PanelSession {
   panel: vscode.WebviewPanel;
   catalog: readonly RouterModelMetadata[];
   subscriptions: vscode.Disposable[];
+  // A fresh webview cannot receive the request before its script runs, so the panel holds it
+  // until the view reports itself ready and the first state has been posted.
+  pendingFormRequest: boolean;
 }
 
 let session: PanelSession | undefined;
@@ -83,6 +93,10 @@ function hasWorkspaceOverride(): boolean {
   );
 }
 
+async function postShowForm(current: PanelSession): Promise<void> {
+  await current.panel.webview.postMessage({ type: 'showForm' });
+}
+
 async function postState(current: PanelSession): Promise<void> {
   await current.panel.webview.postMessage({
     type: 'state',
@@ -95,13 +109,17 @@ async function postState(current: PanelSession): Promise<void> {
 }
 
 export function createModelEditorOpener(dependencies: Dependencies): ModelEditorOpener {
-  return async (token) => {
+  return async (token, options) => {
     const catalog = await fetchCatalog(dependencies, token);
+    const wantsForm = options?.initialView === 'form';
 
     if (session) {
       session.catalog = catalog;
       session.panel.reveal(vscode.ViewColumn.Active, false);
       await postState(session);
+      if (wantsForm) {
+        await postShowForm(session);
+      }
       return;
     }
 
@@ -113,7 +131,12 @@ export function createModelEditorOpener(dependencies: Dependencies): ModelEditor
     );
     panel.webview.html = renderModelEditorHtml(createNonce());
 
-    const current: PanelSession = { panel, catalog, subscriptions: [] };
+    const current: PanelSession = {
+      panel,
+      catalog,
+      subscriptions: [],
+      pendingFormRequest: wantsForm
+    };
     session = current;
 
     current.subscriptions.push(
@@ -276,6 +299,10 @@ async function handleMessage(
   try {
     if (payload.type === 'ready') {
       await postState(current);
+      if (current.pendingFormRequest) {
+        current.pendingFormRequest = false;
+        await postShowForm(current);
+      }
       return;
     }
     if (payload.type === 'saveModel') {

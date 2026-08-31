@@ -7,11 +7,14 @@ import { ENABLED_THINKING_MODES, THINKING_MODES } from '@/types/product-model';
 
 const STYLES = `
 body { font-family: var(--vscode-font-family); color: var(--vscode-foreground); background: var(--vscode-editor-background); margin: 0; padding: 16px; }
-main { max-width: 900px; margin: 0 auto; display: flex; flex-direction: column; gap: 12px; }
+main { max-width: 900px; margin: 0 auto; }
+.view { display: flex; flex-direction: column; gap: 12px; }
+.view[hidden] { display: none; }
 h1 { font-size: 15px; margin: 0; }
-h2 { font-size: 13px; margin: 0 0 8px; }
+h2 { font-size: 13px; margin: 0; }
 .toolbar { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .toolbar-actions { display: flex; gap: 8px; }
+.form-header { display: flex; align-items: center; gap: 8px; }
 button { font-family: inherit; font-size: 12px; padding: 4px 10px; border: 1px solid var(--vscode-button-border, transparent); border-radius: 2px; background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground); cursor: pointer; }
 button:disabled { opacity: 0.5; cursor: default; }
 button.primary { background: var(--vscode-button-background); color: var(--vscode-button-foreground); }
@@ -19,6 +22,7 @@ button.primary { background: var(--vscode-button-background); color: var(--vscod
 .warning, .error { padding: 6px 8px; border-radius: 2px; font-size: 12px; }
 .warning { border: 1px solid var(--vscode-inputValidation-warningBorder); background: var(--vscode-inputValidation-warningBackground); }
 .error { border: 1px solid var(--vscode-inputValidation-errorBorder); background: var(--vscode-inputValidation-errorBackground); }
+.empty { font-size: 12px; color: var(--vscode-descriptionForeground); }
 .model-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
 .row { display: grid; grid-template-columns: 1fr auto; grid-template-areas: "name actions" "ids actions" "chips actions"; gap: 2px 12px; padding: 10px; border: 1px solid var(--vscode-panel-border); border-radius: 3px; }
 .row.invalid { border-color: var(--vscode-inputValidation-errorBorder); }
@@ -46,12 +50,19 @@ const vscodeApi = acquireVsCodeApi();
 let state = { models: [], catalog: [], warnings: [] };
 let pendingSave = false;
 let editingSourceIndex = null;
+let currentView = 'list';
 
 function element(tag, className, text) {
   const node = document.createElement(tag);
   if (className) { node.className = className; }
   if (text !== undefined) { node.textContent = text; }
   return node;
+}
+
+function showView(name) {
+  currentView = name === 'form' ? 'form' : 'list';
+  document.getElementById('view-list').hidden = currentView !== 'list';
+  document.getElementById('view-form').hidden = currentView !== 'form';
 }
 
 function renderWarnings() {
@@ -78,6 +89,7 @@ function renderChips(row) {
 function renderList() {
   const list = document.getElementById('model-list');
   list.replaceChildren();
+  document.getElementById('list-empty').hidden = state.models.length > 0;
   state.models.forEach(function (row, index) {
     const item = element('li', row.valid ? 'row' : 'row invalid');
     item.append(element('div', 'row-name', row.name || row.id || 'Unnamed model'));
@@ -110,10 +122,19 @@ function renderList() {
   });
 }
 
+// Each page owns its error host so a rejected save stays visible beside the form.
 function showError(message) {
-  const host = document.getElementById('error');
+  const host = document.getElementById(currentView === 'form' ? 'form-error' : 'list-error');
   host.textContent = message;
   host.hidden = message.length === 0;
+}
+
+function clearErrors() {
+  ['list-error', 'form-error'].forEach(function (id) {
+    const host = document.getElementById(id);
+    host.textContent = '';
+    host.hidden = true;
+  });
 }
 
 window.addEventListener('message', function (event) {
@@ -121,7 +142,7 @@ window.addEventListener('message', function (event) {
   if (!message || typeof message !== 'object') { return; }
   if (message.type === 'state') {
     state = message.state;
-    showError('');
+    clearErrors();
     renderWarnings();
     renderList();
     renderCatalogOptions();
@@ -129,6 +150,9 @@ window.addEventListener('message', function (event) {
       pendingSave = false;
       closeForm();
     }
+  }
+  if (message.type === 'showForm') {
+    openForm();
   }
   if (message.type === 'error') {
     pendingSave = false;
@@ -244,19 +268,20 @@ function prefillFromCatalog(modelId) {
 function openForm(sourceIndex) {
   editingSourceIndex = sourceIndex === undefined ? null : sourceIndex;
   clearFieldErrors();
-  showError('');
+  clearErrors();
   renderCatalogOptions();
   const rows = state.models.filter(function (item) { return item.sourceIndex === editingSourceIndex; });
   const row = rows[0];
   document.getElementById('form-title').textContent = row ? 'Edit model' : 'Add model';
   document.getElementById('field-catalog').value = row && row.modelId ? row.modelId : '';
   fillForm(row || { toolMode: 'auto', visionMode: 'off', thinkingMode: 'off', thinkingEfforts: [] });
-  document.getElementById('model-form').hidden = false;
+  showView('form');
 }
 
 function closeForm() {
   editingSourceIndex = null;
-  document.getElementById('model-form').hidden = true;
+  clearErrors();
+  showView('list');
 }
 
 function readDraft() {
@@ -276,6 +301,7 @@ function readDraft() {
 }
 
 document.getElementById('add-model').addEventListener('click', function () { openForm(); });
+document.getElementById('form-back').addEventListener('click', closeForm);
 document.getElementById('form-cancel').addEventListener('click', closeForm);
 document.getElementById('field-catalog').addEventListener('change', function (event) {
   if (event.target.value) { prefillFromCatalog(event.target.value); }
@@ -283,6 +309,7 @@ document.getElementById('field-catalog').addEventListener('change', function (ev
 document.getElementById('model-form').addEventListener('submit', function (event) {
   event.preventDefault();
   clearFieldErrors();
+  clearErrors();
   pendingSave = true;
   vscodeApi.postMessage({
     type: 'saveModel',
@@ -290,6 +317,8 @@ document.getElementById('model-form').addEventListener('submit', function (event
     draft: readDraft()
   });
 });
+
+showView('list');
 `;
 
 export function createNonce(): string {
@@ -316,54 +345,63 @@ export function renderModelEditorHtml(nonce: string): string {
 </head>
 <body>
 <main>
-  <header class="toolbar">
-    <h1>9router models</h1>
-    <div class="toolbar-actions">
-      <button id="refresh-catalog" type="button">Refresh catalog</button>
-      <button id="add-model" type="button" class="primary">Add model</button>
-    </div>
-  </header>
-  <div id="warnings" class="warnings" role="status"></div>
-  <div id="error" class="error" role="alert" hidden></div>
-  <ul id="model-list" class="model-list"></ul>
-  <form id="model-form" class="model-form" hidden>
-    <h2 id="form-title">Add model</h2>
-    <label for="field-catalog">9router model</label>
-    <select id="field-catalog"></select>
-    <label for="field-id">Copilot id</label>
-    <input id="field-id" type="text" autocomplete="off" spellcheck="false">
-    <p class="field-error" data-error-for="id"></p>
-    <label for="field-name">Display name</label>
-    <input id="field-name" type="text" autocomplete="off">
-    <p class="field-error" data-error-for="name"></p>
-    <label for="field-model-id">9router model id</label>
-    <input id="field-model-id" type="text" autocomplete="off" spellcheck="false">
-    <p class="field-error" data-error-for="modelId"></p>
-    <label class="checkbox"><input id="field-service-tier" type="checkbox"> Fast tier</label>
-    <fieldset><legend>Tool calling</legend>
-      <label class="checkbox"><input type="radio" name="toolMode" value="auto"> auto</label>
-      <label class="checkbox"><input type="radio" name="toolMode" value="off"> off</label>
-    </fieldset>
-    <fieldset><legend>Vision</legend>
-      <label class="checkbox"><input type="radio" name="visionMode" value="native"> native</label>
-      <label class="checkbox"><input type="radio" name="visionMode" value="proxy"> proxy</label>
-      <label class="checkbox"><input type="radio" name="visionMode" value="off"> off</label>
-    </fieldset>
-    <label for="field-thinking-mode">Default thinking mode</label>
-    <select id="field-thinking-mode">${thinkingModeOptions}</select>
-    <fieldset id="field-thinking-efforts"><legend>Thinking efforts</legend>${thinkingEffortChoices}</fieldset>
-    <p class="field-error" data-error-for="thinkingEfforts"></p>
-    <label for="field-max-input-tokens">Max input tokens</label>
-    <input id="field-max-input-tokens" type="number" min="1" step="1">
-    <p class="field-error" data-error-for="maxInputTokens"></p>
-    <label for="field-max-output-tokens">Max output tokens</label>
-    <input id="field-max-output-tokens" type="number" min="1" step="1">
-    <p class="field-error" data-error-for="maxOutputTokens"></p>
-    <div class="form-actions">
-      <button id="form-cancel" type="button">Cancel</button>
-      <button id="form-save" type="submit" class="primary">Save</button>
-    </div>
-  </form>
+  <section id="view-list" class="view">
+    <header class="toolbar">
+      <h1>9router models</h1>
+      <div class="toolbar-actions">
+        <button id="refresh-catalog" type="button">Refresh catalog</button>
+        <button id="add-model" type="button" class="primary">Add model</button>
+      </div>
+    </header>
+    <div id="warnings" class="warnings" role="status"></div>
+    <div id="list-error" class="error" role="alert" hidden></div>
+    <p id="list-empty" class="empty" hidden>No models configured yet. Choose Add model to create one.</p>
+    <ul id="model-list" class="model-list"></ul>
+  </section>
+  <section id="view-form" class="view" hidden>
+    <header class="form-header">
+      <button id="form-back" type="button">&#8592; Back</button>
+      <h2 id="form-title">Add model</h2>
+    </header>
+    <div id="form-error" class="error" role="alert" hidden></div>
+    <form id="model-form" class="model-form">
+      <label for="field-catalog">9router model</label>
+      <select id="field-catalog"></select>
+      <label for="field-id">Copilot id</label>
+      <input id="field-id" type="text" autocomplete="off" spellcheck="false">
+      <p class="field-error" data-error-for="id"></p>
+      <label for="field-name">Display name</label>
+      <input id="field-name" type="text" autocomplete="off">
+      <p class="field-error" data-error-for="name"></p>
+      <label for="field-model-id">9router model id</label>
+      <input id="field-model-id" type="text" autocomplete="off" spellcheck="false">
+      <p class="field-error" data-error-for="modelId"></p>
+      <label class="checkbox"><input id="field-service-tier" type="checkbox"> Fast tier</label>
+      <fieldset><legend>Tool calling</legend>
+        <label class="checkbox"><input type="radio" name="toolMode" value="auto"> auto</label>
+        <label class="checkbox"><input type="radio" name="toolMode" value="off"> off</label>
+      </fieldset>
+      <fieldset><legend>Vision</legend>
+        <label class="checkbox"><input type="radio" name="visionMode" value="native"> native</label>
+        <label class="checkbox"><input type="radio" name="visionMode" value="proxy"> proxy</label>
+        <label class="checkbox"><input type="radio" name="visionMode" value="off"> off</label>
+      </fieldset>
+      <label for="field-thinking-mode">Default thinking mode</label>
+      <select id="field-thinking-mode">${thinkingModeOptions}</select>
+      <fieldset id="field-thinking-efforts"><legend>Thinking efforts</legend>${thinkingEffortChoices}</fieldset>
+      <p class="field-error" data-error-for="thinkingEfforts"></p>
+      <label for="field-max-input-tokens">Max input tokens</label>
+      <input id="field-max-input-tokens" type="number" min="1" step="1">
+      <p class="field-error" data-error-for="maxInputTokens"></p>
+      <label for="field-max-output-tokens">Max output tokens</label>
+      <input id="field-max-output-tokens" type="number" min="1" step="1">
+      <p class="field-error" data-error-for="maxOutputTokens"></p>
+      <div class="form-actions">
+        <button id="form-cancel" type="button">Cancel</button>
+        <button id="form-save" type="submit" class="primary">Save</button>
+      </div>
+    </form>
+  </section>
 </main>
 <script nonce="${nonce}">${CLIENT_SCRIPT}</script>
 </body>

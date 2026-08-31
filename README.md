@@ -69,6 +69,10 @@ Configuration is local per user under the `9router-copilot` namespace. Array ord
 
 Run `9router: Manage Models` to add, edit, delete, and reorder picker entries without editing `settings.json`. The panel lists every entry in `9router-copilot.models` in picker order.
 
+The panel has two pages. It opens on the configured model list, where `Add model` and each entry's `Edit` button navigate to the model form page; that page is titled `Add model` or `Edit model` and returns to the list through `← Back`, `Cancel`, or a successful save. A rejected save keeps the form open and shows the reason there so the values can be repaired. Deleting and reordering stay on the list page.
+
+Run `9router: Add Model` to reach the blank `Add model` form in one step. It opens the same panel and skips the list page; when the panel is already open, the command replaces whatever the form page holds with a blank draft.
+
 The panel lists available models from authenticated `GET /v1/models`, so it needs a stored API key and a reachable base URL. When that request fails, the panel does not open and the failure is reported as an error notification; `settings.json` remains the fallback for offline edits.
 
 Selecting a model from the 9router dropdown prefills the Copilot-facing `id` (sanitized from the catalog id, suffixed on collision), the display `name` (catalog id without its owner prefix), `modelId`, `visionMode` from `capabilities.vision`, `maxOutputTokens` from `capabilities.maxOutput`, and `maxInputTokens` from `capabilities.contextWindow` minus that output budget. `toolMode` defaults to `auto`; the catalog carries no thinking metadata, so `thinkingMode` and `thinkingEfforts` stay unset. Every prefilled value stays editable before saving.

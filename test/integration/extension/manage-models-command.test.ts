@@ -57,3 +57,36 @@ describe('9routerCopilot.manageModels', () => {
     expect(__getErrorMessages().at(-1)).toContain('9router API key is not configured');
   });
 });
+
+describe('9routerCopilot.addModel', () => {
+  beforeEach(() => {
+    __resetVscodeState();
+    __setConfigurationDefaults({ models: [] });
+    __setConfigurationValues({ models: [] });
+  });
+
+  it('runs the opener straight into the form view', async () => {
+    const requests: unknown[] = [];
+    registerCommands(createContext(), {
+      manageModels: async (_token, options) => {
+        requests.push(options);
+      }
+    });
+
+    await __getCommandHandler('9routerCopilot.addModel')?.();
+
+    expect(requests).toEqual([{ initialView: 'form' }]);
+  });
+
+  it('surfaces opener failures as error messages', async () => {
+    registerCommands(createContext(), {
+      manageModels: async () => {
+        throw new NineRouterError('UPSTREAM_UNAVAILABLE', 'catalog down');
+      }
+    });
+
+    await __getCommandHandler('9routerCopilot.addModel')?.();
+
+    expect(__getErrorMessages().at(-1)).toContain('catalog down');
+  });
+});

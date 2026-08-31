@@ -68,3 +68,37 @@ describe('client script behaviour', () => {
     expect(html).not.toContain('function renderCatalogOptions() {}');
   });
 });
+
+describe('two-page navigation', () => {
+  const html = renderModelEditorHtml('abc123');
+
+  it('splits the panel into a list view and a form view', () => {
+    expect(html).toContain('id="view-list"');
+    expect(html).toContain('id="view-form"');
+  });
+
+  it('opens on the list view with the form view hidden', () => {
+    expect(html).toMatch(/id="view-form"[^>]*hidden/);
+    expect(html).not.toMatch(/id="view-list"[^>]*hidden/);
+  });
+
+  it('gives each view its own error host', () => {
+    expect(html).toContain('id="list-error"');
+    expect(html).toContain('id="form-error"');
+  });
+
+  it('offers a back control on the form view', () => {
+    expect(html).toContain('id="form-back"');
+  });
+
+  it('switches views from the client script', () => {
+    expect(html).toContain('function showView(');
+    expect(html).toContain("showView('list')");
+    expect(html).toContain("showView('form')");
+  });
+
+  it('opens a blank add form when the host asks for the form view', () => {
+    expect(html).toContain("message.type === 'showForm'");
+    expect(html).toContain('openForm();');
+  });
+});

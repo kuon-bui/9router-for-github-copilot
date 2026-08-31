@@ -22,6 +22,15 @@ describe('release guardrails', () => {
     });
   });
 
+  it('contributes the add model command', () => {
+    const commands = manifest.contributes.commands as Array<{ command: string; title: string }>;
+
+    expect(commands).toContainEqual({
+      command: '9routerCopilot.addModel',
+      title: '9router: Add Model'
+    });
+  });
+
   it('contributes one ordered dynamic model setting with a safe agent default', () => {
     const properties = manifest.contributes.configuration.properties as Record<string, unknown>;
     const models = properties['9router-copilot.models'] as {
