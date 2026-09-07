@@ -1,7 +1,8 @@
 import * as vscode from 'vscode';
 import { clearApiKey, setApiKey } from '@/config/secret-store';
 import { showDiagnostics, showSettingsSnapshotDiagnostics } from '@/debug/output-channel';
-import { NineRouterError } from '@/router/errors';
+import { redactBearerTokens } from '@/debug/redaction';
+import { NineRouterError, appendErrorDetail } from '@/router/errors';
 import { showUsagePanel } from './usage-panel';
 import type { SettingsSnapshot } from '@/config/settings';
 import type { VisionProxyConfigurator } from './vision-configuration';
@@ -39,6 +40,17 @@ async function runModelEditor(
   } finally {
     cancellation.dispose();
   }
+}
+
+// A non-router rejection reaching this command still carries the only description of what went
+// wrong, so it is surfaced instead of being flattened into a generic label.
+function describeConnectionFailure(error: unknown): string {
+  if (error instanceof NineRouterError) {
+    return error.message;
+  }
+
+  const detail = error instanceof Error ? redactBearerTokens(error.message) : '';
+  return appendErrorDetail('Unexpected connection error', detail);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -90,8 +102,7 @@ export function registerCommands(
         );
       } catch (error) {
         const requestId = error instanceof NineRouterError ? error.requestId : undefined;
-        const message =
-          error instanceof NineRouterError ? error.message : 'Unexpected connection error';
+        const message = describeConnectionFailure(error);
         await vscode.window.showErrorMessage(
           `9router connection failed: ${message}${requestId ? ` Request ID: ${requestId}.` : ''}`
         );

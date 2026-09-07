@@ -1,3 +1,4 @@
+import { redactBearerTokens } from '@/debug/redaction';
 import type { ExtensionError, ExtensionErrorCode } from '@/types/error';
 
 export class NineRouterError extends Error implements ExtensionError {
@@ -56,4 +57,80 @@ export function toNineRouterError(error: unknown, fallbackCode: ExtensionErrorCo
   }
 
   return new NineRouterError(fallbackCode, 'Unknown error');
+}
+
+// ponytail: 8 nodes covers undici's deepest observed chain (fetch -> aggregate -> socket -> TLS);
+// the bound only exists so a self-referential chain cannot spin.
+const MAX_CAUSE_NODES = 8;
+
+// A rejected `fetch` reports only "fetch failed"; the actionable reason (ECONNREFUSED, ENOTFOUND,
+// a TLS code, every address happy-eyeballs tried) lives on the cause chain, so it is walked
+// depth-first: each error, then an AggregateError's branches in order, then its own cause.
+function collectCauseChain(root: unknown): Error[] {
+  const collected: Error[] = [];
+  const seen = new Set<unknown>();
+
+  const visit = (value: unknown): void => {
+    if (!(value instanceof Error) || seen.has(value) || collected.length >= MAX_CAUSE_NODES) {
+      return;
+    }
+
+    seen.add(value);
+    collected.push(value);
+
+    if (value instanceof AggregateError && Array.isArray(value.errors)) {
+      for (const nested of value.errors as unknown[]) {
+        visit(nested);
+      }
+    }
+
+    visit(value.cause);
+  };
+
+  visit(root);
+  return collected;
+}
+
+// `code` is renamed so diagnostics never confuse the OS-level code with ExtensionErrorCode.
+const TRANSPORT_CAUSE_FIELDS = [
+  ['code', 'transportCode'],
+  ['syscall', 'syscall'],
+  ['address', 'address'],
+  ['hostname', 'hostname'],
+  ['port', 'port']
+] as const;
+
+// Node spreads system-error fields across the chain (an AggregateError carries none of its own),
+// so the first defined value wins for each field.
+function extractTransportCauseFields(causes: Error[]): Record<string, unknown> {
+  const fields: Record<string, unknown> = {};
+
+  for (const cause of causes) {
+    const source = cause as unknown as Record<string, unknown>;
+    for (const [sourceKey, targetKey] of TRANSPORT_CAUSE_FIELDS) {
+      const value = source[sourceKey];
+      const usable = typeof value === 'string' ? value.length > 0 : typeof value === 'number';
+      if (usable && fields[targetKey] === undefined) {
+        fields[targetKey] = value;
+      }
+    }
+  }
+
+  return fields;
+}
+
+export function toTransportError(error: Error): NineRouterError {
+  const causes = collectCauseChain(error.cause);
+  const baseMessage = redactBearerTokens(error.message);
+  const detail = causes
+    .map((cause) => redactBearerTokens(cause.message).trim())
+    .filter((message) => message.length > 0 && message !== baseMessage)
+    .join('; ');
+  const details = extractTransportCauseFields(causes);
+
+  return new NineRouterError(
+    'TRANSPORT_ERROR',
+    appendErrorDetail(baseMessage, detail),
+    Object.keys(details).length > 0 ? { details } : undefined
+  );
 }

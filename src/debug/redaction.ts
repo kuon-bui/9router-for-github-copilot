@@ -19,3 +19,11 @@ export function redactObject(input: Record<string, unknown>): Record<string, unk
     })
   );
 }
+
+// Transport failures can quote outbound request headers back at us (proxy and TLS errors do),
+// so any string headed for a user-visible message gets the credential stripped inline.
+const INLINE_AUTHORIZATION_PATTERN = /\bBearer\s+[^\s'"]+/gi;
+
+export function redactBearerTokens(value: string): string {
+  return value.replace(INLINE_AUTHORIZATION_PATTERN, 'Bearer [REDACTED]');
+}
