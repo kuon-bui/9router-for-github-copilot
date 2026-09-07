@@ -1,4 +1,4 @@
-import { NineRouterError, appendErrorDetail } from './errors';
+import { NineRouterError, appendErrorDetail, toTransportError } from './errors';
 import { parseRouterModels } from './model-catalog';
 import { parseRouterEventStream } from './sse-parser';
 import { parseRouterUsage } from './usage';
@@ -127,23 +127,7 @@ export function createRouterClient(deps: { fetch: typeof globalThis.fetch }): Ro
           yield event;
         }
       } catch (error) {
-        if (composite.didTimeout()) {
-          throw new NineRouterError('TIMEOUT_ERROR', '9router request timed out');
-        }
-
-        if (input.signal.aborted) {
-          throw new NineRouterError('CANCELLATION_ERROR', '9router request was cancelled');
-        }
-
-        if (error instanceof NineRouterError) {
-          throw error;
-        }
-
-        if (error instanceof Error) {
-          throw new NineRouterError('TRANSPORT_ERROR', error.message);
-        }
-
-        throw new NineRouterError('TRANSPORT_ERROR', 'Unknown transport error');
+        throw classifyRequestFailure(error, input.signal, composite.didTimeout());
       } finally {
         composite.cleanup();
       }
@@ -183,23 +167,7 @@ export function createRouterClient(deps: { fetch: typeof globalThis.fetch }): Ro
           throw createMalformedCatalogError(requestId);
         }
       } catch (error) {
-        if (composite.didTimeout()) {
-          throw new NineRouterError('TIMEOUT_ERROR', '9router request timed out');
-        }
-
-        if (input.signal.aborted) {
-          throw new NineRouterError('CANCELLATION_ERROR', '9router request was cancelled');
-        }
-
-        if (error instanceof NineRouterError) {
-          throw error;
-        }
-
-        if (error instanceof Error) {
-          throw new NineRouterError('TRANSPORT_ERROR', error.message);
-        }
-
-        throw new NineRouterError('TRANSPORT_ERROR', 'Unknown transport error');
+        throw classifyRequestFailure(error, input.signal, composite.didTimeout());
       } finally {
         composite.cleanup();
       }
@@ -239,28 +207,38 @@ export function createRouterClient(deps: { fetch: typeof globalThis.fetch }): Ro
           throw createMalformedUsageError(requestId);
         }
       } catch (error) {
-        if (composite.didTimeout()) {
-          throw new NineRouterError('TIMEOUT_ERROR', '9router request timed out');
-        }
-
-        if (input.signal.aborted) {
-          throw new NineRouterError('CANCELLATION_ERROR', '9router request was cancelled');
-        }
-
-        if (error instanceof NineRouterError) {
-          throw error;
-        }
-
-        if (error instanceof Error) {
-          throw new NineRouterError('TRANSPORT_ERROR', error.message);
-        }
-
-        throw new NineRouterError('TRANSPORT_ERROR', 'Unknown transport error');
+        throw classifyRequestFailure(error, input.signal, composite.didTimeout());
       } finally {
         composite.cleanup();
       }
     }
   };
+}
+
+// Timeout and caller cancellation are indistinguishable from a transport failure once the
+// composite signal fires, so they are classified before the cause chain is inspected.
+function classifyRequestFailure(
+  error: unknown,
+  signal: AbortSignal,
+  didTimeout: boolean
+): NineRouterError {
+  if (didTimeout) {
+    return new NineRouterError('TIMEOUT_ERROR', '9router request timed out');
+  }
+
+  if (signal.aborted) {
+    return new NineRouterError('CANCELLATION_ERROR', '9router request was cancelled');
+  }
+
+  if (error instanceof NineRouterError) {
+    return error;
+  }
+
+  if (!(error instanceof Error)) {
+    return new NineRouterError('TRANSPORT_ERROR', 'Unknown transport error');
+  }
+
+  return toTransportError(error);
 }
 
 async function readResponsePrefix(response: ResponseBodySource): Promise<string> {

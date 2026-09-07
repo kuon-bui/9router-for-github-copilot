@@ -193,6 +193,60 @@ describe('9routerCopilot.showDiagnostics', () => {
     expect(__getInformationMessages()).toEqual([]);
   });
 
+  it('reports the exact transport reason for a failed connection test', async () => {
+    registerCommands(
+      {
+        subscriptions: [],
+        extensionUri: Uri.file('/ext'),
+        secrets: {
+          get: async () => undefined,
+          store: async () => undefined,
+          delete: async () => undefined
+        }
+      } as never,
+      {
+        testConnection: async () => {
+          throw new NineRouterError(
+            'TRANSPORT_ERROR',
+            'fetch failed: connect ECONNREFUSED 127.0.0.1:20128',
+            { details: { transportCode: 'ECONNREFUSED' } }
+          );
+        }
+      }
+    );
+
+    await __getCommandHandler('9routerCopilot.testConnection')?.();
+
+    expect(__getErrorMessages()).toEqual([
+      '9router connection failed: fetch failed: connect ECONNREFUSED 127.0.0.1:20128'
+    ]);
+  });
+
+  it('reports the message of an unexpected non-router connection error', async () => {
+    registerCommands(
+      {
+        subscriptions: [],
+        extensionUri: Uri.file('/ext'),
+        secrets: {
+          get: async () => undefined,
+          store: async () => undefined,
+          delete: async () => undefined
+        }
+      } as never,
+      {
+        testConnection: async () => {
+          throw new TypeError('fetch failed');
+        }
+      }
+    );
+
+    await __getCommandHandler('9routerCopilot.testConnection')?.();
+
+    expect(__getErrorMessages()).toEqual([
+      '9router connection failed: Unexpected connection error: fetch failed'
+    ]);
+  });
+
   it('opens a connection-card usage webview panel without a notification', async () => {
     const showUsage = vi.fn(async () => ({
       count: 2,

@@ -657,6 +657,187 @@ describe('createRouterClient', () => {
     ).rejects.toMatchObject({ code: 'CANCELLATION_ERROR' });
   });
 
+  it('surfaces the underlying connect failure when discovery fetch rejects', async () => {
+    const client = createRouterClient({
+      fetch: vi.fn().mockRejectedValue(
+        new TypeError('fetch failed', {
+          cause: Object.assign(new Error('connect ECONNREFUSED 127.0.0.1:20128'), {
+            code: 'ECONNREFUSED',
+            syscall: 'connect',
+            address: '127.0.0.1',
+            port: 20128
+          })
+        })
+      ) as never
+    });
+
+    await expect(
+      client.listModels({
+        baseUrl: 'http://127.0.0.1:20128',
+        apiKey: 'secret-token',
+        timeoutMs: 1000,
+        signal: new AbortController().signal
+      })
+    ).rejects.toMatchObject({
+      code: 'TRANSPORT_ERROR',
+      message: 'fetch failed: connect ECONNREFUSED 127.0.0.1:20128',
+      details: {
+        transportCode: 'ECONNREFUSED',
+        syscall: 'connect',
+        address: '127.0.0.1',
+        port: 20128
+      }
+    });
+  });
+
+  it('surfaces the underlying connect failure when a streaming fetch rejects', async () => {
+    const client = createRouterClient({
+      fetch: vi.fn().mockRejectedValue(
+        new TypeError('fetch failed', {
+          cause: Object.assign(new Error('getaddrinfo ENOTFOUND router.invalid'), {
+            code: 'ENOTFOUND',
+            syscall: 'getaddrinfo',
+            hostname: 'router.invalid'
+          })
+        })
+      ) as never
+    });
+
+    const consume = async (): Promise<void> => {
+      for await (const event of client.streamResponse({
+        baseUrl: 'https://router.invalid',
+        apiKey: 'secret-token',
+        request: { model: 'combo/daily', input: [], stream: true, store: false },
+        timeoutMs: 1000,
+        signal: new AbortController().signal
+      })) {
+        void event;
+      }
+    };
+
+    await expect(consume()).rejects.toMatchObject({
+      code: 'TRANSPORT_ERROR',
+      message: 'fetch failed: getaddrinfo ENOTFOUND router.invalid',
+      details: {
+        transportCode: 'ENOTFOUND',
+        syscall: 'getaddrinfo',
+        hostname: 'router.invalid'
+      }
+    });
+  });
+
+  it('lists every attempted address when the cause is an AggregateError', async () => {
+    const client = createRouterClient({
+      fetch: vi.fn().mockRejectedValue(
+        new TypeError('fetch failed', {
+          cause: new AggregateError(
+            [
+              Object.assign(new Error('connect ECONNREFUSED ::1:20128'), {
+                code: 'ECONNREFUSED',
+                syscall: 'connect',
+                address: '::1',
+                port: 20128
+              }),
+              Object.assign(new Error('connect ECONNREFUSED 127.0.0.1:20128'), {
+                code: 'ECONNREFUSED',
+                syscall: 'connect',
+                address: '127.0.0.1',
+                port: 20128
+              })
+            ],
+            ''
+          )
+        })
+      ) as never
+    });
+
+    await expect(
+      client.listModels({
+        baseUrl: 'http://localhost:20128',
+        apiKey: 'secret-token',
+        timeoutMs: 1000,
+        signal: new AbortController().signal
+      })
+    ).rejects.toMatchObject({
+      code: 'TRANSPORT_ERROR',
+      message:
+        'fetch failed: connect ECONNREFUSED ::1:20128; connect ECONNREFUSED 127.0.0.1:20128',
+      details: { transportCode: 'ECONNREFUSED' }
+    });
+  });
+
+  it('follows a nested cause chain down to the system error', async () => {
+    const client = createRouterClient({
+      fetch: vi.fn().mockRejectedValue(
+        new TypeError('fetch failed', {
+          cause: new Error('Client network socket disconnected before secure TLS connection', {
+            cause: Object.assign(new Error('self-signed certificate'), {
+              code: 'DEPTH_ZERO_SELF_SIGNED_CERT'
+            })
+          })
+        })
+      ) as never
+    });
+
+    await expect(
+      client.listModels({
+        baseUrl: 'https://router.example.com',
+        apiKey: 'secret-token',
+        timeoutMs: 1000,
+        signal: new AbortController().signal
+      })
+    ).rejects.toMatchObject({
+      code: 'TRANSPORT_ERROR',
+      message:
+        'fetch failed: Client network socket disconnected before secure TLS connection; self-signed certificate',
+      details: { transportCode: 'DEPTH_ZERO_SELF_SIGNED_CERT' }
+    });
+  });
+
+  it('keeps a causeless rejection message unchanged', async () => {
+    const client = createRouterClient({
+      fetch: vi.fn().mockRejectedValue(new Error('socket hang up')) as never
+    });
+
+    const error = (await client
+      .listModels({
+        baseUrl: 'https://router.example.com',
+        apiKey: 'secret-token',
+        timeoutMs: 1000,
+        signal: new AbortController().signal
+      })
+      .catch((caught: unknown) => caught)) as {
+      code: string;
+      message: string;
+      details?: Record<string, unknown>;
+    };
+
+    expect(error.code).toBe('TRANSPORT_ERROR');
+    expect(error.message).toBe('socket hang up');
+    expect(error.details).toBeUndefined();
+  });
+
+  it('never echoes the bearer token from a transport cause', async () => {
+    const client = createRouterClient({
+      fetch: vi.fn().mockRejectedValue(
+        new TypeError('fetch failed', {
+          cause: new Error('proxy rejected Bearer secret-token')
+        })
+      ) as never
+    });
+
+    const error = (await client
+      .listModels({
+        baseUrl: 'https://router.example.com',
+        apiKey: 'secret-token',
+        timeoutMs: 1000,
+        signal: new AbortController().signal
+      })
+      .catch((caught: unknown) => caught)) as { message: string };
+
+    expect(error.message).not.toContain('secret-token');
+  });
+
   it('preserves caller cancellation after the timeout deadline passes', async () => {
     vi.useFakeTimers();
 
