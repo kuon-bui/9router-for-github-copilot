@@ -44,6 +44,6 @@ export function registerUsageChatParticipant(
     }
   );
 
-  participant.iconPath = new vscode.ThemeIcon('dashboard');
+  participant.iconPath = vscode.Uri.joinPath(context.extensionUri, 'media', 'icon.png');
   context.subscriptions.push(participant);
 }

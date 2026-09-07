@@ -1,8 +1,35 @@
+import { cp } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import tailwindcss from '@tailwindcss/vite';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+
+/**
+ * Copies a panel's `index.html` shell next to its bundle.
+ *
+ * The shell is not in the module graph, so Vite neither emits it nor rebuilds on it, and
+ * `emptyOutDir` deletes anything staged before the build. Copying from `writeBundle` runs
+ * after the out dir is emptied and the bundle is written, so production and watch restore
+ * the shell through the exact same step; `addWatchFile` covers edits to the shell itself.
+ */
+export function webviewShellPlugin(view) {
+  const shell = resolve(root, `src/webview/${view}/index.html`);
+  let outDir;
+
+  return {
+    name: '9router-webview-shell',
+    configResolved(config) {
+      outDir = config.build.outDir;
+    },
+    buildStart() {
+      this.addWatchFile(shell);
+    },
+    async writeBundle() {
+      await cp(shell, resolve(root, outDir, 'index.html'));
+    }
+  };
+}
 
 /** Prints the markers `.vscode/tasks.json` gates the F5 launch on. */
 export function watchMarkerPlugin(counter) {
@@ -145,7 +172,7 @@ export function createWebviewConfig(view, { watch = false, counter, plugins = []
     configFile: false,
     logLevel: 'info',
     define: { 'process.env.NODE_ENV': JSON.stringify(watch ? 'development' : 'production') },
-    plugins: [...plugins, ...(counter ? [watchMarkerPlugin(counter)] : [])],
+    plugins: [...plugins, webviewShellPlugin(view), ...(counter ? [watchMarkerPlugin(counter)] : [])],
     resolve: {
       alias: {
         '@': resolve(root, 'src'),
