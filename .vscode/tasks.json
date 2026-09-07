@@ -20,8 +20,8 @@
         },
         "background": {
           "activeOnStart": true,
-          "beginsPattern": "^\\[watch\\] build started",
-          "endsPattern": "^\\[watch\\] build finished"
+          "beginsPattern": "^\\[watch(?: [^\\]]+)?\\] build started",
+          "endsPattern": "^\\[watch(?: [^\\]]+)?\\] build finished"
         }
       },
       "presentation": {
