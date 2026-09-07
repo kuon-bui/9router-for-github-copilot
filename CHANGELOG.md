@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.12.0](https://github.com/kuon-bui/9router-for-github-copilot/compare/v0.11.2...v0.12.0) (2026-09-07)
+
+
+### Features
+
+* **build webview:** Extract webviews to Vite-built Preact panels ([#49](https://github.com/kuon-bui/9router-for-github-copilot/issues/49)) ([953a7e9](https://github.com/kuon-bui/9router-for-github-copilot/commit/953a7e9e4e580880e961d5eca429d43929ab0eef))
+* **model:** Add model manager panel and related features ([#46](https://github.com/kuon-bui/9router-for-github-copilot/issues/46)) ([24999ea](https://github.com/kuon-bui/9router-for-github-copilot/commit/24999ea8901e368b56866ad25b839b292678bab4))
+* show error test connection ([#51](https://github.com/kuon-bui/9router-for-github-copilot/issues/51)) ([002e82b](https://github.com/kuon-bui/9router-for-github-copilot/commit/002e82b85307aab60b881d5f5e9d30942966f585))
+* **webview:** implement webview shell copying and testing ([#52](https://github.com/kuon-bui/9router-for-github-copilot/issues/52)) ([a244b80](https://github.com/kuon-bui/9router-for-github-copilot/commit/a244b801dbeb1de676717a0d317852da78e11a8f))
+
 ## [0.11.2](https://github.com/kuon-bui/9router-for-github-copilot/compare/v0.11.1...v0.11.2) (2026-08-30)
 
 
