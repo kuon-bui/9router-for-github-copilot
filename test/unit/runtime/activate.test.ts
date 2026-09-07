@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { activateExtension, deactivateExtension } from '@/runtime/activate';
-import { __resetVscodeState } from '@test/support/vscode';
+import { Uri, __resetVscodeState } from '@test/support/vscode';
 import type { NineRouterChatProvider } from '@/provider/provider';
 import type { VisionProxyConfigurator } from '@/runtime/vision-configuration';
 
@@ -16,7 +16,8 @@ describe('activateExtension', () => {
   it('passes one shared vision configurator to both provider and command wiring', async () => {
     const context = {
       secrets: { get: async () => undefined },
-      subscriptions: []
+      subscriptions: [],
+      extensionUri: Uri.file('/ext')
     } as never;
 
     let providerConfigurator: VisionProxyConfigurator | undefined;
