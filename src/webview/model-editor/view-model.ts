@@ -15,6 +15,7 @@ export interface ChipView {
 export interface ModelRowView {
   readonly sourceIndex: number;
   readonly valid: boolean;
+  readonly catalogMissing: boolean;
   readonly title: string;
   readonly idLabel: string;
   readonly chips: readonly ChipView[];
@@ -35,6 +36,7 @@ export function buildModelListView(state: ModelEditorState): ModelRowView[] {
   return state.models.map((row) => ({
     sourceIndex: row.sourceIndex,
     valid: row.valid,
+    catalogMissing: row.catalogStatus === 'missing',
     title: row.name ?? row.id ?? 'Unnamed model',
     idLabel: `${row.id ?? '(no id)'} -> ${row.modelId ?? '(no modelId)'}`,
     chips: buildChips(row)
