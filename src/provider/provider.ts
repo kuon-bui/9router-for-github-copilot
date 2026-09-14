@@ -26,6 +26,7 @@ import type { VisionProxyConfigurator } from '@/runtime/vision-configuration';
 
 interface NineRouterChatProviderOptions {
   configureVisionProxy?: VisionProxyConfigurator;
+  defaultVisionProxyPrompt?: string;
 }
 
 interface ModelCatalogCache {
@@ -152,7 +153,10 @@ export class NineRouterChatProvider
   }
 
   public refresh(): void {
-    this.snapshot = buildSettingsSnapshot(getExtensionConfiguration());
+    this.snapshot = buildSettingsSnapshot(
+      getExtensionConfiguration(),
+      this.options.defaultVisionProxyPrompt
+    );
     this.snapshotVersion += 1;
     this.onDidChangeEmitter.fire();
   }

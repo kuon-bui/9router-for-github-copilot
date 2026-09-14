@@ -4,6 +4,7 @@ import {
   getExtensionConfiguration,
   loadRuntimeSettings
 } from '@/config/settings';
+import { readDefaultVisionProxyPrompt } from '@/config/vision-proxy-prompt';
 import { disposeOutputChannel } from '@/debug/output-channel';
 import { createRouterClient } from '@/router/client';
 import { NineRouterChatProvider } from '@/provider/provider';
@@ -25,9 +26,13 @@ interface ActivationHooks {
     context: Pick<vscode.ExtensionContext, 'secrets'>,
     routerClient: RouterClient,
     snapshot: SettingsSnapshot,
-    options: { configureVisionProxy: VisionProxyConfigurator }
+    options: {
+      configureVisionProxy: VisionProxyConfigurator;
+      defaultVisionProxyPrompt: string;
+    }
   ) => NineRouterChatProvider;
   registerCommands?: typeof registerCommands;
+  readDefaultVisionProxyPrompt?: typeof readDefaultVisionProxyPrompt;
 }
 
 export async function activateExtension(
@@ -39,26 +44,31 @@ export async function activateExtension(
     ((providerContext, routerClient, snapshot, options) =>
       new NineRouterChatProvider(providerContext, routerClient, snapshot, options));
   const registerRuntimeCommands = hooks.registerCommands ?? registerCommands;
+  const defaultVisionProxyPrompt = await (
+    hooks.readDefaultVisionProxyPrompt ?? readDefaultVisionProxyPrompt
+  )(context.extensionPath);
 
   const routerClient = createRouterClient({ fetch: globalThis.fetch });
   const configureVisionProxy = createVisionProxyConfigurator({
     secrets: context.secrets,
     routerClient,
-    getRuntimeSettings: () => loadRuntimeSettings(getExtensionConfiguration())
+    getRuntimeSettings: () =>
+      loadRuntimeSettings(getExtensionConfiguration(), defaultVisionProxyPrompt)
   });
 
   const manageModels = createModelEditorOpener({
     secrets: context.secrets,
     routerClient,
     extensionUri: context.extensionUri,
-    getRuntimeSettings: () => loadRuntimeSettings(getExtensionConfiguration())
+    getRuntimeSettings: () =>
+      loadRuntimeSettings(getExtensionConfiguration(), defaultVisionProxyPrompt)
   });
 
   provider = createProvider(
     context,
     routerClient,
-    buildSettingsSnapshot(getExtensionConfiguration()),
-    { configureVisionProxy }
+    buildSettingsSnapshot(getExtensionConfiguration(), defaultVisionProxyPrompt),
+    { configureVisionProxy, defaultVisionProxyPrompt }
   );
   const testConnection = createConnectionTester({
     secrets: context.secrets,
@@ -84,7 +94,9 @@ export async function activateExtension(
   context.subscriptions.push(
     vscode.workspace.onDidChangeConfiguration((event) =>
       handleConfigurationChange(event, () => {
-        provider?.refreshFromSnapshot(buildSettingsSnapshot(getExtensionConfiguration()));
+        provider?.refreshFromSnapshot(
+          buildSettingsSnapshot(getExtensionConfiguration(), defaultVisionProxyPrompt)
+        );
       })
     )
   );

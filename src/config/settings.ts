@@ -6,7 +6,6 @@ import {
   DEFAULT_MODELS,
   DEFAULT_REQUEST_TIMEOUT_MS,
   DEFAULT_VISION_PROXY_MODEL_ID,
-  DEFAULT_VISION_PROXY_PROMPT,
   DEFAULT_VISION_PROXY_SOURCE
 } from './defaults';
 import { parseModelSettings } from './model-settings';
@@ -109,7 +108,8 @@ export function isVisionProxyConfigured(runtime: RuntimeSettings): boolean {
 }
 
 export function loadRuntimeSettings(
-  configuration: Pick<vscode.WorkspaceConfiguration, 'get'>
+  configuration: Pick<vscode.WorkspaceConfiguration, 'get'>,
+  defaultVisionProxyPrompt = ''
 ): RuntimeSettings {
   const baseUrl = normalizeBaseUrl(configuration.get<string>('baseUrl') ?? DEFAULT_BASE_URL);
   const maxTokens = normalizeMaxTokens(
@@ -127,7 +127,7 @@ export function loadRuntimeSettings(
     visionProxyModelId
   );
   const visionProxyPrompt =
-    configuration.get<string>('visionProxyPrompt')?.trim() ?? DEFAULT_VISION_PROXY_PROMPT;
+    configuration.get<string>('visionProxyPrompt')?.trim() ?? defaultVisionProxyPrompt;
 
   return {
     baseUrl,
@@ -145,14 +145,15 @@ export function getExtensionConfiguration(): vscode.WorkspaceConfiguration {
 }
 
 export function buildSettingsSnapshot(
-  configuration: Pick<vscode.WorkspaceConfiguration, 'get'>
+  configuration: Pick<vscode.WorkspaceConfiguration, 'get'>,
+  defaultVisionProxyPrompt = ''
 ): SettingsSnapshot {
   const rawModels = configuration.get<unknown>('models');
   const parsedModels = parseModelSettings(
     rawModels === undefined ? DEFAULT_MODELS : rawModels
   );
   const issues: SettingsIssue[] = [...parsedModels.issues];
-  const runtime = validateRuntimeSettings(configuration, issues);
+  const runtime = validateRuntimeSettings(configuration, issues, defaultVisionProxyPrompt);
   const hasProxyModel = parsedModels.models.some((model) => model.visionMode === 'proxy');
   const configuredVisionProxySource = configuration.get<unknown>('visionProxySource');
 
@@ -233,9 +234,10 @@ export function buildSettingsSnapshot(
 
 function validateRuntimeSettings(
   configuration: Pick<vscode.WorkspaceConfiguration, 'get'>,
-  issues: SettingsIssue[]
+  issues: SettingsIssue[],
+  defaultVisionProxyPrompt: string
 ): RuntimeSettings | undefined {
-  const runtime = loadRuntimeSettings(configuration);
+  const runtime = loadRuntimeSettings(configuration, defaultVisionProxyPrompt);
   const baseUrlInput = configuration.get<string>('baseUrl') ?? DEFAULT_BASE_URL;
   const baseUrl = baseUrlInput.trim().length > 0 ? runtime.baseUrl : '';
 

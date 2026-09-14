@@ -10,7 +10,7 @@ import { __createCancellationToken } from '@test/support/vscode';
 const createSnapshot = (models: unknown[], values: Record<string, unknown> = {}) =>
   buildSettingsSnapshot({
     get: (key: string) => (key === 'models' ? models : values[key])
-  } as never);
+  } as never, 'Default Vision prompt.');
 
 describe('handleConfigurationChange', () => {
   beforeEach(() => {

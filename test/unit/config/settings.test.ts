@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_VISION_PROXY_PROMPT } from '@/config/defaults';
 import {
   buildSettingsSnapshot,
   isUsableRuntimeSettings,
@@ -23,11 +22,11 @@ describe('runtime settings', () => {
   });
 
   it('loads default Vision prompt with no selected source', () => {
-    const runtime = loadRuntimeSettings(configuration({}));
+    const runtime = loadRuntimeSettings(configuration({}), 'Default Vision prompt.');
 
     expect(runtime.visionProxySource).toBeUndefined();
     expect(runtime.visionProxyModelId).toBe('');
-    expect(runtime.visionProxyPrompt).toBe(DEFAULT_VISION_PROXY_PROMPT);
+    expect(runtime.visionProxyPrompt).toBe('Default Vision prompt.');
     expect(isVisionProxyConfigured(runtime)).toBe(false);
   });
 
@@ -279,7 +278,8 @@ describe('buildSettingsSnapshot', () => {
             visionMode: 'proxy'
           }
         ]
-      })
+      }),
+      'Default Vision prompt.'
     );
 
     expect(snapshot.state).toBe('degraded');

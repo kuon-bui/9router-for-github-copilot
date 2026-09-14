@@ -596,6 +596,7 @@ describe('NineRouterChatProvider', () => {
         }
       ],
       visionProxyModelId: 'combo/vision',
+      visionProxyPrompt: 'Describe image.',
       baseUrl: 'https://router.example.com/v1',
       maxTokens: 128,
       requestTimeoutMs: 5000,
@@ -1094,6 +1095,7 @@ describe('NineRouterChatProvider', () => {
         }
       ],
       visionProxyModelId: 'router/vision',
+      visionProxyPrompt: 'Describe image.',
       baseUrl: 'https://router.example.com/v1',
       maxTokens: 0,
       requestTimeoutMs: 5_000,
@@ -1155,6 +1157,7 @@ describe('NineRouterChatProvider', () => {
         }
       ],
       visionProxyModelId: 'combo/vision',
+      visionProxyPrompt: 'Describe image.',
       baseUrl: 'https://router.example.com/v1',
       maxTokens: 128,
       requestTimeoutMs: 5000,
@@ -1206,6 +1209,7 @@ describe('NineRouterChatProvider', () => {
         }
       ],
       visionProxySource: '9router',
+      visionProxyPrompt: 'Describe image.',
       baseUrl: 'https://router.example.com/v1',
       maxTokens: 128,
       requestTimeoutMs: 5000,
@@ -1259,6 +1263,7 @@ describe('NineRouterChatProvider', () => {
         }
       ],
       visionProxyModelId: 'combo/vision',
+      visionProxyPrompt: 'Describe image.',
       baseUrl: 'https://router.example.com/v1',
       maxTokens: 128,
       requestTimeoutMs: 5000,
@@ -1326,6 +1331,7 @@ describe('NineRouterChatProvider', () => {
         }
       ],
       visionProxyModelId: 'combo/vision',
+      visionProxyPrompt: 'Describe image.',
       baseUrl: 'https://router.example.com/v1',
       maxTokens: 128,
       requestTimeoutMs: 5000,
