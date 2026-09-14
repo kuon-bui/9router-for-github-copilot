@@ -113,6 +113,9 @@ describe('release guardrails', () => {
       type: 'string',
       minLength: 1
     });
+    expect(
+      (properties['9router-copilot.visionProxyPrompt'] as { default?: unknown }).default
+    ).toBeUndefined();
     expect(manifest.contributes.commands).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ command: '9routerCopilot.testConnection' }),
@@ -231,6 +234,15 @@ describe('release guardrails', () => {
     const license = await readFile(resolve(process.cwd(), 'LICENSE'), 'utf8');
     expect(manifest.license).toBe('MIT');
     expect(license).toContain('MIT License');
+  });
+
+  it('ships the default Vision proxy prompt as Markdown', async () => {
+    const promptPath = resolve(process.cwd(), 'prompts','vision', 'default-vision-proxy-prompt.md');
+
+    await expect(access(promptPath, constants.R_OK)).resolves.toBeUndefined();
+    await expect(readFile(promptPath, 'utf8')).resolves.toMatch(
+      /^Text extraction is mandatory\./
+    );
   });
 
   it('keeps source, tests, and internal docs out of the packaged VSIX', async () => {

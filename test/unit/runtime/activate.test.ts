@@ -30,6 +30,7 @@ describe('activateExtension', () => {
     } as unknown as NineRouterChatProvider;
 
     await activateExtension(context, {
+      readDefaultVisionProxyPrompt: async () => 'Default Vision prompt.',
       createProvider: (_context, _routerClient, _snapshot, options) => {
         providerConfigurator = options.configureVisionProxy;
         return providerStub;

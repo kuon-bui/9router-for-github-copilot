@@ -81,6 +81,7 @@ describe('NineRouterChatProvider cancellation flow', () => {
         }
       ],
       visionProxyModelId: 'combo/vision',
+      visionProxyPrompt: 'Describe image.',
       baseUrl: 'https://router.example.com/v1',
       maxTokens: 128,
       requestTimeoutMs: 5000,
