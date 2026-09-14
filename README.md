@@ -1,193 +1,227 @@
-# 9router Copilot Chat Provider
+<p align="center">
+  <img src="./media/icon.png" alt="9router" width="96" height="96">
+</p>
 
-Expose `9router` as a custom provider inside GitHub Copilot Chat while preserving the native VS Code model picker, tools, Thinking Effort, Vision input, streaming, and Context Window experience.
+<h1 align="center">9router for GitHub Copilot Chat</h1>
 
-The extension is a thin adapter. Users publish an ordered set of user-defined curated models, while `9router` remains responsible for routing, fallback, quotas, and upstream execution.
+<p align="center">
+  <strong>Your models. Your workflow. Native Copilot Chat.</strong><br>
+  Use 9router models inside GitHub Copilot Chat without switching windows.
+</p>
 
-## Status
+<p align="center">
+  <a href="#quick-start">Quick start</a>
+  &nbsp;·&nbsp;
+  <a href="#feature-highlights">Features</a>
+  &nbsp;·&nbsp;
+  <a href="#everyday-commands">Commands</a>
+  &nbsp;·&nbsp;
+  <a href="#troubleshooting">Troubleshooting</a>
+</p>
 
-- Package version: `0.1.0`
-- License: [MIT](./LICENSE)
-- Runtime target: VS Code `^1.125.0`
-- Backend contract: OpenAI-compatible `9router` `/v1/responses`
+<p align="center">
 
-## Installation
+![Manage and organize 9router models in VS Code](./media/images/model-manager.png)
 
-Build and install the local VSIX:
+</p>
+
+## Why use it?
+
+`9router` brings more model choice to Copilot Chat without adding another chat window or changing how you work in VS Code.
+
+| Feature | What you get |
+| --- | --- |
+| **Stay in Copilot Chat** | Native chat, model picker, tools, and workspace context |
+| **Your model lineup** | Add only the models you want, rename them, and set the order |
+| **Thinking Effort** | Switch reasoning depth from chat when a model supports it |
+| **Vision** | Send screenshots and diagrams natively or through a Vision proxy |
+| **Agent tools** | Let compatible models use Copilot tools and project context |
+| **Fast Tier** | Request faster service on supported models; look for the `⚡` badge |
+| **Usage dashboard** | See remaining quota and reset times at a glance |
+| **Private credentials** | Store your API key in VS Code SecretStorage |
+
+## Quick start
+
+**You need:** VS Code `1.133.0` or newer, GitHub Copilot Chat, a running 9router service, and a valid 9router API key.
+
+### 1. Install
+
+Install **9router Copilot Chat Provider** from the VS Code Extensions view, or download a VSIX from the project releases and choose **Extensions: Install from VSIX...**.
+
+<details>
+<summary>Prefer to build from source?</summary>
+
+To build the VSIX from source, clone this repository, then run:
 
 ```bash
+pnpm install
 pnpm run package
-code --install-extension 9router-copilot-chat-provider-0.1.0.vsix
+code --install-extension 9router-copilot-chat-provider-0.12.0.vsix
 ```
 
-Reload VS Code if the provider does not immediately appear in Copilot Chat.
+</details>
 
-## API Key Setup
+Reload VS Code if `9router` does not appear in the Copilot Chat model picker.
 
-Run `9router: Set API Key` from the Command Palette. The key is stored only in VS Code `SecretStorage`. Run `9router: Clear API Key` to remove it.
+### 2. Connect to 9router
 
-Run `9router: Test Connection` to validate the current base URL and API key through authenticated `GET /v1/models`. The result reports latency, available model count, and missing configured model mappings without exposing credentials.
+Open the Command Palette and run:
 
-Run `9router: Show Usage` or chat `@9router /usage` to fetch authenticated `GET /tools/usage`. Both paths open a two-column connection-card usage dashboard (VS Code does not support a free-form HTML modal overlay) with remaining-quota meters and reset timers per connection. The command opens the dashboard in the active editor; `@9router /usage` opens it beside the current editor, leaves a short confirmation in chat, and does not dump quota details into the thread or keep `@9router` sticky for follow-up messages.
+1. `9router: Set API Key`
+2. `9router: Test Connection`
 
-Provider logos in the usage dashboard load from the official Lobe Icons SVG package through `unpkg.com` using the `@latest` CDN tag. If a provider is not mapped, its initial is shown instead.
+The connection check confirms that 9router is reachable and reports available models without exposing your API key.
 
-Run `9router: Toggle Model Fast Tier` to select a curated model and add or remove its `serviceTier: "fast"` setting.
-Fast-tier models appear in the picker as `⚡ Name`.
+### 3. Add models
 
-Never put API keys in `settings.json`, `.env`, logs, or documentation.
+Run `9router: Manage Models`, then select **Add model**. Choose a model from 9router, customize its display name and capabilities, then save it.
 
-## Configuration
+Open GitHub Copilot Chat and choose the new model from the native model picker. No separate chat interface needed.
 
-Configuration is local per user under the `9router-copilot` namespace. Array order controls picker order; removing an object removes that model from the picker.
+## Feature highlights
 
-```json
-{
-  "9router-copilot.baseUrl": "http://127.0.0.1:3456/v1",
-  "9router-copilot.models": [
-    {
-      "id": "agent",
-      "name": "Agent",
-      "modelId": "replace-with-existing-9router-model-id",
-      "serviceTier": "fast",
-      "toolMode": "auto",
-      "visionMode": "off",
-      "thinkingMode": "medium",
-      "thinkingEfforts": ["minimal", "low", "medium", "high"]
-    }
-  ],
-  "9router-copilot.visionProxySource": "9router",
-  "9router-copilot.visionProxyModelId": "provider/vision-model",
-  "9router-copilot.visionProxyPrompt": "Describe the supplied images faithfully for another language model. Include visible text, code, tables, diagrams, layout, and uncertainty. Do not answer the user request; provide only image context.",
-  "9router-copilot.maxTokens": 0,
-  "9router-copilot.requestTimeoutMs": 60000,
-  "9router-copilot.debugMode": "minimal"
-}
-```
+### Native Copilot experience
 
-### Manage models
+Models appear alongside other providers in GitHub Copilot Chat. Conversations keep native streaming, workspace context, tool calls, model selection, and cancellation behavior.
 
-Run `9router: Manage Models` to add, edit, delete, and reorder picker entries without editing `settings.json`. The panel lists every entry in `9router-copilot.models` in picker order.
+### Your model picker, your way
 
-The panel has two pages. It opens on the configured model list, where `Add model` and each entry's `Edit` button navigate to the model form page; that page is titled `Add model` or `Edit model` and returns to the list through `← Back`, `Cancel`, or a successful save. A rejected save keeps the form open and shows the reason there so the values can be repaired. Deleting and reordering stay on the list page.
+Create a focused list of models for coding, reasoning, image analysis, or everyday chat. Rename entries, reorder them, and remove models you no longer use. Broken entries stay visible in the manager so you can repair them without affecting valid models.
 
-Run `9router: Add Model` to reach the blank `Add model` form in one step. It opens the same panel and skips the list page; when the panel is already open, the command replaces whatever the form page holds with a blank draft.
+Use these commands:
 
-The panel lists available models from authenticated `GET /v1/models`, so it needs a stored API key and a reachable base URL. When that request fails, the panel does not open and the failure is reported as an error notification; `settings.json` remains the fallback for offline edits.
-
-Selecting a model from the 9router dropdown prefills the Copilot-facing `id` (sanitized from the catalog id, suffixed on collision), the display `name` (catalog id without its owner prefix), `modelId`, `visionMode` from `capabilities.vision`, `maxOutputTokens` from `capabilities.maxOutput`, and `maxInputTokens` from `capabilities.contextWindow` minus that output budget. `toolMode` defaults to `auto`; the catalog carries no thinking metadata, so `thinkingMode` and `thinkingEfforts` stay unset. Every prefilled value stays editable before saving.
-
-Entries rejected by validation stay listed with the rejection reason so they can be repaired instead of silently disappearing, and entries whose `modelId` is absent from the catalog are flagged. Adding, editing, deleting, and reordering write to User settings; deleting asks for confirmation first, while reordering applies immediately. A workspace value for `9router-copilot.models` overrides those writes, and the panel warns when one exists.
-
-### Breaking configuration change
-
-This release replaces the old fixed-model settings. They are not read or migrated. Recreate each desired picker entry manually as an object in `9router-copilot.models`.
-
-Existing model objects with a non-`off` `thinkingMode` must add that value to `thinkingEfforts`. Invalid or duplicate entries reject only that model.
-
-### Model fields
-
-- `id`: Stable Copilot-facing id matching `[a-z0-9][a-z0-9._-]*`.
-- `name`: Display name shown in the picker.
-- `modelId`: Opaque backend model id sent unchanged as the OpenAI-compatible `model` field. It must refer to an existing 9router model; an empty or invalid value leaves only that entry unpublished.
-- `serviceTier`: Optional `fast` value sent as the OpenAI-compatible `service_tier` field. Omit it to leave service tier selection to `9router`.
-- `toolMode`: `auto` exposes supported host tools; `off` disables tools.
-- `visionMode`: `native`, `proxy`, or `off`.
-- `thinkingMode`: Default Thinking Effort: `off`, `minimal`, `low`, `medium`, `high`, `xhigh`, or `max`.
-- `thinkingEfforts`: Ordered non-`off` picker choices: `minimal`, `low`, `medium`, `high`, `xhigh`, or `max`. Array order controls picker order after `None`. Missing or empty lists support only `off` and omit `configurationSchema`, hiding the picker. A non-`off` `thinkingMode` must appear in this list.
-- `maxInputTokens` and `maxOutputTokens`: Optional compatibility fallbacks for Context Window metadata. Normal operation reads total context size from `capabilities.contextWindow` and output budget from `capabilities.maxOutput` in authenticated `GET /v1/models` results.
-
-Unknown fields, duplicate ids, invalid values, and empty mappings are rejected per model. One broken entry does not hide unrelated valid entries. The default configuration contains one unpublished `agent` entry until its `modelId` is set.
-
-Before returning picker models, the provider attempts one authenticated `GET /v1/models` refresh. For an exact `modelId` match, `capabilities.contextWindow` is the total context size and `capabilities.maxOutput` is the output budget. The provider publishes `maxInputTokens = contextWindow - maxOutputTokens`; therefore, published input and output limits sum to `contextWindow` when the catalog values produce a positive input limit. `maxOutputTokens` falls back to the model object's compatibility value when catalog output metadata is missing. If total context is missing or does not exceed the resolved output limit, `maxInputTokens` falls back to its configured value. Built-in fallback for either configured field is `264000`. The latest successful catalog stays in RAM; a failed refresh keeps that cache.
-
-`9router-copilot.maxTokens` remains independent of Context Window metadata. Its default is `0`. A positive safe integer is sent as `max_output_tokens`; `0` or a malformed value omits `max_output_tokens`, applying no extension-level response limit. `9router` or an upstream provider may still enforce its own limit. Usage is read from terminal `response.completed` or `response.incomplete` events.
-
-`9router-copilot.requestTimeoutMs` defaults to `60000`. A positive value limits each HTTP request sent to `9router`; `0` disables extension-level timeouts. VS Code cancellation still stops active requests.
-
-### Tools
-
-Models default to `toolMode: "off"`; the manifest's initial `agent` example explicitly uses `auto`. Tool definitions are translated to Responses API function tools only when enabled. Previous calls and results are sent as `function_call` and `function_call_output` input items. Routing and tool compatibility policy remain in `9router`.
-
-### Vision
-
-- `native`: Send image input directly to the selected model.
-- `proxy`: Summarize each image-bearing message with one shared analyzer, replace the raw image with a `[Vision proxy summary]`, then call the selected model.
-- `off`: Reject image input.
-
-Shared analyzer settings:
-
-- `9router-copilot.visionProxySource`: `9router` or `copilot`
-- `9router-copilot.visionProxyModelId`: opaque model id selected from the chosen source
-- `9router-copilot.visionProxyPrompt`: complete analyzer instruction (default prompt is editable in Settings)
-
-Use `9router: Configure Vision Proxy` to configure source and model with Quick Pick, or let the extension run the same wizard automatically when a `visionMode: "proxy"` request arrives with missing source or model id.
-
-Proxy models keep image input enabled when source or model id is missing. Sending an image opens VS Code Quick Pick so the source and model can be selected, then continues the same request.
-
-When source is `9router`, the wizard uses authenticated `GET /v1/models` discovery and keeps only models where `capabilities.vision === true`, then deduplicates and sorts by `id`.
-
-When source is native `GitHub Copilot`, the wizard uses `vscode.lm.selectChatModels({ vendor: 'copilot' })`. The stable selector does not expose capability metadata, so the extension does not guess by model name and enforces compatibility at runtime.
-
-Legacy migration is fail-safe: if `9router-copilot.visionProxySource` is unset but `9router-copilot.visionProxyModelId` is already populated, runtime interprets it as `9router`.
-
-Proxy mode is fail-closed: discovery errors, missing/stale analyzer ids, consent/quota rejection, timeout, cancellation, malformed stream, or upstream failures stop the request before the primary model is called. Privacy exclusions are strict: diagnostics contain safe counts and timing only, never image data, prompt content, source message text, API keys, raw response bodies, or proxy summaries.
+- `9router: Manage Models` — view, edit, delete, and reorder models.
+- `9router: Add Model` — open a blank model form immediately.
+- `9router: Toggle Model Fast Tier` — request or stop requesting Fast Tier for one model.
 
 ### Thinking Effort
 
-Each model with at least one configured `thinkingEfforts` value gets the native Copilot Chat Thinking Effort picker. `None` is always first, then configured values in array order. `None` omits `reasoning`; allowed values send `reasoning.effort` with `reasoning.summary: "auto"` while keeping `modelId` unchanged. Missing, malformed, unsupported, or stale host selections fall back to that model's validated `thinkingMode`. An empty list omits `configurationSchema` and hides the picker. `9router` owns provider-specific reasoning translation.
+Choose how much reasoning a model should use for each request. Available levels can include `Minimal`, `Low`, `Medium`, `High`, `XHigh`, and `Max`, depending on model configuration. Select `None` when extra reasoning is unnecessary.
 
-### Reasoning display
+Reasoning can also appear as native thinking content when supported by your VS Code setup.
 
-Reasoning returned by `9router` through `response.reasoning_summary_text.delta` (or the compatible `response.reasoning_text.delta` event) is forwarded to Copilot Chat as thinking content. This uses the `languageModelThinkingPart` proposed API, so VS Code must be started with the proposal enabled:
+<p align="center">
+
+![Choose Thinking Effort in GitHub Copilot Chat](/media/images/thinking-effort.png)
+
+</p>
+
+### Vision
+
+Use screenshots, diagrams, tables, and other images in chat through three per-model modes:
+
+| Mode | How images are handled |
+| --- | --- |
+| **Native** | Send images directly to a Vision-capable model. |
+| **Proxy** | Let a shared Vision model describe the image before your selected model answers. |
+| **Off** | Block image input for that model. |
+
+Run `9router: Configure Vision Proxy` to choose a Vision-capable 9router model or a GitHub Copilot model. Copilot model compatibility is checked when used. If setup is missing, the extension guides you when an image is first sent.
+
+<p align="center">
+
+![Configure a Vision proxy for image requests](./media/images/vision-setup.png)
+
+</p>
+
+### Tools and agent workflows
+
+Enable tools for models that support them. Compatible models can participate in Copilot agent workflows and use available project tools while 9router remains responsible for model routing.
+
+### Usage dashboard
+
+Run `9router: Show Usage` or enter `@9router /usage` in chat. The dashboard shows connection quotas, remaining capacity, and reset timers without filling your conversation with usage data.
+
+<p align="center">
+
+![View connection quotas and reset times](/media/images/usage-dashboard.png)
+
+</p>
+
+### Safe diagnostics
+
+Run `9router: Show Diagnostics` when something does not work. `minimal` and `metadata` diagnostics help identify connection, model, Vision, and configuration problems without recording prompts or secrets.
+
+## Everyday commands
+
+Open the **Command Palette** and search for `9router`.
+
+| Command | What it does |
+| --- | --- |
+| `9router: Set API Key` | Securely save your 9router API key |
+| `9router: Clear API Key` | Remove saved API key |
+| `9router: Test Connection` | Check connection and model availability |
+| `9router: Manage Models` | Add, edit, delete, and reorder models |
+| `9router: Add Model` | Add a model directly |
+| `9router: Toggle Model Fast Tier` | Toggle Fast Tier requests for a model |
+| `9router: Configure Vision Proxy` | Select a Vision proxy source and model |
+| `9router: Show Usage` | Open quota and usage dashboard |
+| `9router: Show Diagnostics` | Open troubleshooting details |
+
+## Advanced setup
+
+<details>
+<summary>Customize settings and per-model options</summary>
+
+Most users can configure everything through commands. For manual control, open VS Code Settings and search for `9router Copilot`.
+
+Important options include:
+
+- **Base URL** — address of your 9router service.
+- **Models** — ordered models shown in Copilot Chat.
+- **Vision Proxy** — source, model, and image-analysis instructions.
+- **Maximum response tokens** — optional response-length limit.
+- **Request timeout** — maximum wait time for a request.
+- **Debug mode** — choose `minimal`, `metadata`, or `verbose` diagnostics.
+
+Each model can have its own display name, Fast Tier, tools, Vision mode, Thinking Effort choices, and context limits.
+
+</details>
+
+## Privacy and security
+
+- API key stays in VS Code SecretStorage.
+- `minimal` and `metadata` diagnostic modes avoid prompt content and secrets.
+- Vision proxy failures stop the request before the main model runs, preventing incomplete image context from being used.
+- API keys should never be placed in `settings.json`, `.env`, logs, screenshots, or documentation.
+
+`verbose` diagnostics may include raw response data. Do not use or share verbose logs when working with sensitive content.
+
+## Troubleshooting
+
+<details>
+<summary>Connection, model picker, Vision, and Thinking Effort help</summary>
+
+- **9router is missing from the model picker** — reload VS Code, then run `9router: Test Connection`.
+- **No models are available** — run `9router: Manage Models` and add at least one valid model.
+- **Connection fails** — confirm that 9router is running, then set the API key again.
+- **Image input is blocked** — edit the model and choose `Native` or `Proxy` Vision mode.
+- **Vision proxy is missing** — run `9router: Configure Vision Proxy`.
+- **Thinking Effort is unavailable** — edit the model and add supported effort choices.
+- **More detail is needed** — run `9router: Show Diagnostics`.
+
+</details>
+
+## Development
+
+<details>
+<summary>Build, test, and debug the extension</summary>
 
 ```bash
-code --enable-proposed-api local.9router-copilot-chat-provider
-```
-
-Without that flag the request still succeeds and the answer streams normally; only the reasoning is dropped. Run `9router: Show Diagnostics` with `debugMode` at `metadata` to confirm — the `9router response stream completed` line reports `thinkingDeltaCount` and `thinkingPartSupported`.
-
-Reasoning is forwarded exactly as it arrives and is never buffered or re-chunked. If `9router` emits a model's reasoning in one burst, Copilot Chat shows it in one burst; pacing is a router-side concern.
-
-### Debug Mode
-
-- `minimal`: Safe default.
-- `metadata`: Operational metadata without prompt bodies or secrets.
-- `verbose`: Deeper diagnostics; avoid it with sensitive prompts.
-
-## Diagnostics
-
-Run `9router: Show Diagnostics`. The output reports snapshot state, runtime settings, published models, rejected entries, and validation issues with sensitive values redacted.
-
-Common fixes:
-
-- Missing API key: run `9router: Set API Key`.
-- Connection failure or stale model mapping: run `9router: Test Connection`.
-- Invalid base URL: use an `http` or `https` URL that ends at, or can normalize to, `/v1`.
-- Missing model: update the affected object's `modelId` to an existing 9router model.
-- Image input blocked: set that object's `visionMode` to `native` or `proxy` only when supported.
-- Missing Vision proxy: run `9router: Configure Vision Proxy` (or set `9router-copilot.visionProxySource`, `9router-copilot.visionProxyModelId`, and optionally `9router-copilot.visionProxyPrompt` directly); proxy mode remains fail-closed until configuration is complete.
-- Invalid thinking mode or effort list: use supported values and include every non-`off` `thinkingMode` in that model's unique `thinkingEfforts` list.
-- Suffixed model id: remove the `(level)` suffix and set `thinkingMode` separately.
-
-## Debug in VS Code
-
-Press `F5` to use `Watch and Debug Extension`, which starts the TypeScript watcher and opens an Extension Development Host. Choose `Build Once and Debug Extension` for a clean one-shot build. Extension diagnostics appear in the `9router Copilot` output channel.
-
-## Verification
-
-```bash
+pnpm install
 pnpm run build
-pnpm run lint
-pnpm run test:unit
-pnpm run test:integration
+pnpm run test
 pnpm run package
 ```
 
-The package excludes source, tests, and internal docs through `.vscodeignore`.
+Press `F5` in VS Code to launch an Extension Development Host.
 
-## Architecture Boundary
+</details>
 
-The extension owns provider registration, publication of user-defined curated picker models, secure local configuration, request/stream adaptation, compatibility layers, and safe diagnostics.
+## Project scope
 
-`9router` owns combo definitions, routing, fallback, quota-aware provider switching, and upstream execution. Configured `modelId` values are opaque to the extension; do not move router business logic into it.
+This extension connects GitHub Copilot Chat to 9router. It handles model selection, secure local settings, Vision and tool compatibility, streaming, usage display, and diagnostics. Model routing, fallbacks, quotas, and upstream execution remain managed by 9router.
+
+## License
+
+[MIT](./LICENSE)
