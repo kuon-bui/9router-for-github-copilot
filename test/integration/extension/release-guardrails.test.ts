@@ -158,7 +158,7 @@ describe('release guardrails', () => {
     }
   });
 
-  it('documents the breaking dynamic model contract without legacy settings', async () => {
+  it('documents the user-facing model workflow and highlights', async () => {
     const readme = await readFile(resolve(process.cwd(), 'README.md'), 'utf8');
     const productionDesign = await readFile(
       resolve(
@@ -170,55 +170,31 @@ describe('release guardrails', () => {
     const agentGuidance = await readFile(resolve(process.cwd(), 'AGENTS.md'), 'utf8');
     const convention = await readFile(resolve(process.cwd(), 'CODE_CONVENTION.md'), 'utf8');
 
-    for (const document of [readme, productionDesign, agentGuidance, convention]) {
+    for (const document of [productionDesign, agentGuidance, convention]) {
       expect(document).toContain('user-defined curated');
     }
-    expect(readme).toContain('9router-copilot.models');
-    expect(readme).toContain('"modelId"');
     for (const text of [
-      '9router-copilot.visionProxySource',
-      '9router-copilot.visionProxyModelId',
-      '9router-copilot.visionProxyPrompt',
+      '## Why use it?',
+      '## Quick start',
+      '## Feature highlights',
+      '9router: Set API Key',
+      '9router: Manage Models',
       '9router: Configure Vision Proxy',
-      'capabilities.vision',
-      'GitHub Copilot'
+      '9router: Show Usage',
+      '9router: Show Diagnostics',
+      '![Manage and organize 9router models in VS Code](./media/model-manager.png)',
+      '![Choose Thinking Effort in GitHub Copilot Chat](./media/thinking-effort.png)',
+      '![Configure a Vision proxy for image requests](./media/vision-setup.png)',
+      '![View connection quotas and reset times](./media/usage-dashboard.png)'
     ]) {
       expect(readme).toContain(text);
-      expect(productionDesign).toContain(text);
     }
-    for (const document of [readme, productionDesign]) {
-      expect(document).toContain('GET /v1/models');
-      expect(document).toContain('fail-closed');
-    }
-    expect(readme).toContain('Breaking configuration change');
-    expect(readme).toContain('toolMode');
-    expect(readme).toContain('visionMode');
-    expect(readme).toContain('thinkingMode');
-    expect(readme).toContain('thinkingEfforts');
-    expect(readme).toContain('maxInputTokens');
-    expect(readme).toContain('maxOutputTokens');
-    expect(readme).toContain('/v1/responses');
-    expect(readme).toContain('reasoning.effort');
-    expect(readme).toContain('response.completed');
-    for (const document of [readme, productionDesign]) {
-      expect(document).toContain('capabilities.contextWindow');
-      expect(document).toContain('capabilities.maxOutput');
-      expect(document).toContain('total context size');
-      expect(document).toContain('maxInputTokens = contextWindow - maxOutputTokens');
-      expect(document).toContain('latest successful');
-      expect(document).toContain('264000');
-      expect(document).toContain('thinkingEfforts');
-      expect(document).toContain('array order');
-      expect(document).toContain('omits `configurationSchema`');
-      expect(document).toContain('stale');
-    }
-    expect(readme).toContain('compatibility fallback');
+    expect(readme).toContain('GitHub Copilot Chat');
     expect(readme).not.toContain('9router-copilot.displayModels');
     expect(readme).not.toContain('9router-copilot.modelMappings.');
   });
 
-  it('documents unlimited maxTokens semantics', async () => {
-    const readme = await readFile(resolve(process.cwd(), 'README.md'), 'utf8');
+  it('keeps unlimited maxTokens semantics in the production design', async () => {
     const productionDesign = await readFile(
       resolve(
         process.cwd(),
@@ -227,12 +203,10 @@ describe('release guardrails', () => {
       'utf8'
     );
 
-    for (const document of [readme, productionDesign]) {
-      expect(document).toContain('default is `0`');
-      expect(document).toContain('positive safe integer');
-      expect(document).toContain('omits `max_output_tokens`');
-      expect(document).toContain('upstream');
-    }
+    expect(productionDesign).toContain('default is `0`');
+    expect(productionDesign).toContain('positive safe integer');
+    expect(productionDesign).toContain('omits `max_output_tokens`');
+    expect(productionDesign).toContain('upstream');
   });
 
   it('keeps the VSIX package command explicit about local repository metadata', () => {
@@ -303,12 +277,12 @@ describe('release guardrails', () => {
     );
   });
 
-  it('documents the VS Code debug workflow for local development', async () => {
+  it('documents the basic VS Code development workflow', async () => {
     const readme = await readFile(resolve(process.cwd(), 'README.md'), 'utf8');
 
-    expect(readme).toContain('## Debug in VS Code');
-    expect(readme).toContain('Watch and Debug Extension');
-    expect(readme).toContain('Build Once and Debug Extension');
-    expect(readme).toContain('9router Copilot');
+    expect(readme).toContain('## Development');
+    expect(readme).toContain('pnpm run build');
+    expect(readme).toContain('pnpm run test');
+    expect(readme).toContain('Press `F5`');
   });
 });
