@@ -4,21 +4,53 @@ import type { RouterUsageSnapshot } from '@/router/usage';
 
 const USAGE_VIEW_TYPE = '9routerCopilot.usage';
 const USAGE_VIEW = 'usage';
+const SECTION = '9router-copilot';
+const USAGE_COMPACT_KEY = 'usageCompact';
 
 interface UsageSession {
   panel: vscode.WebviewPanel;
   subscription: vscode.Disposable;
   snapshot: RouterUsageSnapshot;
+  compact: boolean;
 }
 
 let session: UsageSession | undefined;
+
+function readUsageCompact(): boolean {
+  return vscode.workspace.getConfiguration(SECTION).get<boolean>(USAGE_COMPACT_KEY) === true;
+}
 
 function postState(current: UsageSession): void {
   void current.panel.webview.postMessage({
     type: 'usage',
     snapshot: current.snapshot,
-    nowMs: Date.now()
+    nowMs: Date.now(),
+    compact: current.compact
   });
+}
+
+async function handleMessage(current: UsageSession, message: unknown): Promise<void> {
+  if (typeof message !== 'object' || message === null) {
+    return;
+  }
+
+  const type = (message as { type?: unknown }).type;
+  if (type === 'ready') {
+    current.compact = readUsageCompact();
+    postState(current);
+    return;
+  }
+
+  if (type !== 'setCompact') {
+    return;
+  }
+
+  const compact = (message as { compact?: unknown }).compact === true;
+  current.compact = compact;
+  await vscode.workspace
+    .getConfiguration(SECTION)
+    .update(USAGE_COMPACT_KEY, compact, vscode.ConfigurationTarget.Global);
+  postState(current);
 }
 
 export async function showUsagePanel(
@@ -32,8 +64,14 @@ export async function showUsagePanel(
 
   if (session) {
     session.snapshot = snapshot;
+    session.compact = readUsageCompact();
     session.panel.reveal(viewColumn, false);
-    postState(session);
+    // Reload HTML so watch-rebuilt webview assets replace a retained old document.
+    session.panel.webview.html = await renderWebviewPanelHtml(
+      session.panel.webview,
+      extensionUri,
+      USAGE_VIEW
+    );
     return;
   }
 
@@ -53,10 +91,9 @@ export async function showUsagePanel(
   const current: UsageSession = {
     panel,
     snapshot,
+    compact: readUsageCompact(),
     subscription: panel.webview.onDidReceiveMessage((message: unknown) => {
-      if (typeof message === 'object' && message !== null && (message as { type?: unknown }).type === 'ready') {
-        postState(current);
-      }
+      void handleMessage(current, message);
     })
   };
   session = current;

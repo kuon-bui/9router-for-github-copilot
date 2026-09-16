@@ -35,9 +35,15 @@ export interface UsageCardView {
   readonly quotas: readonly QuotaView[];
 }
 
+export interface UsageGroupView {
+  readonly provider: string;
+  readonly icon: ProviderIconDescriptor | undefined;
+  readonly cards: readonly UsageCardView[];
+}
+
 export interface UsageView {
   readonly sweepLabel: string;
-  readonly cards: readonly UsageCardView[];
+  readonly groups: readonly UsageGroupView[];
 }
 
 function buildQuota(name: string, quota: RouterUsageQuota, nowMs: number): QuotaView {
@@ -89,9 +95,47 @@ function buildCard(entry: RouterUsageEntry, nowMs: number): UsageCardView {
   };
 }
 
+function groupKey(provider: string): string {
+  return provider.trim().toLowerCase();
+}
+
+function groupCards(entries: readonly RouterUsageEntry[], nowMs: number): UsageGroupView[] {
+  const groups: UsageGroupView[] = [];
+  const indexByKey = new Map<string, number>();
+
+  for (const entry of entries) {
+    const card = buildCard(entry, nowMs);
+    const key = groupKey(entry.provider);
+    const existingIndex = indexByKey.get(key);
+
+    if (existingIndex === undefined) {
+      indexByKey.set(key, groups.length);
+      groups.push({
+        provider: card.provider,
+        icon: card.icon,
+        cards: [card]
+      });
+      continue;
+    }
+
+    const existing = groups[existingIndex];
+    if (!existing) {
+      continue;
+    }
+
+    groups[existingIndex] = {
+      provider: existing.provider,
+      icon: existing.icon,
+      cards: [...existing.cards, card]
+    };
+  }
+
+  return groups;
+}
+
 export function buildUsageView(snapshot: RouterUsageSnapshot, nowMs: number): UsageView {
   return {
     sweepLabel: `Last sweep · ${formatTimestamp(snapshot.lastSweepAt)}`,
-    cards: snapshot.entries.map((entry) => buildCard(entry, nowMs))
+    groups: groupCards(snapshot.entries, nowMs)
   };
 }

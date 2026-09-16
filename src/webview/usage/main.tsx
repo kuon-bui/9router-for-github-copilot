@@ -10,11 +10,13 @@ const vscodeApi = acquireVsCodeApi();
 
 function App(): JSX.Element | null {
   const [view, setView] = useState<UsageView>();
+  const [compact, setCompact] = useState(false);
 
   useEffect(() => {
     function onMessage(event: MessageEvent<UsageHostMessage>): void {
       if (event.data.type === 'usage') {
         setView(buildUsageView(event.data.snapshot, event.data.nowMs));
+        setCompact(event.data.compact);
       }
     }
 
@@ -23,7 +25,17 @@ function App(): JSX.Element | null {
     return () => window.removeEventListener('message', onMessage);
   }, []);
 
-  return view === undefined ? null : <UsagePanel view={view} />;
+  if (view === undefined) {
+    return null;
+  }
+
+  function toggleCompact(): void {
+    const next = !compact;
+    setCompact(next);
+    vscodeApi.postMessage({ type: 'setCompact', compact: next });
+  }
+
+  return <UsagePanel view={view} compact={compact} onToggleCompact={toggleCompact} />;
 }
 
 const container = document.getElementById('root');

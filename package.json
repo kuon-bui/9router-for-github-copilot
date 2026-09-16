@@ -244,6 +244,11 @@
           ],
           "default": "minimal",
           "description": "Diagnostics verbosity for the extension."
+        },
+        "9router-copilot.usageCompact": {
+          "type": "boolean",
+          "default": false,
+          "description": "Use compact cards in the Usage panel."
         }
       }
     }
