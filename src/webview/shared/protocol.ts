@@ -6,14 +6,20 @@ export interface UsageStateMessage {
   readonly type: 'usage';
   readonly snapshot: RouterUsageSnapshot;
   readonly nowMs: number;
+  readonly compact: boolean;
 }
 
 export interface ReadyMessage {
   readonly type: 'ready';
 }
 
+export interface SetCompactMessage {
+  readonly type: 'setCompact';
+  readonly compact: boolean;
+}
+
 export type UsageHostMessage = UsageStateMessage;
-export type UsageClientMessage = ReadyMessage;
+export type UsageClientMessage = ReadyMessage | SetCompactMessage;
 
 export interface ModelEditorStateMessage {
   readonly type: 'state';

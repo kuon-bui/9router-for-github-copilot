@@ -252,6 +252,7 @@ describe('release guardrails', () => {
     expect(vscodeIgnore).toContain('src/**');
     expect(vscodeIgnore).toContain('test/**');
     expect(vscodeIgnore).toContain('docs/**');
+    expect(vscodeIgnore).toContain('media/images/**');
     expect(vscodeIgnore).toContain('.pnpm-store/**');
     expect(vscodeIgnore).toContain('AGENTS.md');
     expect(vscodeIgnore).toContain('CODE_CONVENTION.md');

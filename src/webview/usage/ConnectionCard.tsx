@@ -6,6 +6,7 @@ const REFRESH_HREF = 'command:9routerCopilot.showUsage';
 
 interface ConnectionCardProps {
   readonly card: UsageCardView;
+  readonly compact?: boolean;
 }
 
 function RefreshButton(): JSX.Element {
@@ -61,7 +62,41 @@ function Avatar({ card }: ConnectionCardProps): JSX.Element {
   );
 }
 
-export function ConnectionCard({ card }: ConnectionCardProps): JSX.Element {
+export function ConnectionCard({ card, compact = false }: ConnectionCardProps): JSX.Element {
+  if (compact) {
+    return (
+      <article className="min-w-0 rounded-lg border border-border bg-card px-2.5 py-2">
+        <header className="flex items-center justify-between gap-2">
+          <div className="min-w-0">
+            <div className="truncate text-[12px] font-semibold tracking-tight">{card.account}</div>
+            <div className="truncate text-[10px] text-muted">{card.plan}</div>
+          </div>
+          <div className="flex shrink-0 items-center gap-1">
+            {card.chips.map((chip) => (
+              <span
+                key={chip}
+                className="ui-chip border border-border uppercase tracking-wide text-muted"
+              >
+                {chip}
+              </span>
+            ))}
+            <RefreshButton />
+          </div>
+        </header>
+        {card.message !== undefined ? (
+          <p className="mt-1.5 border-l-[3px] border-critical bg-critical/10 px-2 py-1 text-[11px] text-muted">
+            {card.message}
+          </p>
+        ) : null}
+        <div className="mt-1.5 flex flex-col gap-1">
+          {card.quotas.map((quota) => (
+            <QuotaMeter key={quota.name} quota={quota} compact />
+          ))}
+        </div>
+      </article>
+    );
+  }
+
   return (
     <article className="min-w-0 rounded-2xl border border-border bg-card px-[18px] pb-3 pt-4">
       <header className="flex items-start justify-between gap-3">
