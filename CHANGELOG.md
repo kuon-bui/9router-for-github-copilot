@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.13.0](https://github.com/kuon-bui/9router-for-github-copilot/compare/v0.12.0...v0.13.0) (2026-09-17)
+
+
+### Features
+
+* **webview:** add compact Usage panel with provider grouping ([#57](https://github.com/kuon-bui/9router-for-github-copilot/issues/57)) ([c8a74b1](https://github.com/kuon-bui/9router-for-github-copilot/commit/c8a74b18f6bfae3ea0d514fc045aa0a72cbe417e))
+* **webview:** refresh model editor interface ([#54](https://github.com/kuon-bui/9router-for-github-copilot/issues/54)) ([5f538a7](https://github.com/kuon-bui/9router-for-github-copilot/commit/5f538a749e5014e9ca061d2072d7e1a25330d1be))
+
+
+### Documentation
+
+* rewrite README as user-facing guide with screenshots ([#55](https://github.com/kuon-bui/9router-for-github-copilot/issues/55)) ([e2d32fc](https://github.com/kuon-bui/9router-for-github-copilot/commit/e2d32fc934d10cae3c035e3ccbcb65c519b1322d))
+
 ## [0.12.0](https://github.com/kuon-bui/9router-for-github-copilot/compare/v0.11.2...v0.12.0) (2026-09-07)
 
 
