@@ -318,6 +318,7 @@ describe('9routerCopilot.showDiagnostics', () => {
     await __getCommandHandler('9routerCopilot.showUsage')?.();
     expect(__getWebviewPanels()).toHaveLength(1);
     expect(panel?.lastReveal).toEqual({ viewColumn: -1, preserveFocus: false });
+    await panel?.webview.receiveMessage({ type: 'ready' });
     expect(panel?.webview.postedMessages).toHaveLength(2);
     expect(__getInformationMessages()).toEqual([]);
     expect(__getErrorMessages()).toEqual([]);
