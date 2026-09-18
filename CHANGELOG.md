@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.13.1](https://github.com/kuon-bui/9router-for-github-copilot/compare/v0.13.0...v0.13.1) (2026-09-18)
+
+
+### Bug Fixes
+
+* correct README screenshot paths and exclude images from VSIX ([#58](https://github.com/kuon-bui/9router-for-github-copilot/issues/58)) ([45bc74e](https://github.com/kuon-bui/9router-for-github-copilot/commit/45bc74eea64db2ffe7487c7839b60e65d436a62c))
+
 ## [0.13.0](https://github.com/kuon-bui/9router-for-github-copilot/compare/v0.12.0...v0.13.0) (2026-09-17)
 
 
