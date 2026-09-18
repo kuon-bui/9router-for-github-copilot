@@ -185,10 +185,10 @@ describe('release guardrails', () => {
       '9router: Configure Vision Proxy',
       '9router: Show Usage',
       '9router: Show Diagnostics',
-      '![Manage and organize 9router models in VS Code](./media/model-manager.png)',
-      '![Choose Thinking Effort in GitHub Copilot Chat](./media/thinking-effort.png)',
-      '![Configure a Vision proxy for image requests](./media/vision-setup.png)',
-      '![View connection quotas and reset times](./media/usage-dashboard.png)'
+      '![Manage and organize 9router models in VS Code](./media/images/model-manager.png)',
+      '![Choose Thinking Effort in GitHub Copilot Chat](./media/images/thinking-effort.png)',
+      '![Configure a Vision proxy for image requests](./media/images/vision-setup.png)',
+      '![View connection quotas and reset times](./media/images/usage-dashboard.png)'
     ]) {
       expect(readme).toContain(text);
     }

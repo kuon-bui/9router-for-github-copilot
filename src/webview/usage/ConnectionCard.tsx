@@ -18,7 +18,7 @@ function RefreshButton(): JSX.Element {
       aria-label="Refresh usage"
     >
       <svg
-        className="size-[15px]"
+        className="size-3.75"
         viewBox="0 0 24 24"
         fill="none"
         stroke="currentColor"
@@ -52,7 +52,7 @@ function Avatar({ card }: ConnectionCardProps): JSX.Element {
     >
       <span>{card.initial}</span>
       <img
-        className="absolute left-1/2 top-1/2 block size-[26px] -translate-x-1/2 -translate-y-1/2"
+        className="absolute left-1/2 top-1/2 block size-6.5 -translate-x-1/2 -translate-y-1/2"
         src={card.icon.url}
         alt=""
         loading="lazy"
@@ -98,7 +98,7 @@ export function ConnectionCard({ card, compact = false }: ConnectionCardProps): 
   }
 
   return (
-    <article className="min-w-0 rounded-2xl border border-border bg-card px-[18px] pb-3 pt-4">
+    <article className="min-w-0 rounded-2xl border border-border bg-card px-4.5 pb-3 pt-4">
       <header className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 items-center gap-2.5">
           <Avatar card={card} />

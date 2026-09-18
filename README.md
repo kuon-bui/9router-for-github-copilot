@@ -102,7 +102,7 @@ Reasoning can also appear as native thinking content when supported by your VS C
 
 <p align="center">
 
-![Choose Thinking Effort in GitHub Copilot Chat](/media/images/thinking-effort.png)
+![Choose Thinking Effort in GitHub Copilot Chat](./media/images/thinking-effort.png)
 
 </p>
 
@@ -134,7 +134,7 @@ Run `9router: Show Usage` or enter `@9router /usage` in chat. The dashboard show
 
 <p align="center">
 
-![View connection quotas and reset times](/media/images/usage-dashboard.png)
+![View connection quotas and reset times](./media/images/usage-dashboard.png)
 
 </p>
 
