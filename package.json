@@ -268,6 +268,9 @@
     "package": "vsce package --no-dependencies --allow-missing-repository",
     "vscode:prepublish": "pnpm run build"
   },
+  "dependencies": {
+    "smol-toml": "^1.8.0"
+  },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@tailwindcss/vite": "^4.3.3",
@@ -283,8 +286,5 @@
     "typescript": "^5.6.3",
     "vite": "^8.2.2",
     "vitest": "^4.1.10"
-  },
-  "dependencies": {
-    "smol-toml": "^1.8.0"
   }
 }
