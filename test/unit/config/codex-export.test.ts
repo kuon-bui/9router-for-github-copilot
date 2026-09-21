@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   buildCodexCatalogModels,
   buildCodexExport,
+  mergeCodexConfigToml,
   selectExportModels,
   toCodexBaseUrl
 } from '@/config/codex-export';
@@ -152,5 +153,54 @@ describe('buildCodexExport', () => {
     );
     expect(result.profileToml).toContain('wire_api = "responses"');
     expect(result.profileToml).not.toMatch(/sk-|api[_-]?key\s*=\s*"[^"]+"/i);
+  });
+});
+
+describe('mergeCodexConfigToml', () => {
+  it('upserts 9router provider and top-level keys while preserving unrelated keys', () => {
+    const existing = `
+model = "other"
+model_provider = "openai"
+notice = "keep-me"
+
+[model_providers.openai]
+name = "OpenAI"
+base_url = "https://example.invalid/v1"
+
+[model_providers.9router]
+name = "old"
+base_url = "http://old.invalid/v1"
+env_key = "OLD_KEY"
+wire_api = "chat"
+`;
+
+    const merged = mergeCodexConfigToml(existing, {
+      defaultModel: 'router/agent',
+      catalogAbsolutePath: '/home/me/.codex/9router-models.json',
+      codexBaseUrl: 'http://127.0.0.1:20128/v1'
+    });
+
+    expect(merged).toContain('model = "router/agent"');
+    expect(merged).toContain('model_provider = "9router"');
+    expect(merged).toContain('model_catalog_json = "/home/me/.codex/9router-models.json"');
+    expect(merged).toContain('notice = "keep-me"');
+    expect(merged).toContain('[model_providers.openai]');
+    expect(merged).toContain('name = "OpenAI"');
+    expect(merged).toContain('[model_providers.9router]');
+    expect(merged).toContain('base_url = "http://127.0.0.1:20128/v1"');
+    expect(merged).toContain('env_key = "NINE_ROUTER_API_KEY"');
+    expect(merged).toContain('wire_api = "responses"');
+    expect(merged).not.toContain('OLD_KEY');
+    expect(merged).not.toMatch(/api[_-]?key\s*=/i);
+  });
+
+  it('fails closed on invalid TOML', () => {
+    expect(() =>
+      mergeCodexConfigToml('model = [', {
+        defaultModel: 'router/agent',
+        catalogAbsolutePath: '/tmp/9router-models.json',
+        codexBaseUrl: 'http://127.0.0.1:20128/v1'
+      })
+    ).toThrow(/Failed to parse Codex config\.toml/);
   });
 });

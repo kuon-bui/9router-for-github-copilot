@@ -1,3 +1,4 @@
+import { parse, stringify } from 'smol-toml';
 import type { ConfiguredModel } from '@/types/product-model';
 
 export interface CodexCatalogReasoningLevel {
@@ -175,4 +176,47 @@ export function buildCodexExport(input: {
     codexBaseUrl,
     warnings
   };
+}
+
+export function mergeCodexConfigToml(
+  existingToml: string,
+  input: {
+    defaultModel: string;
+    catalogAbsolutePath: string;
+    codexBaseUrl: string;
+  }
+): string {
+  let parsed: Record<string, unknown>;
+  try {
+    const value = parse(existingToml);
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+      throw new Error('root must be a table');
+    }
+    parsed = value as Record<string, unknown>;
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : 'unknown parse error';
+    throw new Error(`Failed to parse Codex config.toml: ${detail}`);
+  }
+
+  const providers =
+    typeof parsed.model_providers === 'object' &&
+    parsed.model_providers !== null &&
+    !Array.isArray(parsed.model_providers)
+      ? { ...(parsed.model_providers as Record<string, unknown>) }
+      : {};
+
+  providers['9router'] = {
+    name: '9router',
+    base_url: input.codexBaseUrl,
+    env_key: 'NINE_ROUTER_API_KEY',
+    env_key_instructions: 'Set NINE_ROUTER_API_KEY to your 9router API key.',
+    wire_api: 'responses'
+  };
+
+  parsed.model = input.defaultModel;
+  parsed.model_provider = '9router';
+  parsed.model_catalog_json = input.catalogAbsolutePath;
+  parsed.model_providers = providers;
+
+  return `${stringify(parsed).trimEnd()}\n`;
 }
