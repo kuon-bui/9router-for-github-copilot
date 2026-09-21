@@ -1,0 +1,242 @@
+import * as vscode from 'vscode';
+import { homedir as osHomedir } from 'node:os';
+import path from 'node:path';
+import { access, mkdir, readFile, writeFile } from 'node:fs/promises';
+import { buildCodexExport, mergeCodexConfigToml } from '@/config/codex-export';
+import { isUsableRuntimeSettings, type SettingsSnapshot } from '@/config/settings';
+import { NineRouterError } from '@/router/errors';
+
+export interface CodexExportSummary {
+  mode: 'profile' | 'merge';
+  directory: string;
+  catalogPath: string;
+  configPath: string;
+  warnings: string[];
+}
+
+export type CodexExporter = () => Promise<CodexExportSummary | undefined>;
+
+export interface CodexExportFs {
+  mkdir(path: string, options: { recursive: true }): Promise<string | undefined>;
+  readFile(path: string, encoding: 'utf8'): Promise<string>;
+  writeFile(path: string, data: string, encoding: 'utf8'): Promise<void>;
+  access(path: string): Promise<void>;
+}
+
+interface DestinationQuickPickItem extends vscode.QuickPickItem {
+  destination: 'folder' | 'codex-home';
+}
+
+interface ModeQuickPickItem extends vscode.QuickPickItem {
+  mode: 'profile' | 'merge';
+}
+
+async function pathExists(fs: CodexExportFs, targetPath: string): Promise<boolean> {
+  try {
+    await fs.access(targetPath);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function confirmOverwrite(
+  fs: CodexExportFs,
+  targetPaths: string[]
+): Promise<boolean> {
+  for (const targetPath of targetPaths) {
+    if (!(await pathExists(fs, targetPath))) {
+      continue;
+    }
+
+    const choice = await vscode.window.showWarningMessage(
+      `Overwrite existing file?\n${targetPath}`,
+      { modal: true },
+      'Overwrite',
+      'Cancel'
+    );
+    if (choice !== 'Overwrite') {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function resolveCodexHome(env: NodeJS.ProcessEnv, homedir: () => string): string {
+  const configured = (env.CODEX_HOME ?? '').trim();
+  return configured.length > 0 ? configured : path.join(homedir(), '.codex');
+}
+
+export function createCodexExporter(dependencies: {
+  getSettingsSnapshot: () => SettingsSnapshot | undefined;
+  env?: NodeJS.ProcessEnv;
+  homedir?: () => string;
+  fs?: CodexExportFs;
+}): CodexExporter {
+  const env = dependencies.env ?? process.env;
+  const homedir = dependencies.homedir ?? osHomedir;
+  const fs =
+    dependencies.fs ??
+    ({
+      mkdir,
+      readFile,
+      writeFile,
+      access
+    } as CodexExportFs);
+
+  return async () => {
+    const snapshot = dependencies.getSettingsSnapshot();
+    if (!snapshot?.runtime || !isUsableRuntimeSettings(snapshot.runtime)) {
+      throw new NineRouterError(
+        'CONFIGURATION_ERROR',
+        '9router runtime settings are invalid. Check diagnostics for details.'
+      );
+    }
+
+    const prepared = buildCodexExport({
+      models: snapshot.models,
+      normalizedBaseUrl: snapshot.runtime.baseUrl,
+      catalogAbsolutePath: ''
+    });
+    if (prepared.models.length === 0) {
+      throw new NineRouterError(
+        'CONFIGURATION_ERROR',
+        'No publishable models available to export.'
+      );
+    }
+
+    const destination = await vscode.window.showQuickPick<DestinationQuickPickItem>(
+      [
+        {
+          label: 'Choose folder…',
+          description: 'Write 9router-models.json and 9router.config.toml',
+          destination: 'folder'
+        },
+        {
+          label: 'Install into Codex home',
+          description: 'Write under CODEX_HOME or ~/.codex',
+          destination: 'codex-home'
+        }
+      ],
+      {
+        title: '9router: Export Codex Config',
+        placeHolder: 'Choose where to write Codex files'
+      }
+    );
+    if (!destination) {
+      return undefined;
+    }
+
+    let directory: string;
+    let mode: 'profile' | 'merge' = 'profile';
+
+    if (destination.destination === 'folder') {
+      const folders = await vscode.window.showOpenDialog({
+        canSelectFiles: false,
+        canSelectFolders: true,
+        canSelectMany: false,
+        openLabel: 'Export here'
+      });
+      if (!folders || folders.length === 0) {
+        return undefined;
+      }
+      directory = folders[0].fsPath;
+    } else {
+      directory = resolveCodexHome(env, homedir);
+      await fs.mkdir(directory, { recursive: true });
+
+      const configTomlPath = path.join(directory, 'config.toml');
+      if (await pathExists(fs, configTomlPath)) {
+        const choice = await vscode.window.showQuickPick<ModeQuickPickItem>(
+          [
+            {
+              label: 'Create profile',
+              description: 'Write 9router.config.toml beside config.toml',
+              mode: 'profile'
+            },
+            {
+              label: 'Merge into config.toml',
+              description: 'Upsert 9router provider settings into config.toml',
+              mode: 'merge'
+            }
+          ],
+          {
+            title: '9router: Export Codex Config',
+            placeHolder: 'config.toml already exists'
+          }
+        );
+        if (!choice) {
+          return undefined;
+        }
+        mode = choice.mode;
+
+        if (mode === 'merge') {
+          const continueMerge = await vscode.window.showWarningMessage(
+            'Merging rewrites config.toml and may not preserve comments or formatting.',
+            { modal: true },
+            'Continue',
+            'Cancel'
+          );
+          if (continueMerge !== 'Continue') {
+            return undefined;
+          }
+        }
+      }
+    }
+
+    const catalogPath = path.join(directory, '9router-models.json');
+    const configPath =
+      mode === 'merge'
+        ? path.join(directory, 'config.toml')
+        : path.join(directory, '9router.config.toml');
+
+    const exportResult = buildCodexExport({
+      models: snapshot.models,
+      normalizedBaseUrl: snapshot.runtime.baseUrl,
+      catalogAbsolutePath: catalogPath
+    });
+
+    if (!(await confirmOverwrite(fs, [catalogPath, configPath]))) {
+      return undefined;
+    }
+
+    let configContents = exportResult.profileToml;
+    if (mode === 'merge') {
+      const existing = await fs.readFile(configPath, 'utf8');
+      try {
+        configContents = mergeCodexConfigToml(existing, {
+          defaultModel: exportResult.defaultModel,
+          catalogAbsolutePath: catalogPath,
+          codexBaseUrl: exportResult.codexBaseUrl
+        });
+      } catch (error) {
+        const detail = error instanceof Error ? error.message : 'unknown merge error';
+        throw new NineRouterError('CONFIGURATION_ERROR', detail);
+      }
+    }
+
+    await fs.writeFile(catalogPath, exportResult.catalogJson, 'utf8');
+    await fs.writeFile(configPath, configContents, 'utf8');
+
+    const launchHint =
+      mode === 'profile'
+        ? ' Launch with `codex --profile 9router` after the profile is available under CODEX_HOME.'
+        : '';
+    await vscode.window.showInformationMessage(
+      `Exported Codex config to ${catalogPath} and ${configPath}. Set NINE_ROUTER_API_KEY in your environment before running Codex.${launchHint}`
+    );
+
+    if (exportResult.warnings.length > 0) {
+      await vscode.window.showWarningMessage(exportResult.warnings.join(' '));
+    }
+
+    return {
+      mode,
+      directory,
+      catalogPath,
+      configPath,
+      warnings: exportResult.warnings
+    };
+  };
+}
