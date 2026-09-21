@@ -1,8 +1,8 @@
 import * as vscode from 'vscode';
 import { homedir as osHomedir } from 'node:os';
 import path from 'node:path';
-import { access, mkdir, readFile, writeFile } from 'node:fs/promises';
-import { buildCodexExport, mergeCodexConfigToml } from '@/config/codex-export';
+import { access, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { buildCodexExport, mergeCodexConfigToml, selectExportModels } from '@/config/codex-export';
 import { isUsableRuntimeSettings, type SettingsSnapshot } from '@/config/settings';
 import { NineRouterError } from '@/router/errors';
 
@@ -21,6 +21,7 @@ export interface CodexExportFs {
   readFile(path: string, encoding: 'utf8'): Promise<string>;
   writeFile(path: string, data: string, encoding: 'utf8'): Promise<void>;
   access(path: string): Promise<void>;
+  rm(path: string): Promise<void>;
 }
 
 interface DestinationQuickPickItem extends vscode.QuickPickItem {
@@ -71,6 +72,67 @@ function resolveCodexHome(
   return configured.length > 0 ? configured : path.join(homedir(), '.codex');
 }
 
+async function ensureDirectory(fs: CodexExportFs, directory: string): Promise<void> {
+  try {
+    await fs.mkdir(directory, { recursive: true });
+  } catch {
+    throw new NineRouterError(
+      'CONFIGURATION_ERROR',
+      `Failed to create Codex export directory: ${directory}`
+    );
+  }
+}
+
+async function writeExportFiles(
+  fs: CodexExportFs,
+  input: {
+    catalogPath: string;
+    configPath: string;
+    catalogJson: string;
+    configContents: string;
+  }
+): Promise<void> {
+  let previousCatalog: string | undefined;
+  if (await pathExists(fs, input.catalogPath)) {
+    try {
+      previousCatalog = await fs.readFile(input.catalogPath, 'utf8');
+    } catch {
+      throw new NineRouterError(
+        'CONFIGURATION_ERROR',
+        `Failed to read existing Codex catalog: ${input.catalogPath}`
+      );
+    }
+  }
+
+  try {
+    await fs.writeFile(input.catalogPath, input.catalogJson, 'utf8');
+  } catch {
+    throw new NineRouterError(
+      'CONFIGURATION_ERROR',
+      `Failed to write Codex catalog: ${input.catalogPath}`
+    );
+  }
+
+  try {
+    await fs.writeFile(input.configPath, input.configContents, 'utf8');
+  } catch {
+    try {
+      if (previousCatalog === undefined) {
+        await fs.rm(input.catalogPath);
+      } else {
+        await fs.writeFile(input.catalogPath, previousCatalog, 'utf8');
+      }
+    } catch {
+      // Best-effort rollback only; surface the original write failure.
+    }
+
+    throw new NineRouterError(
+      'CONFIGURATION_ERROR',
+      `Failed to write Codex config: ${input.configPath}`
+    );
+  }
+}
+
 export function createCodexExporter(dependencies: {
   getSettingsSnapshot: () => SettingsSnapshot | undefined;
   env?: Record<string, string | undefined>;
@@ -85,7 +147,8 @@ export function createCodexExporter(dependencies: {
       mkdir,
       readFile,
       writeFile,
-      access
+      access,
+      rm: (targetPath: string) => rm(targetPath, { force: true })
     } as CodexExportFs);
 
   return async () => {
@@ -97,12 +160,7 @@ export function createCodexExporter(dependencies: {
       );
     }
 
-    const prepared = buildCodexExport({
-      models: snapshot.models,
-      normalizedBaseUrl: snapshot.runtime.baseUrl,
-      catalogAbsolutePath: ''
-    });
-    if (prepared.models.length === 0) {
+    if (selectExportModels(snapshot.models).models.length === 0) {
       throw new NineRouterError(
         'CONFIGURATION_ERROR',
         'No publishable models available to export.'
@@ -148,7 +206,6 @@ export function createCodexExporter(dependencies: {
       directory = selectedFolder.fsPath;
     } else {
       directory = resolveCodexHome(env, homedir);
-      await fs.mkdir(directory, { recursive: true });
 
       const configTomlPath = path.join(directory, 'config.toml');
       if (await pathExists(fs, configTomlPath)) {
@@ -207,7 +264,16 @@ export function createCodexExporter(dependencies: {
 
     let configContents = exportResult.profileToml;
     if (mode === 'merge') {
-      const existing = await fs.readFile(configPath, 'utf8');
+      let existing: string;
+      try {
+        existing = await fs.readFile(configPath, 'utf8');
+      } catch {
+        throw new NineRouterError(
+          'CONFIGURATION_ERROR',
+          `Failed to read Codex config.toml: ${configPath}`
+        );
+      }
+
       try {
         configContents = await mergeCodexConfigToml(existing, {
           defaultModel: exportResult.defaultModel,
@@ -216,12 +282,19 @@ export function createCodexExporter(dependencies: {
         });
       } catch (error) {
         const detail = error instanceof Error ? error.message : 'unknown merge error';
-        throw new NineRouterError('CONFIGURATION_ERROR', detail);
+        throw new NineRouterError('CONFIGURATION_ERROR', detail, {
+          ...(error instanceof Error ? { details: { cause: error.message } } : {})
+        });
       }
     }
 
-    await fs.writeFile(catalogPath, exportResult.catalogJson, 'utf8');
-    await fs.writeFile(configPath, configContents, 'utf8');
+    await ensureDirectory(fs, directory);
+    await writeExportFiles(fs, {
+      catalogPath,
+      configPath,
+      catalogJson: exportResult.catalogJson,
+      configContents
+    });
 
     const launchHint =
       mode === 'profile'

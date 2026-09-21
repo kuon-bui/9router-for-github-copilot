@@ -73,6 +73,9 @@ function memoryFs() {
       if (!files.has(filePath)) {
         throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' });
       }
+    },
+    async rm(filePath: string): Promise<void> {
+      files.delete(filePath);
     }
   };
 }
@@ -276,5 +279,120 @@ describe('createCodexExporter', () => {
     expect(fs.files.get(catalogPath)).toBe('{"models":[]}');
     expect(fs.files.get(configPath)).toBe('model = "old"\n');
     expect(__getErrorMessages()).toEqual([]);
+  });
+
+  it('cancels mode Quick Pick without writing catalog or config files', async () => {
+    const fs = memoryFs();
+    const directory = path.join('/home', 'me', '.codex');
+    fs.files.set(path.join(directory, 'config.toml'), 'model = "other"\n');
+    const mkdirCalls: string[] = [];
+    const wrapped = {
+      ...fs,
+      async mkdir(target: string, options: { recursive: true }) {
+        mkdirCalls.push(target);
+        return fs.mkdir(target, options);
+      }
+    };
+
+    __setQuickPickValues([
+      { label: 'Install into Codex home', destination: 'codex-home' },
+      undefined
+    ]);
+
+    const exportCodexConfig = createCodexExporter({
+      getSettingsSnapshot: () =>
+        usableSnapshot([model({ id: 'agent', name: 'Agent', modelId: 'router/agent' })]),
+      env: { CODEX_HOME: directory },
+      fs: wrapped
+    });
+
+    await expect(exportCodexConfig()).resolves.toBeUndefined();
+    expect(fs.files.has(path.join(directory, '9router-models.json'))).toBe(false);
+    expect(fs.files.has(path.join(directory, '9router.config.toml'))).toBe(false);
+    expect(mkdirCalls).toEqual([]);
+  });
+
+  it('cancels merge rewrite warning without writing catalog or config files', async () => {
+    const fs = memoryFs();
+    const directory = path.join('/home', 'me', '.codex');
+    const configPath = path.join(directory, 'config.toml');
+    fs.files.set(configPath, 'model = "other"\nnotice = "keep-me"\n');
+
+    __setQuickPickValues([
+      { label: 'Install into Codex home', destination: 'codex-home' },
+      { label: 'Merge into config.toml', mode: 'merge' }
+    ]);
+    __setWarningResponses(['Cancel']);
+
+    const exportCodexConfig = createCodexExporter({
+      getSettingsSnapshot: () =>
+        usableSnapshot([model({ id: 'agent', name: 'Agent', modelId: 'router/agent' })]),
+      env: { CODEX_HOME: directory },
+      fs
+    });
+
+    await expect(exportCodexConfig()).resolves.toBeUndefined();
+    expect(fs.files.has(path.join(directory, '9router-models.json'))).toBe(false);
+    expect(fs.files.get(configPath)).toBe('model = "other"\nnotice = "keep-me"\n');
+  });
+
+  it('maps mkdir failure to CONFIGURATION_ERROR', async () => {
+    __setQuickPickValues([{ label: 'Install into Codex home', destination: 'codex-home' }]);
+    const fs = {
+      ...memoryFs(),
+      async mkdir(): Promise<string | undefined> {
+        throw Object.assign(new Error('EACCES'), { code: 'EACCES' });
+      }
+    };
+
+    const exportCodexConfig = createCodexExporter({
+      getSettingsSnapshot: () =>
+        usableSnapshot([model({ id: 'agent', name: 'Agent', modelId: 'router/agent' })]),
+      env: { CODEX_HOME: path.join('/tmp', 'blocked-codex') },
+      fs
+    });
+
+    await expect(exportCodexConfig()).rejects.toMatchObject({
+      code: 'CONFIGURATION_ERROR',
+      message: expect.stringContaining('create')
+    });
+  });
+
+  it('rolls back catalog when config write fails', async () => {
+    const fs = memoryFs();
+    const directory = path.join('/tmp', 'codex-export');
+    const catalogPath = path.join(directory, '9router-models.json');
+    const configPath = path.join(directory, '9router.config.toml');
+    let configWrites = 0;
+    const wrapped = {
+      ...fs,
+      async writeFile(filePath: string, data: string, encoding: 'utf8') {
+        if (filePath === configPath) {
+          configWrites += 1;
+          throw Object.assign(new Error('ENOSPC'), { code: 'ENOSPC' });
+        }
+        return fs.writeFile(filePath, data, encoding);
+      },
+      async rm(filePath: string) {
+        fs.files.delete(filePath);
+      }
+    };
+
+    __setQuickPickValues([{ label: 'Choose folder…', destination: 'folder' }]);
+    __setOpenDialogResult([directory]);
+
+    const exportCodexConfig = createCodexExporter({
+      getSettingsSnapshot: () =>
+        usableSnapshot([model({ id: 'agent', name: 'Agent', modelId: 'router/agent' })]),
+      fs: wrapped
+    });
+
+    await expect(exportCodexConfig()).rejects.toMatchObject({
+      code: 'CONFIGURATION_ERROR',
+      message: expect.stringContaining('write')
+    });
+    expect(configWrites).toBe(1);
+    expect(fs.files.has(catalogPath)).toBe(false);
+    expect(fs.files.has(configPath)).toBe(false);
   });
 });
