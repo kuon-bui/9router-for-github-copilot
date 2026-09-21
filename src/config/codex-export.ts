@@ -1,4 +1,3 @@
-import { parse, stringify } from 'smol-toml';
 import type { ConfiguredModel } from '@/types/product-model';
 
 export interface CodexCatalogReasoningLevel {
@@ -178,14 +177,16 @@ export function buildCodexExport(input: {
   };
 }
 
-export function mergeCodexConfigToml(
+export async function mergeCodexConfigToml(
   existingToml: string,
   input: {
     defaultModel: string;
     catalogAbsolutePath: string;
     codexBaseUrl: string;
   }
-): string {
+): Promise<string> {
+  // Dynamic import keeps Node16 CJS typechecking happy: smol-toml ships ESM-first types.
+  const { parse, stringify } = await import('smol-toml');
   let parsed: Record<string, unknown>;
   try {
     const value = parse(existingToml);
@@ -195,7 +196,7 @@ export function mergeCodexConfigToml(
     parsed = value as Record<string, unknown>;
   } catch (error) {
     const detail = error instanceof Error ? error.message : 'unknown parse error';
-    throw new Error(`Failed to parse Codex config.toml: ${detail}`);
+    throw new Error(`Failed to parse Codex config.toml: ${detail}`, { cause: error });
   }
 
   const providers =

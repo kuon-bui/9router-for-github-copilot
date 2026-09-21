@@ -14,6 +14,7 @@ import { createVisionProxyConfigurator } from './vision-configuration';
 import { createModelEditorOpener } from './model-editor-panel';
 import { createConnectionTester } from './test-connection';
 import { createUsageReporter } from './show-usage';
+import { createCodexExporter } from './export-codex-config';
 import type { RouterClient } from '@/router/client';
 import type { SettingsSnapshot } from '@/config/settings';
 import type { VisionProxyConfigurator } from './vision-configuration';
@@ -80,12 +81,16 @@ export async function activateExtension(
     routerClient,
     getSettingsSnapshot: () => provider?.getSnapshot()
   });
+  const exportCodexConfig = createCodexExporter({
+    getSettingsSnapshot: () => provider?.getSnapshot()
+  });
   registerRuntimeCommands(context, {
     getSettingsSnapshot: () => provider?.getSnapshot(),
     configureVisionProxy,
     manageModels,
     testConnection,
-    showUsage
+    showUsage,
+    exportCodexConfig
   });
   registerUsageChatParticipant(context, { showUsage });
   providerRegistration = vscode.lm.registerLanguageModelChatProvider('9router', provider);

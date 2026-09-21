@@ -51,6 +51,10 @@
         "title": "9router: Show Diagnostics"
       },
       {
+        "command": "9routerCopilot.exportCodexConfig",
+        "title": "9router: Export Codex Config"
+      },
+      {
         "command": "9routerCopilot.configureVisionProxy",
         "title": "9router: Configure Vision Proxy"
       },

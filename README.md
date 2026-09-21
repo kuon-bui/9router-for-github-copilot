@@ -157,6 +157,9 @@ Open the **Command Palette** and search for `9router`.
 | `9router: Configure Vision Proxy` | Select a Vision proxy source and model |
 | `9router: Show Usage` | Open quota and usage dashboard |
 | `9router: Show Diagnostics` | Open troubleshooting details |
+| `9router: Export Codex Config` | Export models to Codex catalog/profile files |
+
+Codex CLI export writes non-secret provider settings only. Set `NINE_ROUTER_API_KEY` in your environment before running Codex. Profile installs launch with `codex --profile 9router`.
 
 ## Advanced setup
 

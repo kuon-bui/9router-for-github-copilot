@@ -120,7 +120,8 @@ describe('release guardrails', () => {
       expect.arrayContaining([
         expect.objectContaining({ command: '9routerCopilot.testConnection' }),
         expect.objectContaining({ command: '9routerCopilot.showUsage' }),
-        expect.objectContaining({ command: '9routerCopilot.configureVisionProxy' })
+        expect.objectContaining({ command: '9routerCopilot.configureVisionProxy' }),
+        expect.objectContaining({ command: '9routerCopilot.exportCodexConfig' })
       ])
     );
     expect(manifest.contributes.chatParticipants).toEqual([

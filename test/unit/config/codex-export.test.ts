@@ -157,7 +157,7 @@ describe('buildCodexExport', () => {
 });
 
 describe('mergeCodexConfigToml', () => {
-  it('upserts 9router provider and top-level keys while preserving unrelated keys', () => {
+  it('upserts 9router provider and top-level keys while preserving unrelated keys', async () => {
     const existing = `
 model = "other"
 model_provider = "openai"
@@ -174,7 +174,7 @@ env_key = "OLD_KEY"
 wire_api = "chat"
 `;
 
-    const merged = mergeCodexConfigToml(existing, {
+    const merged = await mergeCodexConfigToml(existing, {
       defaultModel: 'router/agent',
       catalogAbsolutePath: '/home/me/.codex/9router-models.json',
       codexBaseUrl: 'http://127.0.0.1:20128/v1'
@@ -194,13 +194,13 @@ wire_api = "chat"
     expect(merged).not.toMatch(/api[_-]?key\s*=/i);
   });
 
-  it('fails closed on invalid TOML', () => {
-    expect(() =>
+  it('fails closed on invalid TOML', async () => {
+    await expect(
       mergeCodexConfigToml('model = [', {
         defaultModel: 'router/agent',
         catalogAbsolutePath: '/tmp/9router-models.json',
         codexBaseUrl: 'http://127.0.0.1:20128/v1'
       })
-    ).toThrow(/Failed to parse Codex config\.toml/);
+    ).rejects.toThrow(/Failed to parse Codex config\.toml/);
   });
 });

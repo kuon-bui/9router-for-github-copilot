@@ -63,14 +63,17 @@ async function confirmOverwrite(
   return true;
 }
 
-function resolveCodexHome(env: NodeJS.ProcessEnv, homedir: () => string): string {
+function resolveCodexHome(
+  env: Record<string, string | undefined>,
+  homedir: () => string
+): string {
   const configured = (env.CODEX_HOME ?? '').trim();
   return configured.length > 0 ? configured : path.join(homedir(), '.codex');
 }
 
 export function createCodexExporter(dependencies: {
   getSettingsSnapshot: () => SettingsSnapshot | undefined;
-  env?: NodeJS.ProcessEnv;
+  env?: Record<string, string | undefined>;
   homedir?: () => string;
   fs?: CodexExportFs;
 }): CodexExporter {
@@ -138,10 +141,11 @@ export function createCodexExporter(dependencies: {
         canSelectMany: false,
         openLabel: 'Export here'
       });
-      if (!folders || folders.length === 0) {
+      const selectedFolder = folders?.[0];
+      if (!selectedFolder) {
         return undefined;
       }
-      directory = folders[0].fsPath;
+      directory = selectedFolder.fsPath;
     } else {
       directory = resolveCodexHome(env, homedir);
       await fs.mkdir(directory, { recursive: true });
@@ -205,7 +209,7 @@ export function createCodexExporter(dependencies: {
     if (mode === 'merge') {
       const existing = await fs.readFile(configPath, 'utf8');
       try {
-        configContents = mergeCodexConfigToml(existing, {
+        configContents = await mergeCodexConfigToml(existing, {
           defaultModel: exportResult.defaultModel,
           catalogAbsolutePath: catalogPath,
           codexBaseUrl: exportResult.codexBaseUrl
