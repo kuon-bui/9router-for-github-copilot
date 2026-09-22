@@ -8,7 +8,11 @@ import { logDebugEvent } from '@/debug/output-channel';
 import { NineRouterError, appendErrorDetail } from '@/router/errors';
 import { adaptToolOptionsForRouter } from './tool-adapter';
 import { adaptMessagesToRouterRequest } from './request-adapter';
-import { createRouterEventEmitter, isThinkingPartSupported } from './stream-adapter';
+import {
+  createRouterEventEmitter,
+  isThinkingPartSupported,
+  reportThinkingPart
+} from './stream-adapter';
 import { createAbortSignalFromToken } from './cancellation';
 import { resolveEffectiveThinkingMode } from './thinking-effort';
 import { VisionProxyService } from './vision-proxy';
@@ -366,7 +370,8 @@ export class NineRouterChatProvider
           : {}),
         requestTimeoutMs: snapshot.runtime.requestTimeoutMs,
         signal: requestCancellation.signal,
-        cancellationToken: token
+        cancellationToken: token,
+        onProgress: ({ id, text }) => reportThinkingPart(progress, text, id)
       });
 
       logDebugEvent(snapshot.runtime.debugMode, 'Vision compatibility resolved', {

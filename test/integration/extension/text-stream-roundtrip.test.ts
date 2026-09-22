@@ -608,6 +608,7 @@ describe('NineRouterChatProvider', () => {
       signal: AbortSignal;
     }> = [];
     const visible: string[] = [];
+    const thinking: Array<{ id: string | undefined; text: string }> = [];
     const provider = new NineRouterChatProvider(
       { secrets: { get: async () => 'token' } } as never,
       {
@@ -621,6 +622,7 @@ describe('NineRouterChatProvider', () => {
             yield { type: 'response-complete', requestId: 'vision-req' };
             return;
           }
+          yield { type: 'thinking-delta', text: 'Primary reasoning' };
           yield { type: 'text-delta', text: 'Primary answer' };
           yield { type: 'response-complete', requestId: 'primary-req' };
         }
@@ -662,6 +664,11 @@ describe('NineRouterChatProvider', () => {
       } as never,
       {
         report: (part: vscode.LanguageModelResponsePart) => {
+          if (part instanceof vscode.LanguageModelThinkingPart) {
+            thinking.push({ id: part.id, text: String(part.value) });
+            return;
+          }
+
           if (part instanceof vscode.LanguageModelTextPart) visible.push(part.value);
         }
       } as never,
@@ -697,6 +704,13 @@ describe('NineRouterChatProvider', () => {
     expect(calls[0]?.signal).toBe(calls[1]?.signal);
     expect(JSON.stringify(calls[1]?.request.input)).toContain('[Vision proxy summary]');
     expect(JSON.stringify(calls[1]?.request.input)).not.toContain('data:image/png');
+    expect(thinking).toEqual([
+      { id: 'vision-proxy-1', text: 'Đang phân tích ảnh 1/1...\n' },
+      { id: 'vision-proxy-1', text: 'A diagram with A pointing to B.' },
+      { id: 'vision-proxy-1', text: '\n✓ Đã phân tích ảnh 1/1.\n' },
+      { id: 'vision-proxy-1', text: '' },
+      { id: undefined, text: 'Primary reasoning' }
+    ]);
     expect(visible).toEqual(['Primary answer']);
   });
 

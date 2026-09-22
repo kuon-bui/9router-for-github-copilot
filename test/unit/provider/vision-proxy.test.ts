@@ -32,6 +32,7 @@ function createCancellationToken() {
 describe('VisionProxyService', () => {
   it('summarizes each image-bearing message sequentially', async () => {
     const requests: RouterResponseRequest[] = [];
+    const progress: Array<{ id: string; text: string }> = [];
     let active = 0;
     let maxActive = 0;
     const service = new VisionProxyService({
@@ -67,7 +68,8 @@ describe('VisionProxyService', () => {
       maxTokens: 128,
       requestTimeoutMs: 5_000,
       signal: new AbortController().signal,
-      cancellationToken: createCancellationToken()
+      cancellationToken: createCancellationToken(),
+      onProgress: (event) => progress.push(event)
     });
 
     expect(requests.map((request) => request.model)).toEqual([
@@ -86,6 +88,16 @@ describe('VisionProxyService', () => {
     expect(JSON.stringify(result.messages)).not.toContain('mimeType');
     expect(result.messages[1]?.content).toEqual([
       { callId: 'call-1', name: 'tool', input: {} }
+    ]);
+    expect(progress).toEqual([
+      { id: 'vision-proxy-1', text: 'Đang phân tích ảnh 1/3...\n' },
+      { id: 'vision-proxy-1', text: 'summary-1' },
+      { id: 'vision-proxy-1', text: '\n✓ Đã phân tích ảnh 1/3.\n' },
+      { id: 'vision-proxy-1', text: '' },
+      { id: 'vision-proxy-2', text: 'Đang phân tích ảnh 2-3/3...\n' },
+      { id: 'vision-proxy-2', text: 'summary-2' },
+      { id: 'vision-proxy-2', text: '\n✓ Đã phân tích ảnh 2-3/3.\n' },
+      { id: 'vision-proxy-2', text: '' }
     ]);
   });
 
@@ -209,6 +221,7 @@ describe('VisionProxyService', () => {
         yield { type: 'text-delta', text: 'partial-summary-secret' };
       }
     });
+    const progress: Array<{ id: string; text: string }> = [];
 
     const promise = service.prepare({
       selectedModel: proxyModel,
@@ -221,7 +234,8 @@ describe('VisionProxyService', () => {
       maxTokens: 128,
       requestTimeoutMs: 5_000,
       signal: new AbortController().signal,
-      cancellationToken: createCancellationToken()
+      cancellationToken: createCancellationToken(),
+      onProgress: (event) => progress.push(event)
     });
 
     await expect(promise).rejects.toMatchObject({
@@ -234,6 +248,43 @@ describe('VisionProxyService', () => {
       })
     });
     await expect(promise).rejects.not.toThrow('partial-summary-secret');
+    expect(progress).toEqual([
+      { id: 'vision-proxy-1', text: 'Đang phân tích ảnh 1/1...\n' },
+      { id: 'vision-proxy-1', text: 'partial-summary-secret' },
+      { id: 'vision-proxy-1', text: '' }
+    ]);
+  });
+
+  it('does not report completion when cancellation arrives after the Vision summary', async () => {
+    const cancellation = __createCancellationToken();
+    const progress: Array<{ id: string; text: string }> = [];
+    const service = new VisionProxyService({
+      async *streamResponse() {
+        yield { type: 'text-delta', text: 'summary' };
+        cancellation.cancel();
+        yield { type: 'response-complete' };
+      }
+    });
+
+    await expect(service.prepare({
+      selectedModel: proxyModel,
+      messages: [{ role: 1, content: [image('image/png', 1)] }],
+      visionProxySource: '9router',
+      visionProxyModelId: 'combo/vision',
+      visionProxyPrompt: 'Custom image instruction.',
+      baseUrl: 'https://router.example.com/v1',
+      apiKey: 'secret',
+      maxTokens: 128,
+      requestTimeoutMs: 5_000,
+      signal: new AbortController().signal,
+      cancellationToken: cancellation.value as never,
+      onProgress: (event) => progress.push(event)
+    })).rejects.toMatchObject({ code: 'CANCELLATION_ERROR' });
+    expect(progress).toEqual([
+      { id: 'vision-proxy-1', text: 'Đang phân tích ảnh 1/1...\n' },
+      { id: 'vision-proxy-1', text: 'summary' },
+      { id: 'vision-proxy-1', text: '' }
+    ]);
   });
 
   it('maps a missing Vision model to the shared setting without raw response text', async () => {
@@ -401,6 +452,7 @@ describe('VisionProxyService', () => {
 
   it('dispatches Copilot source without calling 9router', async () => {
     let routerCalled = false;
+    const progress: Array<{ id: string; text: string }> = [];
     const service = new VisionProxyService(
       {
         async *streamResponse() {
@@ -409,7 +461,11 @@ describe('VisionProxyService', () => {
         }
       } as never,
       {
-        summarize: async () => ({ summary: 'native summary' })
+        summarize: async (input: { onTextDelta?: (text: string) => void }) => {
+          input.onTextDelta?.('native ');
+          input.onTextDelta?.('summary');
+          return { summary: 'native summary' };
+        }
       } as never
     );
 
@@ -423,12 +479,20 @@ describe('VisionProxyService', () => {
       apiKey: 'secret',
       requestTimeoutMs: 5_000,
       signal: new AbortController().signal,
-      cancellationToken: createCancellationToken()
+      cancellationToken: createCancellationToken(),
+      onProgress: (event) => progress.push(event)
     });
 
     expect(result.outcome).toBe('vision-proxied');
     expect(routerCalled).toBe(false);
     expect(JSON.stringify(result.messages)).toContain('native summary');
+    expect(progress).toEqual([
+      { id: 'vision-proxy-1', text: 'Đang phân tích ảnh 1/1...\n' },
+      { id: 'vision-proxy-1', text: 'native ' },
+      { id: 'vision-proxy-1', text: 'summary' },
+      { id: 'vision-proxy-1', text: '\n✓ Đã phân tích ảnh 1/1.\n' },
+      { id: 'vision-proxy-1', text: '' }
+    ]);
   });
 });
 

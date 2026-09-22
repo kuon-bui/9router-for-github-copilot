@@ -12,6 +12,7 @@ interface CopilotVisionSummaryInput {
   modelId: string;
   prompt: string;
   token: vscode.CancellationToken;
+  onTextDelta?: (text: string) => void;
 }
 
 function createPhaseDetails(): Record<string, unknown> {
@@ -170,6 +171,7 @@ export class CopilotVisionAnalyzer {
       let summary = '';
       for await (const text of response.text) {
         summary += text;
+        input.onTextDelta?.(text);
       }
 
       const trimmed = summary.trim();

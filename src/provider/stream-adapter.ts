@@ -22,12 +22,26 @@ export function isThinkingPartSupported(host: ThinkingPartHost = vscode): boolea
   return typeof host.LanguageModelThinkingPart === 'function';
 }
 
+export function reportThinkingPart(
+  progress: vscode.Progress<vscode.LanguageModelResponsePart>,
+  value: string,
+  id?: string,
+  host: ThinkingPartHost = vscode
+): void {
+  const thinkingPart = host.LanguageModelThinkingPart;
+  if (typeof thinkingPart !== 'function') {
+    return;
+  }
+
+  // Narrow interop cast: stable typings do not name proposed thinking parts yet.
+  progress.report(new thinkingPart(value, id) as unknown as vscode.LanguageModelResponsePart);
+}
+
 export function createRouterEventEmitter(
   progress: vscode.Progress<vscode.LanguageModelResponsePart>,
   host: ThinkingPartHost = vscode
 ): RouterEventEmitter {
   const toolCalls = new Map<string, ToolAccumulator>();
-  const thinkingPart = host.LanguageModelThinkingPart;
   let totalToolCallBytes = 0;
 
   return {
@@ -38,12 +52,7 @@ export function createRouterEventEmitter(
       }
 
       if (event.type === 'thinking-delta') {
-        if (typeof thinkingPart === 'function') {
-          // Narrow interop cast: thinking parts are accepted by the host at runtime but the stable
-          // LanguageModelResponsePart union does not name them yet.
-          progress.report(new thinkingPart(event.text) as unknown as vscode.LanguageModelResponsePart);
-        }
-
+        reportThinkingPart(progress, event.text, undefined, host);
         return;
       }
 
