@@ -43,6 +43,7 @@ async function expectNoSecretLeak(
 describe('CopilotVisionAnalyzer', () => {
   it('resolves exact model and sends prompt, text context, and image', async () => {
     const sent: unknown[] = [];
+    const deltas: string[] = [];
     let selectedToken: unknown;
 
     const analyzer = new CopilotVisionAnalyzer({
@@ -68,7 +69,8 @@ describe('CopilotVisionAnalyzer', () => {
         message: createMessage(),
         modelId: 'copilot/vision',
         prompt: 'Describe image.',
-        token: createToken()
+        token: createToken(),
+        onTextDelta: (text) => deltas.push(text)
       })
     ).resolves.toEqual({ summary: 'visible text and layout' });
 
@@ -76,6 +78,7 @@ describe('CopilotVisionAnalyzer', () => {
     expect(JSON.stringify(sent)).toContain('Describe image.');
     expect(JSON.stringify(sent)).toContain('local context secret');
     expect(JSON.stringify(sent)).toContain('image/png');
+    expect(deltas).toEqual(['visible text', ' and layout']);
     expect(selectedToken).toBeDefined();
   });
 

@@ -48,6 +48,12 @@ export interface VisionProxyInput {
   requestTimeoutMs: number;
   signal: AbortSignal;
   cancellationToken: vscode.CancellationToken;
+  onProgress?: (event: VisionProxyProgress) => void;
+}
+
+export interface VisionProxyProgress {
+  id: string;
+  text: string;
 }
 
 interface VisionInputCounts {
@@ -260,6 +266,8 @@ export class VisionProxyService {
 
     const messages: HostChatRequestMessage[] = [];
     const requestIds: string[] = [];
+    let analyzedImages = 0;
+    let sequence = 0;
     for (const message of input.messages) {
       if (!hasImageParts(message.content)) {
         messages.push(message);
@@ -274,11 +282,39 @@ export class VisionProxyService {
         );
       }
 
-      const result =
-        source === '9router'
-          ? await this.summarizeWithNineRouter(message, modelId, prompt, input)
-          : await this.summarizeWithCopilot(message, modelId, prompt, input);
+      const messageImageCount = countImageParts(message.content);
+      const firstImage = analyzedImages + 1;
+      const lastImage = analyzedImages + messageImageCount;
+      const id = `vision-proxy-${++sequence}`;
+      const imageRange = firstImage === lastImage ? `${firstImage}` : `${firstImage}-${lastImage}`;
+      input.onProgress?.({
+        id,
+        text: `Đang phân tích ảnh ${imageRange}/${counts.imageCount}...\n`
+      });
+      const onTextDelta = (text: string): void => input.onProgress?.({ id, text });
+
+      let result: { summary: string; requestId?: string };
+      try {
+        result =
+          source === '9router'
+            ? await this.summarizeWithNineRouter(message, modelId, prompt, input, onTextDelta)
+            : await this.summarizeWithCopilot(message, modelId, prompt, input, onTextDelta);
+        if (input.signal.aborted || input.cancellationToken.isCancellationRequested) {
+          throw new NineRouterError(
+            'CANCELLATION_ERROR',
+            '9router request was cancelled',
+            { details: { phase: 'vision-proxy', source } }
+          );
+        }
+        input.onProgress?.({
+          id,
+          text: `\n✓ Đã phân tích ảnh ${imageRange}/${counts.imageCount}.\n`
+        });
+      } finally {
+        input.onProgress?.({ id, text: '' });
+      }
       messages.push(replaceImagesWithSummary(message, result.summary));
+      analyzedImages = lastImage;
       if (result.requestId) {
         requestIds.push(result.requestId);
       }
@@ -298,7 +334,8 @@ export class VisionProxyService {
     message: HostChatRequestMessage,
     modelId: string,
     prompt: string,
-    input: VisionProxyInput
+    input: VisionProxyInput,
+    onTextDelta: (text: string) => void
   ): Promise<{ summary: string; requestId?: string }> {
     let summary = '';
     let requestId: string | undefined;
@@ -316,6 +353,7 @@ export class VisionProxyService {
       for await (const event of stream) {
         if (event.type === 'text-delta') {
           summary += event.text;
+          onTextDelta(event.text);
         }
 
         if (event.type === 'response-complete') {
@@ -370,13 +408,15 @@ export class VisionProxyService {
     message: HostChatRequestMessage,
     modelId: string,
     prompt: string,
-    input: VisionProxyInput
+    input: VisionProxyInput,
+    onTextDelta: (text: string) => void
   ): Promise<{ summary: string; requestId?: string }> {
     const result = await this.copilotAnalyzer.summarize({
       message,
       modelId,
       prompt,
-      token: input.cancellationToken
+      token: input.cancellationToken,
+      onTextDelta
     });
 
     return { summary: result.summary };

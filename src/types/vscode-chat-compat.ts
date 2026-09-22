@@ -28,5 +28,9 @@ export interface ModelConfigurationResponseOptions
  * explicit dependency keeps the capability check testable and lets the emitter degrade safely.
  */
 export interface ThinkingPartHost {
-  readonly LanguageModelThinkingPart?: new (value: string | string[]) => unknown;
+  readonly LanguageModelThinkingPart?: new (
+    value: string | string[],
+    id?: string,
+    metadata?: Readonly<Record<string, unknown>>
+  ) => unknown;
 }
