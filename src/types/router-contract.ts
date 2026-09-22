@@ -75,6 +75,9 @@ export interface RouterResponseRequest {
 
 export type RouterStreamEvent =
   | { type: 'text-delta'; text: string }
+  // Terminal snapshot of one output text part. Routers that relay a non-streaming upstream send
+  // this without any preceding delta, so consumers that need the whole text can fall back to it.
+  | { type: 'text-done'; text: string }
   | { type: 'thinking-delta'; text: string }
   | {
       type: 'usage';
