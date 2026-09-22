@@ -58,26 +58,29 @@ describe('selectExportModels', () => {
 
 describe('buildCodexCatalogModels', () => {
   it('maps reasoning, vision, and fast-tier fields', () => {
-    const catalog = buildCodexCatalogModels([
-      model({
-        id: 'vision',
-        name: 'Vision',
-        modelId: 'router/vision',
-        visionMode: 'native',
-        thinkingMode: 'high',
-        thinkingEfforts: ['low', 'high'],
-        serviceTier: 'fast',
-        maxInputTokens: 1000,
-        maxOutputTokens: 200
-      }),
-      model({
-        id: 'plain',
-        name: 'Plain',
-        modelId: 'router/plain',
-        thinkingMode: 'off',
-        thinkingEfforts: []
-      })
-    ]);
+    const catalog = buildCodexCatalogModels(
+      [
+        model({
+          id: 'vision',
+          name: 'Vision',
+          modelId: 'router/vision',
+          visionMode: 'native',
+          thinkingMode: 'high',
+          thinkingEfforts: ['low', 'high'],
+          serviceTier: 'fast',
+          maxInputTokens: 1000,
+          maxOutputTokens: 200
+        }),
+        model({
+          id: 'plain',
+          name: 'Plain',
+          modelId: 'router/plain',
+          thinkingMode: 'off',
+          thinkingEfforts: []
+        })
+      ],
+      'TEST INSTRUCTIONS'
+    );
 
     expect(catalog[0]).toMatchObject({
       slug: 'router/vision',
@@ -97,7 +100,7 @@ describe('buildCodexCatalogModels', () => {
       availability_nux: null,
       upgrade: null,
       model_messages: {
-        instructions_template: 'You are a coding agent connected through 9router.'
+        instructions_template: 'TEST INSTRUCTIONS'
       },
       support_verbosity: false,
       default_verbosity: null,
@@ -131,7 +134,8 @@ describe('buildCodexExport', () => {
         model({ id: 'dup', name: 'Dup', modelId: 'router/agent' })
       ],
       normalizedBaseUrl: 'http://127.0.0.1:20128',
-      catalogAbsolutePath: 'C:/Users/me/.codex/9router-models.json'
+      catalogAbsolutePath: 'C:/Users/me/.codex/9router-models.json',
+      instructionsTemplate: 'TEST INSTRUCTIONS'
     });
 
     expect(result.defaultModel).toBe('router/agent');

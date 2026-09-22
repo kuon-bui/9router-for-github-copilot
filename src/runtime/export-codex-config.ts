@@ -135,6 +135,7 @@ async function writeExportFiles(
 
 export function createCodexExporter(dependencies: {
   getSettingsSnapshot: () => SettingsSnapshot | undefined;
+  loadCodexInstructions: () => Promise<string>;
   env?: Record<string, string | undefined>;
   homedir?: () => string;
   fs?: CodexExportFs;
@@ -252,15 +253,33 @@ export function createCodexExporter(dependencies: {
         ? path.join(directory, 'config.toml')
         : path.join(directory, '9router.config.toml');
 
-    const exportResult = buildCodexExport({
-      models: snapshot.models,
-      normalizedBaseUrl: snapshot.runtime.baseUrl,
-      catalogAbsolutePath: catalogPath
-    });
-
     if (!(await confirmOverwrite(fs, [catalogPath, configPath]))) {
       return undefined;
     }
+
+    let instructionsTemplate: string;
+    try {
+      instructionsTemplate = (await dependencies.loadCodexInstructions()).trim();
+      if (instructionsTemplate.length === 0) {
+        throw new Error('Codex instructions prompt is empty.');
+      }
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : 'unknown prompt load error';
+      throw new NineRouterError(
+        'CONFIGURATION_ERROR',
+        `Failed to load Codex instructions: ${detail}`,
+        {
+          ...(error instanceof Error ? { details: { cause: error.message } } : {})
+        }
+      );
+    }
+
+    const exportResult = buildCodexExport({
+      models: snapshot.models,
+      normalizedBaseUrl: snapshot.runtime.baseUrl,
+      catalogAbsolutePath: catalogPath,
+      instructionsTemplate
+    });
 
     let configContents = exportResult.profileToml;
     if (mode === 'merge') {

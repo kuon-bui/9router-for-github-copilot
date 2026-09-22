@@ -77,7 +77,8 @@ export function selectExportModels(models: readonly ConfiguredModel[]): {
 }
 
 export function buildCodexCatalogModels(
-  models: readonly ConfiguredModel[]
+  models: readonly ConfiguredModel[],
+  instructionsTemplate: string
 ): CodexCatalogModel[] {
   return models.map((entry, index) => {
     const fast = entry.serviceTier === 'fast';
@@ -100,7 +101,7 @@ export function buildCodexCatalogModels(
       availability_nux: null,
       upgrade: null,
       model_messages: {
-        instructions_template: 'You are a coding agent connected through 9router.'
+        instructions_template: instructionsTemplate
       },
       support_verbosity: false,
       default_verbosity: null,
@@ -149,9 +150,10 @@ export function buildCodexExport(input: {
   models: readonly ConfiguredModel[];
   normalizedBaseUrl: string;
   catalogAbsolutePath: string;
+  instructionsTemplate: string;
 }): CodexExportResult {
   const selected = selectExportModels(input.models);
-  const catalogModels = buildCodexCatalogModels(selected.models);
+  const catalogModels = buildCodexCatalogModels(selected.models, input.instructionsTemplate);
   const defaultModel = selected.models[0]?.modelId ?? '';
   const codexBaseUrl = toCodexBaseUrl(input.normalizedBaseUrl);
   const catalog = { models: catalogModels };

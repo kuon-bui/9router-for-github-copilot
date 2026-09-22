@@ -80,13 +80,28 @@ function memoryFs() {
   };
 }
 
+function createTestExporter(
+  dependencies: {
+    getSettingsSnapshot: () => SettingsSnapshot | undefined;
+    loadCodexInstructions?: () => Promise<string>;
+    env?: Record<string, string | undefined>;
+    homedir?: () => string;
+    fs?: ReturnType<typeof memoryFs> | Parameters<typeof createCodexExporter>[0]['fs'];
+  }
+) {
+  return createCodexExporter({
+    loadCodexInstructions: async () => 'Test instructions.',
+    ...dependencies
+  } as Parameters<typeof createCodexExporter>[0]);
+}
+
 describe('createCodexExporter', () => {
   beforeEach(() => {
     __resetVscodeState();
   });
 
   it('throws CONFIGURATION_ERROR when runtime is missing', async () => {
-    const exportCodexConfig = createCodexExporter({
+    const exportCodexConfig = createTestExporter({
       getSettingsSnapshot: () => ({
         state: 'invalid-runtime',
         runtime: undefined,
@@ -104,7 +119,7 @@ describe('createCodexExporter', () => {
   });
 
   it('throws CONFIGURATION_ERROR when no exportable models remain', async () => {
-    const exportCodexConfig = createCodexExporter({
+    const exportCodexConfig = createTestExporter({
       getSettingsSnapshot: () => usableSnapshot([]),
       fs: memoryFs()
     });
@@ -120,7 +135,7 @@ describe('createCodexExporter', () => {
     const fs = memoryFs();
     __setQuickPickValues([undefined]);
 
-    const exportCodexConfig = createCodexExporter({
+    const exportCodexConfig = createTestExporter({
       getSettingsSnapshot: () =>
         usableSnapshot([model({ id: 'agent', name: 'Agent', modelId: 'router/agent' })]),
       fs
@@ -137,7 +152,7 @@ describe('createCodexExporter', () => {
     __setQuickPickValues([{ label: 'Choose folder…', destination: 'folder' }]);
     __setOpenDialogResult([folder]);
 
-    const exportCodexConfig = createCodexExporter({
+    const exportCodexConfig = createTestExporter({
       getSettingsSnapshot: () =>
         usableSnapshot([model({ id: 'agent', name: 'Agent', modelId: 'router/agent' })]),
       fs
@@ -173,7 +188,7 @@ describe('createCodexExporter', () => {
     const directory = path.join(home, '.codex');
     __setQuickPickValues([{ label: 'Install into Codex home', destination: 'codex-home' }]);
 
-    const exportCodexConfig = createCodexExporter({
+    const exportCodexConfig = createTestExporter({
       getSettingsSnapshot: () =>
         usableSnapshot([model({ id: 'agent', name: 'Agent', modelId: 'router/agent' })]),
       env: { CODEX_HOME: '   ' },
@@ -215,7 +230,7 @@ describe('createCodexExporter', () => {
     ]);
     __setWarningResponses(['Continue']);
 
-    const exportCodexConfig = createCodexExporter({
+    const exportCodexConfig = createTestExporter({
       getSettingsSnapshot: () =>
         usableSnapshot([model({ id: 'agent', name: 'Agent', modelId: 'router/agent' })]),
       env: { CODEX_HOME: directory },
@@ -245,7 +260,7 @@ describe('createCodexExporter', () => {
     const home = path.join('/Users', 'kuon');
     __setQuickPickValues([{ label: 'Install into Codex home', destination: 'codex-home' }]);
 
-    const exportCodexConfig = createCodexExporter({
+    const exportCodexConfig = createTestExporter({
       getSettingsSnapshot: () =>
         usableSnapshot([model({ id: 'agent', name: 'Agent', modelId: 'router/agent' })]),
       env: { CODEX_HOME: '\t  \n' },
@@ -268,7 +283,7 @@ describe('createCodexExporter', () => {
     __setQuickPickValues([{ label: 'Install into Codex home', destination: 'codex-home' }]);
     __setWarningResponse('Cancel');
 
-    const exportCodexConfig = createCodexExporter({
+    const exportCodexConfig = createTestExporter({
       getSettingsSnapshot: () =>
         usableSnapshot([model({ id: 'agent', name: 'Agent', modelId: 'router/agent' })]),
       env: { CODEX_HOME: directory },
@@ -299,7 +314,7 @@ describe('createCodexExporter', () => {
       undefined
     ]);
 
-    const exportCodexConfig = createCodexExporter({
+    const exportCodexConfig = createTestExporter({
       getSettingsSnapshot: () =>
         usableSnapshot([model({ id: 'agent', name: 'Agent', modelId: 'router/agent' })]),
       env: { CODEX_HOME: directory },
@@ -324,7 +339,7 @@ describe('createCodexExporter', () => {
     ]);
     __setWarningResponses(['Cancel']);
 
-    const exportCodexConfig = createCodexExporter({
+    const exportCodexConfig = createTestExporter({
       getSettingsSnapshot: () =>
         usableSnapshot([model({ id: 'agent', name: 'Agent', modelId: 'router/agent' })]),
       env: { CODEX_HOME: directory },
@@ -345,7 +360,7 @@ describe('createCodexExporter', () => {
       }
     };
 
-    const exportCodexConfig = createCodexExporter({
+    const exportCodexConfig = createTestExporter({
       getSettingsSnapshot: () =>
         usableSnapshot([model({ id: 'agent', name: 'Agent', modelId: 'router/agent' })]),
       env: { CODEX_HOME: path.join('/tmp', 'blocked-codex') },
@@ -381,7 +396,7 @@ describe('createCodexExporter', () => {
     __setQuickPickValues([{ label: 'Choose folder…', destination: 'folder' }]);
     __setOpenDialogResult([directory]);
 
-    const exportCodexConfig = createCodexExporter({
+    const exportCodexConfig = createTestExporter({
       getSettingsSnapshot: () =>
         usableSnapshot([model({ id: 'agent', name: 'Agent', modelId: 'router/agent' })]),
       fs: wrapped
@@ -394,5 +409,89 @@ describe('createCodexExporter', () => {
     expect(configWrites).toBe(1);
     expect(fs.files.has(catalogPath)).toBe(false);
     expect(fs.files.has(configPath)).toBe(false);
+  });
+
+  it('does not invoke loadCodexInstructions when user cancels destination Quick Pick', async () => {
+    const fs = memoryFs();
+    __setQuickPickValues([undefined]);
+    let loadCalled = false;
+
+    const exportCodexConfig = createTestExporter({
+      getSettingsSnapshot: () =>
+        usableSnapshot([model({ id: 'agent', name: 'Agent', modelId: 'router/agent' })]),
+      loadCodexInstructions: async () => {
+        loadCalled = true;
+        return 'Prompt';
+      },
+      fs
+    });
+
+    await expect(exportCodexConfig()).resolves.toBeUndefined();
+    expect(loadCalled).toBe(false);
+    expect(fs.files.size).toBe(0);
+  });
+
+  it('throws CONFIGURATION_ERROR and writes nothing when loadCodexInstructions fails or returns blank', async () => {
+    const fs = memoryFs();
+    const folder = path.join('/tmp', 'codex-export');
+    __setQuickPickValues([{ label: 'Choose folder…', destination: 'folder' }]);
+    __setOpenDialogResult([folder]);
+
+    const exportFailingLoader = createTestExporter({
+      getSettingsSnapshot: () =>
+        usableSnapshot([model({ id: 'agent', name: 'Agent', modelId: 'router/agent' })]),
+      loadCodexInstructions: async () => {
+        throw new Error('Disk unreadable');
+      },
+      fs
+    });
+
+    await expect(exportFailingLoader()).rejects.toMatchObject({
+      code: 'CONFIGURATION_ERROR',
+      message: expect.stringContaining('Disk unreadable')
+    });
+    expect(fs.files.size).toBe(0);
+
+    __setQuickPickValues([{ label: 'Choose folder…', destination: 'folder' }]);
+    __setOpenDialogResult([folder]);
+
+    const exportBlankLoader = createTestExporter({
+      getSettingsSnapshot: () =>
+        usableSnapshot([model({ id: 'agent', name: 'Agent', modelId: 'router/agent' })]),
+      loadCodexInstructions: async () => '   \n\t  ',
+      fs
+    });
+
+    await expect(exportBlankLoader()).rejects.toMatchObject({
+      code: 'CONFIGURATION_ERROR',
+      message: expect.stringContaining('empty')
+    });
+    expect(fs.files.size).toBe(0);
+  });
+
+  it('passes loaded prompt to all models in exported catalog', async () => {
+    const fs = memoryFs();
+    const folder = path.join('/tmp', 'codex-export');
+    __setQuickPickValues([{ label: 'Choose folder…', destination: 'folder' }]);
+    __setOpenDialogResult([folder]);
+
+    const customPrompt = 'Custom Opus Prompt for all models';
+    const exportCodexConfig = createTestExporter({
+      getSettingsSnapshot: () =>
+        usableSnapshot([
+          model({ id: 'agent', name: 'Agent', modelId: 'router/agent' }),
+          model({ id: 'coder', name: 'Coder', modelId: 'router/coder' })
+        ]),
+      loadCodexInstructions: async () => customPrompt,
+      fs
+    });
+
+    await exportCodexConfig();
+    const catalogJson = fs.files.get(path.join(folder, '9router-models.json'));
+    expect(catalogJson).toBeDefined();
+    const catalog = JSON.parse(catalogJson!);
+    expect(catalog.models).toHaveLength(2);
+    expect(catalog.models[0].model_messages.instructions_template).toBe(customPrompt);
+    expect(catalog.models[1].model_messages.instructions_template).toBe(customPrompt);
   });
 });

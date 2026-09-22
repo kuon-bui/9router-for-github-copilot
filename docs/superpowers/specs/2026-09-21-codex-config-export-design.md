@@ -70,7 +70,9 @@ Two modules own the feature:
 | `src/config/codex-export.ts` | Pure adapter: select exportable models, dedupe by `modelId`, build catalog JSON, build profile TOML text, build Codex provider `base_url`, describe warnings |
 | `src/runtime/export-codex-config.ts` | Runtime flow: destination Quick Pick, folder / `CODEX_HOME` resolution, profile-vs-merge choice, overwrite confirmation, filesystem writes, user-facing success/error messages |
 
-`registerCommands` gains an optional `exportCodexConfig` dependency, matching `testConnection` / `showUsage`. Activation constructs the exporter with `getSettingsSnapshot`.
+`registerCommands` gains an optional `exportCodexConfig` dependency, matching `testConnection` / `showUsage`. Activation constructs the exporter with `getSettingsSnapshot` and lazy prompt loader `loadCodexInstructions: () => readDefaultCodexInstructions(context.extensionPath)`.
+
+Codex instructions are loaded lazily only when executing the export command, after destination and overwrite confirmations. Any prompt loading failure (missing file, unreadable file, or blank content) fails only the export command with `CONFIGURATION_ERROR` without writing files, and never blocks extension activation or Copilot Chat provider operations.
 
 No provider, router transport, webview, or secret-store changes are required.
 
@@ -86,6 +88,7 @@ Command Palette: 9router: Export Codex Config
   -> if Codex home and config.toml exists:
        Quick Pick: Create profile / Merge into config.toml
   -> confirm overwrite for any existing target file
+  -> load Codex instructions template (lazy; fails closed on read/empty error)
   -> write 9router-models.json
   -> write 9router.config.toml or merge into config.toml
   -> show success message with paths, env-key reminder, and launch hint
@@ -133,7 +136,7 @@ Per configured publishable model, after `modelId` dedupe:
 | `service_tiers` | `[{ "id": "priority", "name": "Fast", "description": "Faster tier" }]` when fast, else `[]` |
 | `availability_nux` | `null` |
 | `upgrade` | `null` |
-| `model_messages.instructions_template` | `"You are a coding agent connected through 9router."` |
+| `model_messages.instructions_template` | contents of bundled `prompts/codex/default-codex-instructions.md` |
 | `support_verbosity` | `false` |
 | `default_verbosity` | `null` |
 | `apply_patch_tool_type` | `null` |

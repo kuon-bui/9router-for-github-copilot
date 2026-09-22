@@ -5,6 +5,7 @@ import {
   loadRuntimeSettings
 } from '@/config/settings';
 import { readDefaultVisionProxyPrompt } from '@/config/vision-proxy-prompt';
+import { readDefaultCodexInstructions } from '@/config/read-codex-instructions';
 import { disposeOutputChannel } from '@/debug/output-channel';
 import { createRouterClient } from '@/router/client';
 import { NineRouterChatProvider } from '@/provider/provider';
@@ -34,6 +35,7 @@ interface ActivationHooks {
   ) => NineRouterChatProvider;
   registerCommands?: typeof registerCommands;
   readDefaultVisionProxyPrompt?: typeof readDefaultVisionProxyPrompt;
+  readDefaultCodexInstructions?: typeof readDefaultCodexInstructions;
 }
 
 export async function activateExtension(
@@ -48,6 +50,8 @@ export async function activateExtension(
   const defaultVisionProxyPrompt = await (
     hooks.readDefaultVisionProxyPrompt ?? readDefaultVisionProxyPrompt
   )(context.extensionPath);
+  const readCodexInstructions =
+    hooks.readDefaultCodexInstructions ?? readDefaultCodexInstructions;
 
   const routerClient = createRouterClient({ fetch: globalThis.fetch });
   const configureVisionProxy = createVisionProxyConfigurator({
@@ -82,7 +86,8 @@ export async function activateExtension(
     getSettingsSnapshot: () => provider?.getSnapshot()
   });
   const exportCodexConfig = createCodexExporter({
-    getSettingsSnapshot: () => provider?.getSnapshot()
+    getSettingsSnapshot: () => provider?.getSnapshot(),
+    loadCodexInstructions: () => readCodexInstructions(context.extensionPath)
   });
   registerRuntimeCommands(context, {
     getSettingsSnapshot: () => provider?.getSnapshot(),
