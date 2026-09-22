@@ -29,11 +29,21 @@ export function createRouterEventEmitter(
   const toolCalls = new Map<string, ToolAccumulator>();
   const thinkingPart = host.LanguageModelThinkingPart;
   let totalToolCallBytes = 0;
+  let streamedText = false;
+  let completedText = '';
 
   return {
     emit(event) {
       if (event.type === 'text-delta') {
+        streamedText = true;
         progress.report(new vscode.LanguageModelTextPart(event.text));
+        return;
+      }
+
+      // Held back rather than reported on arrival: when deltas already streamed this is the same
+      // text again, and only the terminal event tells us whether the turn produced any.
+      if (event.type === 'text-done') {
+        completedText += event.text;
         return;
       }
 
@@ -115,6 +125,12 @@ export function createRouterEventEmitter(
       }
 
       if (event.type === 'response-complete') {
+        if (!streamedText && completedText.length > 0) {
+          progress.report(new vscode.LanguageModelTextPart(completedText));
+        }
+
+        completedText = '';
+
         for (const toolCall of toolCalls.values()) {
           emitToolCall(progress, toolCall);
         }

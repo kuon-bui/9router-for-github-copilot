@@ -42,6 +42,7 @@ interface RouterResponsesSsePayload {
   response_id?: unknown;
   output_index?: unknown;
   delta?: unknown;
+  text?: unknown;
   message?: unknown;
   error?: {
     message?: unknown;
@@ -103,6 +104,12 @@ function parseSseFrame(frame: string): RouterStreamEvent[] {
   if (parsed.type === 'response.output_text.delta' || parsed.type === 'response.refusal.delta') {
     return typeof parsed.delta === 'string' && parsed.delta.length > 0
       ? [{ type: 'text-delta', text: parsed.delta }]
+      : [];
+  }
+
+  if (parsed.type === 'response.output_text.done') {
+    return typeof parsed.text === 'string' && parsed.text.length > 0
+      ? [{ type: 'text-done', text: parsed.text }]
       : [];
   }
 

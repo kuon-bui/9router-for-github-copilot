@@ -36,6 +36,21 @@ describe('parseSseChunk', () => {
     ]);
   });
 
+  it('emits the completed output text so routers that skip deltas still deliver text', () => {
+    const events = parseSseChunk(
+      'event: response.output_text.done\n' +
+        'data: {"type":"response.output_text.done","text":"full text"}\n\n'
+    );
+
+    expect(events).toEqual([{ type: 'text-done', text: 'full text' }]);
+  });
+
+  it('ignores an empty completed output text', () => {
+    expect(parseSseChunk('data: {"type":"response.output_text.done","text":""}\n\n')).toEqual(
+      []
+    );
+  });
+
   it('accepts a trailing done sentinel for router compatibility', () => {
     expect(parseSseChunk('data: [DONE]\n\n')).toEqual([{ type: 'response-complete' }]);
   });

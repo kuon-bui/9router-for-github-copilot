@@ -18,6 +18,56 @@ describe('createRouterEventEmitter', () => {
     expect((parts[0] as vscode.LanguageModelTextPart).value).toBe('Hello');
   });
 
+  it('emits the completed output text when the router streams no text deltas', () => {
+    const parts: unknown[] = [];
+    const emitter = createRouterEventEmitter({
+      report(part) {
+        parts.push(part);
+      }
+    } as vscode.Progress<vscode.LanguageModelResponsePart>);
+
+    emitter.emit({ type: 'text-done', text: 'full answer' });
+    emitter.emit({ type: 'response-complete' });
+
+    expect(parts).toHaveLength(1);
+    expect(parts[0]).toBeInstanceOf(vscode.LanguageModelTextPart);
+    expect((parts[0] as vscode.LanguageModelTextPart).value).toBe('full answer');
+  });
+
+  it('joins several completed output texts when no deltas streamed', () => {
+    const parts: unknown[] = [];
+    const emitter = createRouterEventEmitter({
+      report(part) {
+        parts.push(part);
+      }
+    } as vscode.Progress<vscode.LanguageModelResponsePart>);
+
+    emitter.emit({ type: 'text-done', text: 'first' });
+    emitter.emit({ type: 'text-done', text: 'second' });
+    emitter.emit({ type: 'response-complete' });
+
+    expect(parts).toHaveLength(1);
+    expect((parts[0] as vscode.LanguageModelTextPart).value).toBe('firstsecond');
+  });
+
+  it('does not repeat text that already streamed as deltas', () => {
+    const parts: unknown[] = [];
+    const emitter = createRouterEventEmitter({
+      report(part) {
+        parts.push(part);
+      }
+    } as vscode.Progress<vscode.LanguageModelResponsePart>);
+
+    emitter.emit({ type: 'text-delta', text: 'full ' });
+    emitter.emit({ type: 'text-delta', text: 'answer' });
+    emitter.emit({ type: 'text-done', text: 'full answer' });
+    emitter.emit({ type: 'response-complete' });
+
+    expect(parts).toHaveLength(2);
+    expect((parts[0] as vscode.LanguageModelTextPart).value).toBe('full ');
+    expect((parts[1] as vscode.LanguageModelTextPart).value).toBe('answer');
+  });
+
   it('assembles tool call arguments across streaming chunks', () => {
     const parts: unknown[] = [];
     const emitter = createRouterEventEmitter({

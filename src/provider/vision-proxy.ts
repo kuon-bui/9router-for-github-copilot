@@ -163,6 +163,21 @@ function replaceImagesWithSummary(
   };
 }
 
+// The stream completed normally but carried no answer, so the reason lives in the router metadata
+// rather than in an error frame. Surfacing it keeps a one-off upstream hiccup apart from a model
+// that never answers, without echoing any generated content back to the user.
+function formatEmptySummaryMessage(
+  finishReason: string | undefined,
+  thinkingOnly: boolean
+): string {
+  const cause = finishReason ? ` (finish reason: ${finishReason})` : '';
+  const detail = thinkingOnly
+    ? ' The Vision proxy model emitted reasoning only.'
+    : ' The Vision proxy model returned no output.';
+
+  return `9router Vision analysis returned an empty summary${cause}.${detail} Retry the request, or point 9router-copilot.visionProxyModelId at another Vision-capable model if it keeps happening.`;
+}
+
 function mapVisionProxyError(
   error: unknown,
   source: '9router' | 'copilot'
@@ -301,7 +316,10 @@ export class VisionProxyService {
     input: VisionProxyInput
   ): Promise<{ summary: string; requestId?: string }> {
     let summary = '';
+    let completedText = '';
+    let thinkingLength = 0;
     let requestId: string | undefined;
+    let finishReason: string | undefined;
     let responseCompleted = false;
 
     try {
@@ -318,10 +336,21 @@ export class VisionProxyService {
           summary += event.text;
         }
 
+        if (event.type === 'text-done') {
+          completedText = event.text;
+        }
+
+        if (event.type === 'thinking-delta') {
+          thinkingLength += event.text.length;
+        }
+
         if (event.type === 'response-complete') {
           responseCompleted = true;
           if (event.requestId) {
             requestId = event.requestId;
+          }
+          if (event.finishReason) {
+            finishReason = event.finishReason;
           }
         }
 
@@ -351,14 +380,20 @@ export class VisionProxyService {
       );
     }
 
-    const trimmed = summary.trim();
+    // Routers that relay a non-streaming upstream deliver the whole text in the terminal part
+    // instead of deltas, so it is the fallback rather than a duplicate of what already streamed.
+    const trimmed = (summary.length > 0 ? summary : completedText).trim();
     if (trimmed.length === 0) {
       throw new NineRouterError(
         'MALFORMED_STREAM_ERROR',
-        '9router Vision analysis returned an empty summary',
+        formatEmptySummaryMessage(finishReason, thinkingLength > 0),
         {
           ...(requestId ? { requestId } : {}),
-          details: { phase: 'vision-proxy' }
+          details: {
+            phase: 'vision-proxy',
+            ...(finishReason ? { finishReason } : {}),
+            ...(thinkingLength > 0 ? { thinkingOnly: true, thinkingLength } : {})
+          }
         }
       );
     }

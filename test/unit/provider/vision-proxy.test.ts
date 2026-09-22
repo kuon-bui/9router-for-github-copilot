@@ -203,6 +203,103 @@ describe('VisionProxyService', () => {
     });
   });
 
+  it('reports the completion reason when the Vision stream carries no text', async () => {
+    const service = new VisionProxyService({
+      async *streamResponse() {
+        yield { type: 'thinking-delta', text: 'internal reasoning only' };
+        yield {
+          type: 'response-complete',
+          finishReason: 'max_output_tokens',
+          requestId: 'resp-empty-1'
+        };
+      }
+    });
+
+    const promise = service.prepare({
+      selectedModel: proxyModel,
+      messages: [{ role: 1, content: [image('image/png', 1)] }],
+      visionProxySource: '9router',
+      visionProxyModelId: 'combo/vision',
+      visionProxyPrompt: 'Custom image instruction.',
+      baseUrl: 'https://router.example.com/v1',
+      apiKey: 'secret',
+      maxTokens: 128,
+      requestTimeoutMs: 5_000,
+      signal: new AbortController().signal,
+      cancellationToken: createCancellationToken()
+    });
+
+    await expect(promise).rejects.toMatchObject({
+      code: 'MALFORMED_STREAM_ERROR',
+      requestId: 'resp-empty-1',
+      details: {
+        phase: 'vision-proxy',
+        finishReason: 'max_output_tokens',
+        thinkingOnly: true
+      }
+    });
+    await expect(promise).rejects.toThrow('max_output_tokens');
+    await expect(promise).rejects.not.toThrow('internal reasoning only');
+  });
+
+  it('falls back to the completed output text when the stream sends no text deltas', async () => {
+    const service = new VisionProxyService({
+      async *streamResponse() {
+        yield { type: 'text-done', text: 'full summary without deltas' };
+        yield { type: 'response-complete', requestId: 'resp-done-1' };
+      }
+    });
+
+    const result = await service.prepare({
+      selectedModel: proxyModel,
+      messages: [{ role: 1, content: [image('image/png', 1)] }],
+      visionProxySource: '9router',
+      visionProxyModelId: 'combo/vision',
+      visionProxyPrompt: 'Custom image instruction.',
+      baseUrl: 'https://router.example.com/v1',
+      apiKey: 'secret',
+      maxTokens: 128,
+      requestTimeoutMs: 5_000,
+      signal: new AbortController().signal,
+      cancellationToken: createCancellationToken()
+    });
+
+    expect(result.outcome).toBe('vision-proxied');
+    expect(result.messages[0]?.content).toEqual([
+      { value: '[Vision proxy summary]\nfull summary without deltas' }
+    ]);
+    expect(result.requestIds).toEqual(['resp-done-1']);
+  });
+
+  it('prefers streamed text deltas over the completed output text', async () => {
+    const service = new VisionProxyService({
+      async *streamResponse() {
+        yield { type: 'text-delta', text: 'streamed ' };
+        yield { type: 'text-delta', text: 'summary' };
+        yield { type: 'text-done', text: 'streamed summary' };
+        yield { type: 'response-complete' };
+      }
+    });
+
+    const result = await service.prepare({
+      selectedModel: proxyModel,
+      messages: [{ role: 1, content: [image('image/png', 1)] }],
+      visionProxySource: '9router',
+      visionProxyModelId: 'combo/vision',
+      visionProxyPrompt: 'Custom image instruction.',
+      baseUrl: 'https://router.example.com/v1',
+      apiKey: 'secret',
+      maxTokens: 128,
+      requestTimeoutMs: 5_000,
+      signal: new AbortController().signal,
+      cancellationToken: createCancellationToken()
+    });
+
+    expect(result.messages[0]?.content).toEqual([
+      { value: '[Vision proxy summary]\nstreamed summary' }
+    ]);
+  });
+
   it('rejects a truncated Vision stream after text deltas without leaking the summary', async () => {
     const service = new VisionProxyService({
       async *streamResponse() {
