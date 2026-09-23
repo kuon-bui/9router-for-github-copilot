@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.14.0](https://github.com/kuon-bui/9router-for-github-copilot/compare/v0.13.1...v0.14.0) (2026-09-23)
+
+
+### Features
+
+* **provider:** stream vision proxy progress and summary as thinking ([#62](https://github.com/kuon-bui/9router-for-github-copilot/issues/62)) ([efcf851](https://github.com/kuon-bui/9router-for-github-copilot/commit/efcf85156303d45648aeaea5888562b2cf98afb4))
+* **router:** support completed output text events ([#61](https://github.com/kuon-bui/9router-for-github-copilot/issues/61)) ([9ab800c](https://github.com/kuon-bui/9router-for-github-copilot/commit/9ab800c5d06d7a65ebc7be4d4e5689ab81a3ea34))
+* **webview:** add inline row actions and view transitions to model list ([#64](https://github.com/kuon-bui/9router-for-github-copilot/issues/64)) ([9642a56](https://github.com/kuon-bui/9router-for-github-copilot/commit/9642a56b52969ee7667952b7758e46838ced56ca))
+
 ## [0.13.1](https://github.com/kuon-bui/9router-for-github-copilot/compare/v0.13.0...v0.13.1) (2026-09-18)
 
 
