@@ -9,9 +9,53 @@ const CHIP_CLASS: Record<ChipTone, string> = {
   bad: 'ui-chip bg-err-bg text-err-fg'
 };
 
+const ICON_PATHS = {
+  moveUp: ['M12 19V5', 'M5 12l7-7 7 7'],
+  moveDown: ['M12 5v14', 'M19 12l-7 7-7-7'],
+  remove: ['M4 7h16', 'M9 7V4h6v3', 'M6 7l1 13h10l1-13', 'M10 11v6', 'M14 11v6']
+} as const;
+
+interface RowActionProps {
+  readonly icon: keyof typeof ICON_PATHS;
+  readonly label: string;
+  readonly tone?: 'danger';
+  readonly disabled?: boolean;
+  readonly onClick: () => void;
+}
+
+function RowAction({ icon, label, tone, disabled, onClick }: RowActionProps): JSX.Element {
+  return (
+    <button
+      type="button"
+      className={`ui-button grid size-7 place-items-center p-0 ${tone === 'danger' ? 'text-err-fg' : ''}`}
+      title={label}
+      aria-label={label}
+      disabled={disabled ?? false}
+      onClick={onClick}
+    >
+      <svg
+        className="size-3.75"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={1.8}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+      >
+        {ICON_PATHS[icon].map((path) => (
+          <path key={path} d={path} />
+        ))}
+      </svg>
+    </button>
+  );
+}
+
 interface ModelListProps {
   readonly state: ModelEditorState;
   readonly error: string;
+  /** sourceIndex of the row mid-delete; see ModelEditor for why this exists. */
+  readonly exitingSourceIndex: number | null;
   readonly onAdd: () => void;
   readonly onEdit: (sourceIndex: number) => void;
   readonly onRemove: (sourceIndex: number) => void;
@@ -22,6 +66,7 @@ interface ModelListProps {
 export function ModelList({
   state,
   error,
+  exitingSourceIndex,
   onAdd,
   onEdit,
   onRemove,
@@ -100,7 +145,12 @@ export function ModelList({
           {rows.map((row, index) => (
             <li
               key={row.sourceIndex}
-              className="relative grid grid-cols-1 gap-3 rounded-xl bg-card py-3 pl-4 pr-3 transition-colors min-[560px]:grid-cols-[minmax(0,1fr)_auto]"
+              className="model-row relative grid grid-cols-1 gap-3 rounded-xl bg-card py-3 pl-4 pr-3 transition-colors min-[560px]:grid-cols-[minmax(0,1fr)_auto]"
+              style={{
+                viewTransitionName: row.key,
+                viewTransitionClass:
+                  row.sourceIndex === exitingSourceIndex ? 'model-row model-row-exit' : 'model-row'
+              }}
             >
               <span
                 aria-hidden="true"
@@ -125,39 +175,24 @@ export function ModelList({
                 <button type="button" className="ui-button" onClick={() => onEdit(row.sourceIndex)}>
                   Edit
                 </button>
-                <details className="group relative">
-                  <summary
-                    aria-label={`More actions for ${row.title}`}
-                    className="ui-button list-none px-2.5 [&::-webkit-details-marker]:hidden"
-                  >
-                    ...
-                  </summary>
-                  <div className="absolute right-0 z-10 mt-1 flex min-w-32 flex-col rounded-lg border border-border bg-card p-1 shadow-lg">
-                    <button
-                      type="button"
-                      className="ui-menu-item"
-                      disabled={index === 0}
-                      onClick={() => onMove(row.sourceIndex, 'up')}
-                    >
-                      Move up
-                    </button>
-                    <button
-                      type="button"
-                      className="ui-menu-item"
-                      disabled={index === rows.length - 1}
-                      onClick={() => onMove(row.sourceIndex, 'down')}
-                    >
-                      Move down
-                    </button>
-                    <button
-                      type="button"
-                      className="ui-menu-item text-err-fg"
-                      onClick={() => onRemove(row.sourceIndex)}
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </details>
+                <RowAction
+                  icon="moveUp"
+                  label={`Move ${row.title} up`}
+                  disabled={index === 0}
+                  onClick={() => onMove(row.sourceIndex, 'up')}
+                />
+                <RowAction
+                  icon="moveDown"
+                  label={`Move ${row.title} down`}
+                  disabled={index === rows.length - 1}
+                  onClick={() => onMove(row.sourceIndex, 'down')}
+                />
+                <RowAction
+                  icon="remove"
+                  label={`Delete ${row.title}`}
+                  tone="danger"
+                  onClick={() => onRemove(row.sourceIndex)}
+                />
               </div>
             </li>
           ))}
