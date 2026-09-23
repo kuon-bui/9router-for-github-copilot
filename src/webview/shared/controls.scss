@@ -53,21 +53,6 @@ button {
   }
 }
 
-.ui-menu-item {
-  border: 0;
-  border-radius: 5px;
-  background: transparent;
-  padding: 5px 8px;
-  text-align: left;
-
-  &:hover:not(:disabled),
-  &:focus-visible {
-    outline: none;
-    background: var(--vscode-list-hoverBackground);
-    color: var(--vscode-list-hoverForeground, var(--vscode-editor-foreground));
-  }
-}
-
 .ui-field {
   width: 100%;
   box-sizing: border-box;
@@ -195,4 +180,57 @@ legend {
   padding: 0;
   color: var(--vscode-descriptionForeground);
   font-size: 11px;
+}
+
+/*
+ * Model list row transitions (moveModel/removeModel). ModelList tags every
+ * row with view-transition-name (a stable per-model id) and
+ * view-transition-class: model-row; ModelEditor additionally adds
+ * model-row-exit to the one row it asked the host to delete, from the click
+ * until the resulting state lands, so the "old" snapshot carries it. The browser
+ * pairs old/new snapshots by name, not by DOM node, so this animates a row
+ * to its new slot correctly even though Preact reuses each <li> by position
+ * rather than moving the element itself.
+ *
+ * Reposition (move up/down): the named group's default cross-fade is
+ * invisible since old/new content is pixel-identical, leaving pure
+ * position/size interpolation - just re-timed here to feel snappier than the
+ * browser's 0.25s default.
+ *
+ * This file is processed as plain CSS (with native nesting), not through
+ * sass, despite the .scss extension - only block comments survive here.
+ */
+::view-transition-group(.model-row) {
+  animation-duration: 220ms;
+  animation-timing-function: cubic-bezier(0.2, 0, 0, 1);
+}
+
+/*
+ * Delete: the exiting row has no new-side counterpart, so only its
+ * ::view-transition-old exists - safe to replace with a dedicated exit
+ * animation without touching the reposition case above. Adapted from
+ * Animista's "slide out right" (animista.net/play/exits/slide-out-right),
+ * distance and duration shortened to fit this panel instead of a full page.
+ */
+@keyframes model-row-slide-out-right {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+
+  to {
+    transform: translateX(160px);
+    opacity: 0;
+  }
+}
+
+::view-transition-old(.model-row-exit) {
+  animation: model-row-slide-out-right 220ms cubic-bezier(0.55, 0.085, 0.68, 0.53) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(.model-row),
+  ::view-transition-old(.model-row-exit) {
+    animation: none !important;
+  }
 }
