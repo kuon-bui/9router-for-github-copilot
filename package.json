@@ -51,6 +51,10 @@
         "title": "9router: Show Diagnostics"
       },
       {
+        "command": "9routerCopilot.exportCodexConfig",
+        "title": "9router: Export Codex Config"
+      },
+      {
         "command": "9routerCopilot.configureVisionProxy",
         "title": "9router: Configure Vision Proxy"
       },
@@ -263,6 +267,9 @@
     "test": "pnpm run test:unit && pnpm run test:integration",
     "package": "vsce package --no-dependencies --allow-missing-repository",
     "vscode:prepublish": "pnpm run build"
+  },
+  "dependencies": {
+    "smol-toml": "^1.8.0"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
