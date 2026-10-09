@@ -59,6 +59,18 @@ an invalid upstream payload.
   still emits `role: tool` with the matching `tool_call_id`.
 - Run the complete repository verification gate after implementation.
 
+## Revision (2026-10-03): numeric role `3` is the system role
+
+Numeric role `3` is not undocumented: VS Code defines
+`LanguageModelChatMessageRole.System = 3` (the extension host enum is
+`User = 1, Assistant = 2, System = 3`), and Copilot Chat sends its system
+prompt to a third-party provider with that role. Degrading it to `user`
+delivered Copilot's system prompt as an ordinary user turn.
+
+The adapter now maps role `3` to `system`. The content-driven tool rule above
+is unchanged, so role `3` still never becomes a `tool` message. Roles VS Code
+does not define continue to degrade to `user`.
+
 ## Non-Goals
 
 - Changing combo routing

@@ -98,7 +98,9 @@ function parseSseFrame(frame: string): RouterStreamEvent[] {
   const parsed = decoded as RouterResponsesSsePayload;
 
   if (typeof parsed.type !== 'string') {
-    return [];
+    // 9router reports a mid-stream abort on translated routes as an untyped OpenAI-style
+    // `{"error":{...}}` frame followed by [DONE], so the frame must not be skipped as unknown.
+    return isRecord(parsed.error) ? [createRouterErrorEvent(parsed)] : [];
   }
 
   if (parsed.type === 'response.output_text.delta' || parsed.type === 'response.refusal.delta') {
