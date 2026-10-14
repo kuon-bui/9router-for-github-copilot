@@ -24,7 +24,7 @@ export function createPublishedModel(
     setting.visionMode === 'native' ||
     (setting.visionMode === 'proxy' && options.visionProxyAvailable === true);
   const capabilities: PublishedModel['capabilities'] = {
-    ...(setting.toolMode === 'auto' ? { toolCalling: 32 } : {}),
+    ...(setting.toolMode === 'auto' ? { toolCalling: true } : {}),
     ...(exposesImageInput ? { imageInput: true } : {})
   };
 
