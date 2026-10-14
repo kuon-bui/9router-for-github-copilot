@@ -184,12 +184,29 @@ describe('adaptMessagesToRouterRequest', () => {
     ]);
   });
 
-  it('degrades undocumented numeric roles without tool results to user messages', () => {
+  // VS Code numbers LanguageModelChatMessageRole.System as 3, which is how Copilot sends its
+  // system prompt to a provider.
+  it('maps the VS Code system role to a system message', () => {
+    const request = adaptMessagesToRouterRequest({
+      selectedModel: selectedModel(),
+      messages: [
+        { role: 3, content: 'You are an expert programming assistant.' },
+        { role: 1, content: 'Hi' }
+      ]
+    });
+
+    expect(request.input).toEqual([
+      { role: 'system', content: 'You are an expert programming assistant.' },
+      { role: 'user', content: 'Hi' }
+    ]);
+  });
+
+  it('degrades unknown numeric roles without tool results to user messages', () => {
     const request = adaptMessagesToRouterRequest({
       selectedModel: selectedModel(),
       messages: [
         {
-          role: 3,
+          role: 7,
           content: 'Internal progress-message instructions'
         }
       ]
@@ -405,24 +422,89 @@ describe('adaptMessagesToRouterRequest', () => {
     ]);
   });
 
-  it('keeps assistant placeholder text as output_text under native vision', () => {
+  // A placeholder in history is model-visible text, and a model reading its own past turns full of
+  // it starts answering with the placeholder itself.
+  it.each(['off', 'native'] as const)(
+    'drops unsupported parts without placeholder text when vision is %s',
+    (visionMode) => {
+      const request = adaptMessagesToRouterRequest({
+        selectedModel: selectedModel({ toolMode: 'off', visionMode }),
+        messages: [
+          {
+            role: 1,
+            content: ['Read this.', { mimeType: 'application/json', data: new Uint8Array([123, 125]) }]
+          },
+          { role: 2, content: ['Done.', { unsupported: true }] }
+        ]
+      });
+
+      expect(JSON.stringify(request.input)).not.toContain('Unsupported input part');
+      expect(request.input).toHaveLength(2);
+    }
+  );
+
+  it.each(['off', 'native'] as const)(
+    'keeps replayed thinking out of assistant text when vision is %s',
+    (visionMode) => {
+      const request = adaptMessagesToRouterRequest({
+        selectedModel: selectedModel({ toolMode: 'off', visionMode }),
+        messages: [
+          { role: 1, content: ['Plan it.'] },
+          {
+            role: 2,
+            content: [
+              { value: ['Considering', ' options'], id: 'think-1', metadata: undefined },
+              { value: 'Private reasoning', id: undefined, metadata: { source: 'router' } },
+              'Here is the plan.'
+            ]
+          }
+        ]
+      });
+
+      const serialized = JSON.stringify(request.input);
+      expect(serialized).not.toContain('Considering');
+      expect(serialized).not.toContain('Private reasoning');
+      expect(serialized).toContain('Here is the plan.');
+    }
+  );
+
+  it('keeps replayed thinking out of the assistant text that precedes tool calls', () => {
     const request = adaptMessagesToRouterRequest({
-      selectedModel: selectedModel({
-        name: 'Agent Vision',
-        modelId: 'combo/agent-vision',
-        toolMode: 'off',
-        visionMode: 'native'
-      }),
-      messages: [{ role: 2, content: [{ unsupported: true }] }]
+      selectedModel: selectedModel(),
+      messages: [
+        {
+          role: 2,
+          content: [
+            { value: ['Need to search'], id: 'think-1', metadata: undefined },
+            { callId: 'call-1', name: 'findFiles', input: { query: '*.go' } }
+          ]
+        }
+      ]
     });
 
     expect(request.input).toEqual([
-      {
-        role: 'assistant',
-        content: [{ type: 'output_text', text: '[Unsupported input part omitted]' }]
-      }
+      { type: 'function_call', call_id: 'call-1', name: 'findFiles', arguments: '{"query":"*.go"}' }
     ]);
   });
+
+  it.each(['off', 'native'] as const)(
+    'omits a turn whose only content was thinking when vision is %s',
+    (visionMode) => {
+      const request = adaptMessagesToRouterRequest({
+        selectedModel: selectedModel({ toolMode: 'off', visionMode }),
+        messages: [
+          { role: 1, content: ['Hi'] },
+          { role: 2, content: [{ value: ['Thinking only'], id: 'think-1', metadata: undefined }] },
+          { role: 1, content: ['Still there?'] }
+        ]
+      });
+
+      expect(request.input.map((item) => ('role' in item ? item.role : item.type))).toEqual([
+        'user',
+        'user'
+      ]);
+    }
+  );
 
   it('drops image parts from assistant turns under native vision', () => {
     const request = adaptMessagesToRouterRequest({

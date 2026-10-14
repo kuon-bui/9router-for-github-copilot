@@ -189,6 +189,20 @@ describe('parseSseChunk', () => {
     ]);
   });
 
+  // 9router aborts a translated stream after HTTP 200 with an untyped OpenAI-style error frame and
+  // then [DONE]; reading only `type` let that [DONE] pass as a successful, empty completion.
+  it('extracts untyped error frames before the done sentinel', () => {
+    const events = parseSseChunk(
+      'data: {"error":{"message":"upstream connection lost","type":"server_error","code":"gateway_timeout"}}\n\n' +
+        'data: [DONE]\n\n'
+    );
+
+    expect(events).toEqual([
+      { type: 'router-error', error: 'upstream connection lost' },
+      { type: 'response-complete' }
+    ]);
+  });
+
   it('ignores unknown or malformed event shapes', () => {
     expect(parseSseChunk('data: {"type":"response.output_text.delta","delta":42}\n\n')).toEqual([]);
     expect(parseSseChunk('data: {"type":"response.created","response":{}}\n\n')).toEqual([]);

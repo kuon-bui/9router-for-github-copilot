@@ -13,8 +13,9 @@ import type { HostChatRequestMessage } from './vision-proxy';
 import { createRouterImagePart, isHostImageDataPart } from './image-input-adapter';
 import { canonicalJsonStringify } from './canonical-json';
 
+// VS Code numbers LanguageModelChatMessageRole as User = 1, Assistant = 2, System = 3.
 function mapRole(role: unknown): RouterResponseMessage['role'] {
-  if (role === 0 || role === 'system') {
+  if (role === 3 || role === 0 || role === 'system') {
     return 'system';
   }
 
@@ -25,6 +26,9 @@ function mapRole(role: unknown): RouterResponseMessage['role'] {
   return 'user';
 }
 
+// Unsupported parts are dropped rather than replaced with placeholder text: anything written here
+// is model-visible, and a model that reads a placeholder in its own past turns starts answering
+// with it.
 function extractTextContent(content: HostChatRequestMessage['content']): string {
   if (typeof content === 'string') {
     return content;
@@ -36,15 +40,15 @@ function extractTextContent(content: HostChatRequestMessage['content']): string 
         return part;
       }
 
+      if (isThinkingPartLike(part)) {
+        return '';
+      }
+
       if (typeof part === 'object' && part !== null && 'value' in part && typeof part.value === 'string') {
         return part.value;
       }
 
-      if (isToolCallPartLike(part) || isToolResultPartLike(part)) {
-        return '';
-      }
-
-      return '[Unsupported input part omitted]';
+      return '';
     })
     .filter((part) => part.length > 0)
     .join('\n');
@@ -73,15 +77,15 @@ function adaptNativeVisionContent(
         return role === 'assistant' ? undefined : createRouterImagePart(part);
       }
 
+      if (isThinkingPartLike(part)) {
+        return undefined;
+      }
+
       if (typeof part === 'object' && part !== null && 'value' in part && typeof part.value === 'string') {
         return asText(part.value);
       }
 
-      if (isToolCallPartLike(part) || isToolResultPartLike(part)) {
-        return undefined;
-      }
-
-      return asText('[Unsupported input part omitted]');
+      return undefined;
     })
     .filter((part): part is RouterResponseMessageContent => part !== undefined);
 }
@@ -104,6 +108,21 @@ function adaptOrdinaryMessage(
 interface ToolResultLike {
   callId: string;
   content: readonly unknown[];
+}
+
+// Replayed reasoning (`LanguageModelThinkingPart`) is not assistant output, so it never becomes
+// input text. Its `value` may be a string array, and it always carries own `id` and `metadata`
+// slots, which a text part never has.
+function isThinkingPartLike(part: unknown): boolean {
+  if (typeof part !== 'object' || part === null || !('value' in part)) {
+    return false;
+  }
+
+  if (Array.isArray(part.value)) {
+    return part.value.every((item) => typeof item === 'string');
+  }
+
+  return typeof part.value === 'string' && ('id' in part || 'metadata' in part);
 }
 
 function isToolCallPartLike(part: unknown): part is Record<string, unknown> {
@@ -280,7 +299,10 @@ export function adaptMessagesToRouterRequest(input: {
     }
 
     activeToolCallIds.clear();
-    responseInput.push(adaptOrdinaryMessage(message, input.selectedModel));
+    const ordinaryMessage = adaptOrdinaryMessage(message, input.selectedModel);
+    if (ordinaryMessage.content.length > 0) {
+      responseInput.push(ordinaryMessage);
+    }
   }
 
   const request: RouterResponseRequest = {
