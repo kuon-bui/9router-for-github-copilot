@@ -89,6 +89,36 @@ describe('resolvePublishedModels', () => {
     });
   });
 
+  it('publishes tool calling capability as true when toolMode is auto', () => {
+    const autoModel = createPublishedModel({
+      sourceIndex: 0,
+      id: 'agent',
+      name: 'Agent',
+      modelId: 'router/agent',
+      toolMode: 'auto',
+      visionMode: 'off',
+      thinkingMode: 'off',
+      thinkingEfforts: [],
+      maxInputTokens: 128_000,
+      maxOutputTokens: 8_192
+    });
+    const offModel = createPublishedModel({
+      sourceIndex: 1,
+      id: 'daily',
+      name: 'Daily',
+      modelId: 'router/daily',
+      toolMode: 'off',
+      visionMode: 'off',
+      thinkingMode: 'off',
+      thinkingEfforts: [],
+      maxInputTokens: 128_000,
+      maxOutputTokens: 8_192
+    });
+
+    expect(autoModel.capabilities.toolCalling).toBe(true);
+    expect(offModel.capabilities.toolCalling).toBeUndefined();
+  });
+
   it('publishes proxy image input when guided setup is available', () => {
     const setting = {
       sourceIndex: 0,
