@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.15.0](https://github.com/kuon-bui/9router-for-github-copilot/compare/v0.14.0...v0.15.0) (2026-10-14)
+
+
+### Features
+
+* **adapter:** map VS Code system role to system message and improve role handling ([#66](https://github.com/kuon-bui/9router-for-github-copilot/issues/66)) ([4af213b](https://github.com/kuon-bui/9router-for-github-copilot/commit/4af213bff3a400cbba5c8bb49045ddda2771d6a3))
+* **provider:** expose all copilot tools by setting toolCalling to true ([#67](https://github.com/kuon-bui/9router-for-github-copilot/issues/67)) ([b291d8f](https://github.com/kuon-bui/9router-for-github-copilot/commit/b291d8f4408869a7f1b10890317b9fc1c560f628))
+
 ## [0.14.0](https://github.com/kuon-bui/9router-for-github-copilot/compare/v0.13.1...v0.14.0) (2026-09-23)
 
 
