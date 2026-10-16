@@ -14,6 +14,8 @@ node_modules/**
 AGENTS.md
 CODE_CONVENTION.md
 src/**
+packages/**
+prompts/acp/**
 dist/package.json
 dist/test/**
 dist/vitest.config.js

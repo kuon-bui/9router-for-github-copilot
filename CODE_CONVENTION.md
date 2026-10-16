@@ -66,6 +66,7 @@ src/
   config/
   debug/
   types/
+  acp/
 ```
 
 ### Boundary rules
@@ -118,6 +119,18 @@ literals in TypeScript.
 
 - owns normalized shared interfaces and compatibility contracts
 - must not become a generic dumping ground
+
+`src/acp`
+
+- owns the standalone ACP (Agent Client Protocol) coding agent CLI (`9router-acp`)
+- spawned as an independent child process by external ACP clients (such as Zed, JetBrains, or VS Code ACP client extensions)
+- runs outside the VS Code extension host
+- is permitted to execute a multi-turn tool-calling loop and use `node:fs` and `node:child_process`
+- must not implement routing or fallback policy (`9router` remains the sole routing backend)
+- standard output (`stdout`) is strictly reserved for ACP JSON-RPC framing (NDJSON); all logging and diagnostics must go to `stderr` with secret redaction
+- secrets must be read solely from environment variables (`NINEROUTER_API_KEY`), never stored in files or settings
+- must not import `vscode`, `@/runtime`, `@/provider`, `@/webview`, or `@/config/*` (except constants from `@/config/defaults` and `@/debug/debug-level`)
+- modules outside `src/acp` must not import `@/acp` or ACP/MCP client SDKs
 
 ## File and Naming Rules
 

@@ -1,4 +1,5 @@
 import { cp } from 'node:fs/promises';
+import { builtinModules } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import tailwindcss from '@tailwindcss/vite';
@@ -198,6 +199,51 @@ export function createWebviewConfig(view, { watch = false, counter, plugins = []
         }
       },
       watch: watch ? {} : null
+    }
+  };
+}
+
+export function createAcpAgentConfig({ watch = false, counter } = {}) {
+  const nodeBuiltins = [
+    ...builtinModules,
+    ...builtinModules.map((m) => `node:${m}`),
+    /^node:/
+  ];
+
+  return {
+    root,
+    configFile: false,
+    logLevel: 'info',
+    plugins: counter ? [watchMarkerPlugin('ACP Agent', counter)] : [],
+    resolve: {
+      alias: {
+        '@': resolve(root, 'src')
+      }
+    },
+    build: {
+      target: 'node20',
+      outDir: resolve(root, 'packages/acp-agent/dist'),
+      emptyOutDir: true,
+      minify: !watch,
+      sourcemap: watch,
+      ssr: true,
+      lib: {
+        entry: resolve(root, 'src/acp/main.ts'),
+        formats: ['cjs'],
+        fileName: () => 'index.cjs'
+      },
+      rollupOptions: {
+        external: nodeBuiltins,
+        output: {
+          banner: '#!/usr/bin/env node\n',
+          entryFileNames: 'index.cjs',
+          format: 'cjs'
+        }
+      },
+      watch: watch ? {} : null
+    },
+    ssr: {
+      noExternal: true
     }
   };
 }
