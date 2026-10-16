@@ -94,7 +94,6 @@ export function createSessionStore(defaults: SessionDefaults = {}): SessionStore
       const session = sessions.get(sessionId);
       if (session?.activeTurn) {
         session.activeTurn.abortController.abort('cancelled by user');
-        session.activeTurn = null;
         return true;
       }
       return false;

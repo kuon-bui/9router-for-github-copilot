@@ -18,7 +18,7 @@ export interface CommandExecutionResult {
 export function sanitizeEnvironment(env: Record<string, string | undefined> = process.env): Record<string, string> {
   const sanitized: Record<string, string> = {};
   for (const [key, value] of Object.entries(env)) {
-    if (key.startsWith('NINEROUTER_')) {
+    if (key.toUpperCase().startsWith('NINEROUTER_')) {
       continue;
     }
     if (typeof value === 'string') {
@@ -56,25 +56,36 @@ export function runLocalCommand(options: LocalCommandOptions): Promise<CommandEx
     proc.stdout?.on('data', onData);
     proc.stderr?.on('data', onData);
 
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    if (timeoutMs > 0) {
-      timer = setTimeout(() => {
-        timedOut = true;
+    const killProcessTree = (): void => {
+      if (!proc.pid) {
+        return;
+      }
+      try {
+        if (isWindows) {
+          spawn('taskkill', ['/pid', String(proc.pid), '/T', '/F'], { stdio: 'ignore' });
+        } else {
+          proc.kill('SIGKILL');
+        }
+      } catch {
         try {
           proc.kill();
         } catch {
           // ignore
         }
+      }
+    };
+
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    if (timeoutMs > 0) {
+      timer = setTimeout(() => {
+        timedOut = true;
+        killProcessTree();
       }, timeoutMs);
     }
 
     const onAbort = (): void => {
       aborted = true;
-      try {
-        proc.kill();
-      } catch {
-        // ignore
-      }
+      killProcessTree();
     };
 
     if (signal) {

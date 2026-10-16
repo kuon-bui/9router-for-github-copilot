@@ -9,8 +9,9 @@ export interface CheckPermissionInput {
   session: Session;
   toolName: string;
   args: Record<string, unknown>;
-  isOutsideCwd?: boolean;
-  diffPreview?: { oldText: string; newText: string; path: string };
+  isOutsideCwd?: boolean | undefined;
+  diffPreview?: { oldText: string; newText: string; path: string } | undefined;
+  signal?: AbortSignal | undefined;
   requestPermission: (request: {
     sessionId: string;
     toolCall: {
@@ -135,7 +136,11 @@ export async function checkToolPermission(input: CheckPermissionInput): Promise<
     });
   }
 
-  const response = await requestPermission({
+  if (input.signal?.aborted) {
+    return { allowed: false, reason: 'Permission request cancelled' };
+  }
+
+  const promptPromise = requestPermission({
     sessionId: session.sessionId,
     toolCall: {
       toolCallId: `call_${Date.now()}`,
@@ -147,6 +152,22 @@ export async function checkToolPermission(input: CheckPermissionInput): Promise<
     },
     options
   });
+
+  let response: { outcome: { outcome: 'cancelled' } | { outcome: 'selected'; optionId: string } };
+
+  if (input.signal) {
+    const sig = input.signal;
+    const abortPromise = new Promise<{ outcome: { outcome: 'cancelled' } }>((resolve) => {
+      sig.addEventListener('abort', () => resolve({ outcome: { outcome: 'cancelled' } }), { once: true });
+    });
+    response = await Promise.race([promptPromise, abortPromise]);
+  } else {
+    response = await promptPromise;
+  }
+
+  if (input.signal?.aborted) {
+    return { allowed: false, reason: 'Permission request cancelled' };
+  }
 
   if (response.outcome.outcome === 'cancelled') {
     return { allowed: false, reason: 'User rejected this action' };

@@ -28,9 +28,14 @@ interface ToolAccumulator {
 export function parseToolCallArguments(
   raw: string
 ): { ok: true; value: Record<string, unknown> } | { ok: false; reason: string } {
+  const trimmed = raw.trim();
+  if (trimmed.length === 0) {
+    return { ok: true, value: {} };
+  }
+
   let parsed: unknown;
   try {
-    parsed = JSON.parse(raw);
+    parsed = JSON.parse(trimmed);
   } catch {
     return { ok: false, reason: '9router streamed malformed tool call arguments' };
   }

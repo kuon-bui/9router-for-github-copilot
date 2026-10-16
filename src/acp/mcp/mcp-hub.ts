@@ -36,6 +36,7 @@ interface ConnectedServer {
 
 export interface McpHub {
   connectServers(servers: unknown[]): Promise<void>;
+  ready(timeoutMs?: number): Promise<void>;
   getTools(): RouterToolDefinition[];
   hasTool(name: string): boolean;
   executeTool(name: string, args: Record<string, unknown>, signal?: AbortSignal): Promise<ToolResult>;
@@ -46,10 +47,10 @@ export function createMcpHub(logger?: StderrLogger): McpHub {
   const connectedServers: ConnectedServer[] = [];
   const toolDefinitions: RouterToolDefinition[] = [];
   const toolRegistry = new Map<string, { server: ConnectedServer; realName: string }>();
+  let initPromise: Promise<void> | null = null;
 
-  return {
-    async connectServers(servers: unknown[]): Promise<void> {
-      for (let i = 0; i < servers.length; i++) {
+  async function doConnectServers(servers: unknown[]): Promise<void> {
+    for (let i = 0; i < servers.length; i++) {
         const rawServer = servers[i] as McpServerConfig | undefined;
         if (!rawServer || typeof rawServer !== 'object') {
           continue;
@@ -134,6 +135,28 @@ export function createMcpHub(logger?: StderrLogger): McpHub {
           logger?.warn(`Failed to connect to MCP server "${serverName}": ${err instanceof Error ? err.message : String(err)}`);
         }
       }
+    }
+
+  return {
+    connectServers(servers: unknown[]): Promise<void> {
+      initPromise = doConnectServers(servers);
+      return initPromise;
+    },
+
+    async ready(timeoutMs = 30000): Promise<void> {
+      if (!initPromise) {
+        return;
+      }
+      if (timeoutMs <= 0) {
+        await initPromise;
+        return;
+      }
+      let timeoutId: ReturnType<typeof setTimeout>;
+      const timerPromise = new Promise<void>((resolve) => {
+        timeoutId = setTimeout(resolve, timeoutMs);
+      });
+      await Promise.race([initPromise, timerPromise]);
+      clearTimeout(timeoutId!);
     },
 
     getTools(): RouterToolDefinition[] {

@@ -17,7 +17,20 @@ export interface ClientTerminalOptions {
 
 export async function runClientTerminal(options: ClientTerminalOptions): Promise<CommandExecutionResult> {
   const { command, cwd, terminalDelegate, signal } = options;
-  const { terminalId } = await terminalDelegate.createTerminal({ command, cwd });
+
+  let terminalId: string;
+  try {
+    const created = await terminalDelegate.createTerminal({ command, cwd });
+    terminalId = created.terminalId;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return {
+      exitCode: 1,
+      output: `Failed to create client terminal: ${message}`,
+      timedOut: false,
+      aborted: false
+    };
+  }
 
   let aborted = false;
   const onAbort = async (): Promise<void> => {

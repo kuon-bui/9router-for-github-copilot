@@ -136,6 +136,9 @@ export function createAgentApp(deps: AgentAppDependencies): acp.AgentApp {
       }
 
       const newMode = ctx.params.modeId as AcpAgentMode;
+      if (newMode !== 'ask' && newMode !== 'auto-edit' && newMode !== 'read-only') {
+        throw createInvalidParamsError(`Invalid mode: "${ctx.params.modeId}". Expected ask, auto-edit, or read-only.`);
+      }
       session.mode = newMode;
 
       logger.log('metadata', 'Session mode updated', {
@@ -183,6 +186,9 @@ export function createAgentApp(deps: AgentAppDependencies): acp.AgentApp {
       } else if (configId === 'reasoning_effort' && typeof value === 'string') {
         session.reasoningEffort = value as AcpReasoningEffort;
       } else if (configId === 'mode' && typeof value === 'string') {
+        if (value !== 'ask' && value !== 'auto-edit' && value !== 'read-only') {
+          throw createInvalidParamsError(`Invalid mode: "${value}". Expected ask, auto-edit, or read-only.`);
+        }
         session.mode = value as AcpAgentMode;
         await ctx.client.notify(acp.methods.client.session.update, {
           sessionId: session.sessionId,

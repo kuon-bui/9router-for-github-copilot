@@ -35,7 +35,10 @@ export interface ExecutePromptTurnOptions {
   notifyClient: (method: string, params: unknown) => Promise<void>;
 }
 
-function finalizeDanglingFunctionCalls(session: Session): void {
+async function finalizeDanglingFunctionCalls(
+  session: Session,
+  notifyClient?: (method: string, params: unknown) => Promise<void>
+): Promise<void> {
   const pendingCallIds = new Set<string>();
 
   for (const item of session.history) {
@@ -52,6 +55,18 @@ function finalizeDanglingFunctionCalls(session: Session): void {
       call_id: callId,
       output: 'Cancelled by user'
     });
+
+    if (notifyClient) {
+      await notifyClient('session/update', {
+        sessionId: session.sessionId,
+        update: {
+          sessionUpdate: 'tool_call_update',
+          toolCallId: callId,
+          status: 'failed',
+          rawOutput: { error: 'Cancelled by user' }
+        }
+      }).catch(() => {});
+    }
   }
 }
 
@@ -101,8 +116,12 @@ export async function executePromptTurn(options: ExecutePromptTurnOptions): Prom
 
     for (let iteration = 0; iteration < maxTurnRequests; iteration++) {
       if (combinedSignal.aborted) {
-        finalizeDanglingFunctionCalls(session);
+        await finalizeDanglingFunctionCalls(session, notifyClient);
         return { stopReason: 'cancelled' };
+      }
+
+      if (iteration === 0) {
+        await session.mcpHub.ready(30000).catch(() => {});
       }
 
       const builtinTools = getAvailableTools(session.mode);
@@ -134,7 +153,7 @@ export async function executePromptTurn(options: ExecutePromptTurnOptions): Prom
 
       for await (const event of eventStream) {
         if (combinedSignal.aborted) {
-          finalizeDanglingFunctionCalls(session);
+          await finalizeDanglingFunctionCalls(session, notifyClient);
           return { stopReason: 'cancelled' };
         }
 
@@ -177,7 +196,7 @@ export async function executePromptTurn(options: ExecutePromptTurnOptions): Prom
       // Process tool calls sequentially
       for (const call of toolCalls) {
         if (combinedSignal.aborted) {
-          finalizeDanglingFunctionCalls(session);
+          await finalizeDanglingFunctionCalls(session, notifyClient);
           return { stopReason: 'cancelled' };
         }
 
@@ -206,6 +225,7 @@ export async function executePromptTurn(options: ExecutePromptTurnOptions): Prom
           session,
           toolName: call.name,
           args: call.arguments,
+          signal: combinedSignal,
           requestPermission: permissionRequester
         });
 
@@ -274,7 +294,7 @@ export async function executePromptTurn(options: ExecutePromptTurnOptions): Prom
     return { stopReason: 'max_turn_requests' };
   } catch (error) {
     if (combinedSignal.aborted) {
-      finalizeDanglingFunctionCalls(session);
+      await finalizeDanglingFunctionCalls(session, notifyClient);
       return { stopReason: 'cancelled' };
     }
     throw error;
