@@ -61,6 +61,10 @@
       {
         "command": "9routerCopilot.addModel",
         "title": "9router: Add Model"
+      },
+      {
+        "command": "9routerCopilot.setupAcpAgent",
+        "title": "9router: Set Up ACP Agent"
       }
     ],
     "chatParticipants": [
