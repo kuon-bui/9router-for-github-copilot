@@ -322,11 +322,16 @@ export const window = {
     warningMessages.push(message);
     const actions = items.filter((item): item is string => typeof item === 'string');
     return warningResponseSet ? warningResponse : actions[0];
+  },
+  async showTextDocument(document: unknown): Promise<unknown> {
+    shownDocuments.push(document);
+    return document;
   }
 };
 
 let clipboardText = '';
 const openedDocuments: Array<{ content?: string; language?: string }> = [];
+const shownDocuments: unknown[] = [];
 
 export const env = {
   clipboard: {
@@ -569,9 +574,14 @@ export function __getOpenedDocuments(): Array<{ content?: string; language?: str
   return [...openedDocuments];
 }
 
+export function __getShownDocuments(): unknown[] {
+  return [...shownDocuments];
+}
+
 export function __resetVscodeState(): void {
   clipboardText = '';
   openedDocuments.length = 0;
+  shownDocuments.length = 0;
   configurationValues.clear();
   commandHandlers.clear();
   registeredProvider = undefined;

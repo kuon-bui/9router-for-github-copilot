@@ -135,10 +135,11 @@ export async function setupAcpAgent(deps: SetupAcpAgentDependencies): Promise<vo
       '9router ACP configuration snippet copied to clipboard.'
     );
   } else {
-    await vscode.workspace.openTextDocument({
+    const doc = await vscode.workspace.openTextDocument({
       content: snippet,
       language: 'json'
     });
+    await vscode.window.showTextDocument(doc);
     await vscode.window.showInformationMessage(
       '9router ACP configuration snippet copied to clipboard and opened in editor.'
     );

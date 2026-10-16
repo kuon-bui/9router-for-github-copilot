@@ -1,4 +1,4 @@
-import { existsSync, realpathSync } from 'node:fs';
+import { lstatSync, readlinkSync } from 'node:fs';
 import { dirname, isAbsolute, relative, resolve } from 'node:path';
 
 export function isPathWithinCwd(targetPath: string, cwd: string, allowGit = false): boolean {
@@ -38,34 +38,24 @@ export function assertPathWithinCwd(targetPath: string, cwd: string, allowGit = 
     }
   }
 
-  // Symlink escape check for path or nearest existing ancestor
-  if (existsSync(normalizedCwd)) {
-    let ancestorToCheck = resolvedTarget;
-    while (!existsSync(ancestorToCheck)) {
-      const parent = dirname(ancestorToCheck);
-      if (parent === ancestorToCheck || parent.length <= normalizedCwd.length) {
-        break;
+  // Safely resolve symlinks component by component to prevent broken symlink bypass
+  let current = normalizedCwd;
+  const parts = rel.split(/[\\/]/).filter(Boolean);
+  for (const part of parts) {
+    current = resolve(current, part);
+    try {
+      const stat = lstatSync(current);
+      if (stat.isSymbolicLink()) {
+        const target = readlinkSync(current);
+        const resolvedTarget = isAbsolute(target) ? resolve(target) : resolve(dirname(current), target);
+        assertPathWithinCwd(resolvedTarget, normalizedCwd, allowGit);
+        current = resolvedTarget;
       }
-      ancestorToCheck = parent;
-    }
-
-    if (existsSync(ancestorToCheck)) {
-      try {
-        const realAncestor = realpathSync(ancestorToCheck);
-        const realCwd = realpathSync(normalizedCwd);
-        const realRel = relative(realCwd, realAncestor);
-        const realOutside = isWindows
-          ? realRel.startsWith('..') || isAbsolute(realRel) || !realAncestor.toLowerCase().startsWith(realCwd.toLowerCase())
-          : realRel.startsWith('..') || isAbsolute(realRel);
-
-        if (realOutside) {
-          throw new Error(`Symlink target for "${targetPath}" escapes workspace root "${cwd}"`);
-        }
-      } catch (err) {
-        if (err instanceof Error && err.message.includes('escapes workspace')) {
-          throw err;
-        }
+    } catch (err) {
+      if (err instanceof Error && (err.message.includes('outside workspace') || err.message.includes('forbidden'))) {
+        throw err;
       }
+      break;
     }
   }
 

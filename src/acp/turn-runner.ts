@@ -229,6 +229,11 @@ export async function executePromptTurn(options: ExecutePromptTurnOptions): Prom
           requestPermission: permissionRequester
         });
 
+        if (combinedSignal.aborted) {
+          await finalizeDanglingFunctionCalls(session, notifyClient);
+          return { stopReason: 'cancelled' };
+        }
+
         if (!permission.allowed) {
           const reason = permission.reason ?? 'User rejected this action';
           await notifyClient('session/update', {

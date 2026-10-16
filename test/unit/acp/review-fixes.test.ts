@@ -5,6 +5,10 @@ import { sanitizeEnvironment } from '@/acp/tools/local-process-runner';
 import { parseToolCallArguments } from '@/router/response-assembler';
 import { createSessionStore } from '@/acp/session-store';
 import { checkToolPermission } from '@/acp/permissions';
+import { executePromptTurn } from '@/acp/turn-runner';
+import { createMcpHub } from '@/acp/mcp/mcp-hub';
+import { FakeRouterClient } from '../../support/fake-router-client';
+import type { RouterStreamEvent } from '@/types/router-contract';
 
 describe('Review Fixes', () => {
   it('rejects case-insensitive .git directory variants on Windows/macOS', () => {
@@ -87,6 +91,73 @@ describe('Review Fixes', () => {
     expect(decision.allowed).toBe(false);
     expect(decision.reason).toContain('cancelled');
   });
+
+  it('detects broken symlinks escaping workspace using lstatSync and readlinkSync', async () => {
+    const fs = await import('node:fs');
+    const os = await import('node:os');
+    const path = await import('node:path');
+
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'acp-symlink-'));
+    try {
+      const linkPath = path.join(tempDir, 'broken-link');
+      const outsideTarget = path.resolve(tempDir, '../outside-nonexistent-dir');
+      const isWindows = process.platform === 'win32';
+      fs.symlinkSync(outsideTarget, linkPath, isWindows ? 'junction' : 'dir');
+
+      expect(() => assertPathWithinCwd('broken-link', tempDir)).toThrow(/outside workspace/i);
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it('executePromptTurn stops immediately on abort during permission check and does not process subsequent tool calls', async () => {
+    const session = storeHelperSession('ask');
+    const controller = new AbortController();
+
+    const toolEvents: RouterStreamEvent[] = [
+      {
+        type: 'tool-call-delta',
+        toolCallIndex: 0,
+        toolCallId: 'call_1',
+        toolName: 'first_tool',
+        delta: '{}'
+      },
+      {
+        type: 'tool-call-delta',
+        toolCallIndex: 1,
+        toolCallId: 'call_2',
+        toolName: 'second_tool',
+        delta: '{}'
+      },
+      { type: 'response-complete' }
+    ];
+
+    const fakeClient = new FakeRouterClient({ events: toolEvents });
+    const promptedTools: string[] = [];
+
+    const requestPermission = async (req: { toolCall: { title: string } }) => {
+      promptedTools.push(req.toolCall.title);
+      controller.abort('user cancel');
+      return { outcome: { outcome: 'cancelled' as const } };
+    };
+
+    const result = await executePromptTurn({
+      session,
+      client: fakeClient,
+      apiKey: 'sk-test-key',
+      baseUrl: 'http://127.0.0.1:20128/v1',
+      timeoutMs: 30000,
+      turnSignal: controller.signal,
+      prompt: [{ type: 'text', text: 'Run tools' }],
+      requestPermission,
+      notifyClient: async () => {}
+    });
+
+    expect(result.stopReason).toBe('cancelled');
+    expect(promptedTools).toEqual(['Run first_tool']);
+    const outputs = session.history.filter((h) => h.type === 'function_call_output');
+    expect(outputs.length).toBeGreaterThan(0);
+  });
 });
 
 function storeHelperSession(mode: 'ask' | 'auto-edit' | 'read-only') {
@@ -100,12 +171,6 @@ function storeHelperSession(mode: 'ask' | 'auto-edit' | 'read-only') {
     activeTurn: null,
     grants: new Set<string>(),
     mcpServers: [],
-    mcpHub: {
-      connectServers: async () => {},
-      getTools: () => [],
-      hasTool: () => false,
-      executeTool: async () => ({ ok: true, output: '' }),
-      close: async () => {}
-    }
+    mcpHub: createMcpHub()
   };
 }

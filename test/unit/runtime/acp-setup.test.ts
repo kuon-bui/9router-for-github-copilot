@@ -4,6 +4,7 @@ import {
   __getClipboardText,
   __getErrorMessages,
   __getOpenedDocuments,
+  __getShownDocuments,
   __getWarningMessages,
   __resetVscodeState,
   __setQuickPickValues,
@@ -41,6 +42,7 @@ describe('setupAcpAgent', () => {
     expect(openedDocs).toHaveLength(1);
     expect(openedDocs[0]?.language).toBe('json');
     expect(openedDocs[0]?.content).toContain('<your-9router-api-key>');
+    expect(__getShownDocuments()).toHaveLength(1);
     expect(__getWarningMessages()).toHaveLength(0);
   });
 
@@ -67,6 +69,7 @@ describe('setupAcpAgent', () => {
 
     // Never opened in document buffer
     expect(__getOpenedDocuments()).toHaveLength(0);
+    expect(__getShownDocuments()).toHaveLength(0);
   });
 
   it('shows error if real key is requested but no key is stored', async () => {

@@ -46,7 +46,8 @@ export function runLocalCommand(options: LocalCommandOptions): Promise<CommandEx
     const proc = spawn(shell, shellArgs, {
       cwd,
       env,
-      stdio: ['ignore', 'pipe', 'pipe']
+      stdio: ['ignore', 'pipe', 'pipe'],
+      detached: !isWindows
     });
 
     const onData = (chunk: Buffer): void => {
@@ -66,11 +67,21 @@ export function runLocalCommand(options: LocalCommandOptions): Promise<CommandEx
         } catch {
           // ignore
         }
-      }
-      try {
-        proc.kill();
-      } catch {
-        // ignore
+        try {
+          proc.kill();
+        } catch {
+          // ignore
+        }
+      } else {
+        try {
+          process.kill(-proc.pid, 'SIGKILL');
+        } catch {
+          try {
+            proc.kill();
+          } catch {
+            // ignore
+          }
+        }
       }
     };
 
