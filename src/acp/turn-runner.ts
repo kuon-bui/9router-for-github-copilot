@@ -12,6 +12,7 @@ import type { CheckPermissionInput } from './permissions';
 import type { PromptContentBlock } from './prompt-content';
 import type { Session } from './session-store';
 import type { WorkspaceFs } from './tools/workspace-fs';
+import type { ClientTerminalDelegate } from './tools/client-terminal-runner';
 import type { RouterClient } from '@/router/client';
 import type { RouterResponseRequest } from '@/types/router-contract';
 
@@ -29,6 +30,7 @@ export interface ExecutePromptTurnOptions {
   prompt: PromptContentBlock[];
   workspaceFs?: WorkspaceFs | undefined;
   requestPermission?: CheckPermissionInput['requestPermission'] | undefined;
+  clientTerminal?: ClientTerminalDelegate | undefined;
   maxTurnRequests?: number | undefined;
   notifyClient: (method: string, params: unknown) => Promise<void>;
 }
@@ -64,6 +66,7 @@ export async function executePromptTurn(options: ExecutePromptTurnOptions): Prom
     prompt,
     workspaceFs = createWorkspaceFs({ cwd: session.cwd }),
     requestPermission,
+    clientTerminal,
     maxTurnRequests = 50,
     notifyClient
   } = options;
@@ -238,7 +241,9 @@ export async function executePromptTurn(options: ExecutePromptTurnOptions): Prom
         // Execute tool
         const toolResult = await executeBuiltinTool(call.name, call.arguments, {
           cwd: session.cwd,
-          fs: workspaceFs
+          fs: workspaceFs,
+          signal: combinedSignal,
+          ...(clientTerminal ? { clientTerminal } : {})
         });
 
         const outputForModel = truncateOutput(toolResult.output, MAX_MODEL_OUTPUT_BYTES);
