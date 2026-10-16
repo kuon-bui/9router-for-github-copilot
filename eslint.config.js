@@ -15,10 +15,12 @@ const sharedGlobals = {
   URL: 'readonly',
   WritableStream: 'readonly',
   __dirname: 'readonly',
+  clearInterval: 'readonly',
   clearTimeout: 'readonly',
   module: 'readonly',
   process: 'readonly',
   require: 'readonly',
+  setInterval: 'readonly',
   setTimeout: 'readonly'
 };
 
