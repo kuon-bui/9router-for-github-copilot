@@ -90,6 +90,12 @@ export function createAgentApp(deps: AgentAppDependencies): acp.AgentApp {
         timeoutMs: settings.timeoutMs,
         turnSignal: ctx.signal,
         prompt: ctx.params.prompt as PromptContentBlock[],
+        requestPermission: async (req) => {
+          return ctx.client.request(
+            acp.methods.client.session.requestPermission,
+            req as unknown as acp.ClientRequestParamsByMethod['session/request_permission']
+          );
+        },
         notifyClient: async (method, params) => {
           await ctx.client.notify(method as 'session/update', params as acp.ClientNotificationParamsByMethod['session/update']);
         }

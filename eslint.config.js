@@ -5,6 +5,7 @@ const tsPlugin = require('@typescript-eslint/eslint-plugin');
 const sharedGlobals = {
   AbortController: 'readonly',
   AbortSignal: 'readonly',
+  Buffer: 'readonly',
   Event: 'readonly',
   Headers: 'readonly',
   ReadableStream: 'readonly',
