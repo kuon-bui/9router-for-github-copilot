@@ -1,15 +1,12 @@
 import * as vscode from 'vscode';
+import { DEBUG_RANK, shouldLogDebug } from './debug-level';
 import { redactObject } from './redaction';
 import { isVisionProxyConfigured } from '@/config/settings';
+import type { DebugMode } from './debug-level';
 import type { SettingsSnapshot } from '@/config/settings';
 
-export type DebugMode = 'minimal' | 'metadata' | 'verbose';
-
-const DEBUG_RANK: Record<DebugMode, number> = {
-  minimal: 0,
-  metadata: 1,
-  verbose: 2
-};
+export type { DebugMode };
+export { DEBUG_RANK };
 
 let outputChannel: vscode.OutputChannel | undefined;
 
@@ -24,7 +21,7 @@ export function logDebugEvent(
   metadata?: Record<string, unknown>,
   threshold: DebugMode = 'metadata'
 ): void {
-  if (DEBUG_RANK[debugMode] < DEBUG_RANK[threshold]) {
+  if (!shouldLogDebug(debugMode, threshold)) {
     return;
   }
 

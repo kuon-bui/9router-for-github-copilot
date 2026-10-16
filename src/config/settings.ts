@@ -9,12 +9,15 @@ import {
   DEFAULT_VISION_PROXY_SOURCE
 } from './defaults';
 import { parseModelSettings } from './model-settings';
+import { isHttpBaseUrl, normalizeBaseUrl } from '@/router/url';
 import { createPublishedModel } from '@/provider/model-catalog';
 import type {
   ModelSettingsIssue,
   RejectedModelSetting
 } from './model-settings';
 import type { ConfiguredModel, PublishedModel } from '@/types/product-model';
+
+export { isHttpBaseUrl, normalizeBaseUrl };
 
 const SECTION = '9router-copilot';
 
@@ -68,16 +71,7 @@ export function isUsableRuntimeSettings(runtime: RuntimeSettings): boolean {
     return false;
   }
 
-  try {
-    const url = new URL(runtime.baseUrl);
-    return url.protocol === 'http:' || url.protocol === 'https:';
-  } catch {
-    return false;
-  }
-}
-
-export function normalizeBaseUrl(input: string): string {
-  return input.trim().replace(/\/v1\/*$|\/+$/, '');
+  return isHttpBaseUrl(runtime.baseUrl);
 }
 
 export function normalizeMaxTokens(input: unknown): number | undefined {

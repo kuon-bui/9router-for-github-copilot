@@ -1,8 +1,9 @@
 import * as vscode from 'vscode';
-import { clearApiKey, setApiKey } from '@/config/secret-store';
+import { clearApiKey, getApiKey, setApiKey } from '@/config/secret-store';
 import { showDiagnostics, showSettingsSnapshotDiagnostics } from '@/debug/output-channel';
 import { redactBearerTokens } from '@/debug/redaction';
 import { NineRouterError, appendErrorDetail } from '@/router/errors';
+import { setupAcpAgent } from './acp-setup';
 import { showUsagePanel } from './usage-panel';
 import type { SettingsSnapshot } from '@/config/settings';
 import type { VisionProxyConfigurator } from './vision-configuration';
@@ -215,6 +216,24 @@ export function registerCommands(
       } finally {
         cancellation.dispose();
       }
+    })
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand('9routerCopilot.setupAcpAgent', async () => {
+      const snapshot = dependencies.getSettingsSnapshot?.();
+      const settings = {
+        baseUrl: snapshot?.runtime?.baseUrl ?? 'http://127.0.0.1:20128/v1',
+        models: snapshot?.models ?? []
+      };
+
+      await setupAcpAgent({
+        secretStore: {
+          getApiKey: () => getApiKey(context.secrets)
+        },
+        settings,
+        version: '0.15.0'
+      });
     })
   );
 }

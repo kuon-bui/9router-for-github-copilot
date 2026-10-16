@@ -501,6 +501,8 @@ The production design does not require a local sidecar or proxy process.
 - Requests are sent directly from the extension host to `9router`.
 - `9router` remains the only routing control plane and data plane for model execution.
 
+The companion `9router-acp` CLI package is a standalone headless process spawned directly by external ACP clients (such as Zed, JetBrains, or VS Code ACP client extensions). It does not act as a sidecar for the VS Code extension, and the VS Code extension host remains process-isolated without running or managing the ACP agent.
+
 This minimizes local operational burden and keeps installation simple for end users.
 
 ## Delivery Plan

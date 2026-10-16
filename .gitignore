@@ -4,6 +4,7 @@ node_modules/
 
 # Build and package artifacts
 dist/
+packages/acp-agent/dist/
 *.vsix
 *.tgz
 coverage/

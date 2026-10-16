@@ -156,6 +156,19 @@ Prefer tests around the adapter boundaries:
 
 If changing tools or vision logic, add focused tests around those adapters rather than broad unrelated refactors.
 
+## ACP Coding Agent (`9router-acp`)
+
+The repository also builds the standalone `9router-acp` npm CLI package (`npx -y 9router-acp`), which implements Agent Client Protocol (ACP) v1 to serve external coding editors (such as Zed, JetBrains, and VS Code via ACP client extensions).
+
+Rules for `src/acp`:
+
+- `src/acp` builds an independent process spawned over stdio by ACP clients, not in the VS Code extension host.
+- Reuses `src/router/` clients, streaming parsers, and error classification without implementing local fallback or routing policy.
+- `stdout` is exclusively reserved for ACP JSON-RPC framing (NDJSON); all logging and diagnostics go to `stderr` with secret redaction.
+- Secrets are read solely from environment variables (`NINEROUTER_API_KEY`); never stored in files or settings.
+- `src/acp/` must not import `vscode`, `@/runtime`, `@/provider`, `@/webview`, or `@/config/*` (except constants from `@/config/defaults` and `@/debug/debug-level`).
+- Code outside `src/acp` must not import `@/acp` or ACP/MCP client SDKs.
+
 ## Change Discipline
 
 When making changes:

@@ -322,10 +322,36 @@ export const window = {
     warningMessages.push(message);
     const actions = items.filter((item): item is string => typeof item === 'string');
     return warningResponseSet ? warningResponse : actions[0];
+  },
+  async showTextDocument(document: unknown): Promise<unknown> {
+    shownDocuments.push(document);
+    return document;
+  }
+};
+
+let clipboardText = '';
+const openedDocuments: Array<{ content?: string; language?: string }> = [];
+const shownDocuments: unknown[] = [];
+
+export const env = {
+  clipboard: {
+    async writeText(value: string): Promise<void> {
+      clipboardText = value;
+    },
+    async readText(): Promise<string> {
+      return clipboardText;
+    }
   }
 };
 
 export const workspace = {
+  async openTextDocument(options?: { content?: string; language?: string }): Promise<{ getText: () => string; languageId: string }> {
+    openedDocuments.push(options ?? {});
+    return {
+      getText: () => options?.content ?? '',
+      languageId: options?.language ?? 'plaintext'
+    };
+  },
   fs: {
     async readFile(_uri: MockUri): Promise<Uint8Array> {
       return new TextEncoder().encode(webviewShell);
@@ -540,7 +566,22 @@ export function __createCancellationToken(): {
   };
 }
 
+export function __getClipboardText(): string {
+  return clipboardText;
+}
+
+export function __getOpenedDocuments(): Array<{ content?: string; language?: string }> {
+  return [...openedDocuments];
+}
+
+export function __getShownDocuments(): unknown[] {
+  return [...shownDocuments];
+}
+
 export function __resetVscodeState(): void {
+  clipboardText = '';
+  openedDocuments.length = 0;
+  shownDocuments.length = 0;
   configurationValues.clear();
   commandHandlers.clear();
   registeredProvider = undefined;

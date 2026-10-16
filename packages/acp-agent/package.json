@@ -1,0 +1,15 @@
+{
+  "name": "9router-acp",
+  "version": "0.15.0",
+  "description": "Agent Client Protocol (ACP) coding agent powered by 9router",
+  "bin": {
+    "9router-acp": "./dist/index.cjs"
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "license": "MIT"
+}

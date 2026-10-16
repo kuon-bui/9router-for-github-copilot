@@ -4,6 +4,7 @@ import { dirname, resolve } from 'node:path';
 import { unlink } from 'node:fs/promises';
 import {
   WEBVIEW_VIEWS,
+  createAcpAgentConfig,
   createExtensionConfig,
   createPreactVendorConfig,
   createSharedStylesConfig,
@@ -13,6 +14,7 @@ import {
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
 await build(createExtensionConfig({}));
+await build(createAcpAgentConfig({}));
 await build(createPreactVendorConfig({}));
 await build(createSharedStylesConfig({}));
 await unlink(resolve(root, 'dist/webview/shared/ui.js')).catch(() => undefined);
