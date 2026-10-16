@@ -1,40 +1,23 @@
 import * as acp from '@agentclientprotocol/sdk';
 import { Readable, Writable } from 'node:stream';
-
-export function createSpikeAgent() {
-  return acp
-    .agent({ name: '9router-acp' })
-    .onRequest('initialize', async () => ({
-      protocolVersion: acp.PROTOCOL_VERSION,
-      agentInfo: {
-        name: '9router-acp',
-        title: '9router',
-        version: '0.15.0'
-      },
-      authMethods: [],
-      agentCapabilities: {
-        loadSession: false,
-        promptCapabilities: {
-          image: false,
-          audio: false,
-          embeddedContext: true
-        },
-        mcpCapabilities: {
-          http: true,
-          sse: false
-        },
-        sessionCapabilities: {
-          close: {}
-        }
-      }
-    }));
-}
+import { createAgentApp } from './agent-app';
+import { loadAgentSettings } from './agent-settings';
+import { createStderrLogger } from './stderr-logger';
 
 export function startAgentCli(): void {
+  const settings = loadAgentSettings();
+  const logger = createStderrLogger(settings.debugMode);
+
+  logger.log('metadata', 'Starting 9router ACP Agent CLI', {
+    baseUrl: settings.baseUrl,
+    mode: settings.mode,
+    timeoutMs: settings.timeoutMs
+  });
+
   const input = Writable.toWeb(process.stdout);
   const output = Readable.toWeb(process.stdin);
   const stream = acp.ndJsonStream(input, output);
-  const app = createSpikeAgent();
+  const app = createAgentApp({ settings, logger });
   app.connect(stream);
 }
 

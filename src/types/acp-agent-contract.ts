@@ -12,9 +12,9 @@ export type AcpReasoningEffort =
   | 'max';
 
 export interface AcpAgentEnvConfig {
-  apiKey?: string;
+  apiKey?: string | undefined;
   baseUrl: string;
-  defaultModel?: string;
+  defaultModel?: string | undefined;
   reasoningEffort: AcpReasoningEffort;
   mode: AcpAgentMode;
   timeoutMs: number;

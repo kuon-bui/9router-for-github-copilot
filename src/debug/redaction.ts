@@ -1,4 +1,4 @@
-const AUTHORIZATION_PATTERN = /^Bearer\s+.+$/i;
+﻿const AUTHORIZATION_PATTERN = /^Bearer\s+.+$/i;
 
 export function redactBearerToken(value: string): string {
   return AUTHORIZATION_PATTERN.test(value) ? 'Bearer [REDACTED]' : value;
@@ -26,4 +26,9 @@ const INLINE_AUTHORIZATION_PATTERN = /\bBearer\s+[^\s'"]+/gi;
 
 export function redactBearerTokens(value: string): string {
   return value.replace(INLINE_AUTHORIZATION_PATTERN, 'Bearer [REDACTED]');
+}
+const INLINE_API_KEY_PATTERN = /\b(?:sk-[a-zA-Z0-9_-]{16,})\b/g;
+
+export function redactSensitiveText(value: string): string {
+  return redactBearerTokens(value).replace(INLINE_API_KEY_PATTERN, '******');
 }
