@@ -60,18 +60,17 @@ export function runLocalCommand(options: LocalCommandOptions): Promise<CommandEx
       if (!proc.pid) {
         return;
       }
-      try {
-        if (isWindows) {
-          spawn('taskkill', ['/pid', String(proc.pid), '/T', '/F'], { stdio: 'ignore' });
-        } else {
-          proc.kill('SIGKILL');
-        }
-      } catch {
+      if (isWindows) {
         try {
-          proc.kill();
+          spawn('taskkill', ['/pid', String(proc.pid), '/T', '/F'], { stdio: 'ignore' });
         } catch {
           // ignore
         }
+      }
+      try {
+        proc.kill();
+      } catch {
+        // ignore
       }
     };
 
