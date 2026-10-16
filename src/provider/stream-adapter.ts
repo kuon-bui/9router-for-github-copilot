@@ -1,11 +1,12 @@
 import * as vscode from 'vscode';
 import { NineRouterError } from '@/router/errors';
+import {
+  MAX_TOTAL_TOOL_CALL_ARGUMENT_BYTES,
+  MAX_TOOL_CALL_ARGUMENT_BYTES,
+  parseToolCallArguments
+} from '@/router/response-assembler';
 import type { RouterStreamEvent } from '@/types/router-contract';
 import type { ThinkingPartHost } from '@/types/vscode-chat-compat';
-
-// ponytail: 1 MiB per call and 4 MiB total cover normal tool JSON; raise if 9router supports larger tool payloads.
-const MAX_TOOL_CALL_ARGUMENT_BYTES = 1024 * 1024;
-const MAX_TOTAL_TOOL_CALL_ARGUMENT_BYTES = 4 * 1024 * 1024;
 
 interface ToolAccumulator {
   id?: string;
@@ -158,28 +159,18 @@ function emitToolCall(
     throw createMalformedToolCallError('9router streamed a tool call without id or name');
   }
 
-  let parsedInput: unknown;
-  try {
-    parsedInput = JSON.parse(toolCall.buffer);
-  } catch {
-    throw createMalformedToolCallError('9router streamed malformed tool call arguments');
+  const parsed = parseToolCallArguments(toolCall.buffer);
+  if (!parsed.ok) {
+    throw createMalformedToolCallError(parsed.reason);
   }
 
-  if (!isPlainObject(parsedInput)) {
-    throw createMalformedToolCallError('9router streamed non-object tool call arguments');
-  }
-
-  progress.report(new vscode.LanguageModelToolCallPart(toolCall.id, toolCall.name, parsedInput));
+  progress.report(new vscode.LanguageModelToolCallPart(toolCall.id, toolCall.name, parsed.value));
 }
 
 function createMalformedToolCallError(message: string): NineRouterError {
   return new NineRouterError('MALFORMED_STREAM_ERROR', message, {
     details: { phase: 'tool-call-streaming' }
   });
-}
-
-function isPlainObject(value: unknown): value is object {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 function getToolAccumulatorKey(
