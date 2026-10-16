@@ -1,6 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import { isAbsolute } from 'node:path';
 import { createInvalidParamsError } from './errors';
+import { createMcpHub } from './mcp/mcp-hub';
+import type { McpHub } from './mcp/mcp-hub';
 import type { AcpAgentMode, AcpReasoningEffort } from '@/types/acp-agent-contract';
 import type { RouterResponseInputItem } from '@/types/router-contract';
 
@@ -20,6 +22,7 @@ export interface Session {
   activeTurn: ActiveTurnState | null;
   grants: Set<string>;
   mcpServers: unknown[];
+  mcpHub: McpHub;
 }
 
 export interface SessionDefaults {
@@ -64,7 +67,8 @@ export function createSessionStore(defaults: SessionDefaults = {}): SessionStore
         history: [],
         activeTurn: null,
         grants: new Set<string>(),
-        mcpServers: params.mcpServers ?? []
+        mcpServers: params.mcpServers ?? [],
+        mcpHub: createMcpHub()
       };
 
       sessions.set(sessionId, session);
@@ -77,8 +81,11 @@ export function createSessionStore(defaults: SessionDefaults = {}): SessionStore
 
     closeSession(sessionId: string): void {
       const session = sessions.get(sessionId);
-      if (session?.activeTurn) {
-        session.activeTurn.abortController.abort('session closed');
+      if (session) {
+        if (session.activeTurn) {
+          session.activeTurn.abortController.abort('session closed');
+        }
+        session.mcpHub.close().catch(() => {});
       }
       sessions.delete(sessionId);
     },

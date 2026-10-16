@@ -47,6 +47,12 @@ export function createAgentApp(deps: AgentAppDependencies): acp.AgentApp {
         mcpServers: ctx.params.mcpServers as unknown[] | undefined
       });
 
+      if (Array.isArray(ctx.params.mcpServers) && ctx.params.mcpServers.length > 0) {
+        session.mcpHub.connectServers(ctx.params.mcpServers).catch((err) => {
+          logger.warn(`Failed to initialize MCP servers: ${err instanceof Error ? err.message : String(err)}`);
+        });
+      }
+
       const models = await catalogCache.getModels(client, settings.apiKey, settings.baseUrl);
       if (!session.model) {
         session.model = settings.defaultModel ?? models[0]?.id ?? '';

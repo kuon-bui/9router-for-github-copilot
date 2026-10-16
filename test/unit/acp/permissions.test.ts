@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { checkToolPermission } from '@/acp/permissions';
+import { createMcpHub } from '@/acp/mcp/mcp-hub';
 import type { Session } from '@/acp/session-store';
 
 function createTestSession(mode: 'ask' | 'auto-edit' | 'read-only'): Session {
@@ -12,7 +13,8 @@ function createTestSession(mode: 'ask' | 'auto-edit' | 'read-only'): Session {
     history: [],
     activeTurn: null,
     grants: new Set(),
-    mcpServers: []
+    mcpServers: [],
+    mcpHub: createMcpHub()
   };
 }
 

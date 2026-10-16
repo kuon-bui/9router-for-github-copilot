@@ -105,7 +105,9 @@ export async function executePromptTurn(options: ExecutePromptTurnOptions): Prom
         return { stopReason: 'cancelled' };
       }
 
-      const tools = getAvailableTools(session.mode);
+      const builtinTools = getAvailableTools(session.mode);
+      const mcpTools = session.mode !== 'read-only' ? session.mcpHub.getTools() : [];
+      const tools = [...builtinTools, ...mcpTools];
       const requestPayload: RouterResponseRequest = {
         model: session.model,
         input: [...session.history],
@@ -239,12 +241,14 @@ export async function executePromptTurn(options: ExecutePromptTurnOptions): Prom
         }
 
         // Execute tool
-        const toolResult = await executeBuiltinTool(call.name, call.arguments, {
-          cwd: session.cwd,
-          fs: workspaceFs,
-          signal: combinedSignal,
-          ...(clientTerminal ? { clientTerminal } : {})
-        });
+        const toolResult = session.mcpHub.hasTool(call.name)
+          ? await session.mcpHub.executeTool(call.name, call.arguments, combinedSignal)
+          : await executeBuiltinTool(call.name, call.arguments, {
+              cwd: session.cwd,
+              fs: workspaceFs,
+              signal: combinedSignal,
+              ...(clientTerminal ? { clientTerminal } : {})
+            });
 
         const outputForModel = truncateOutput(toolResult.output, MAX_MODEL_OUTPUT_BYTES);
 

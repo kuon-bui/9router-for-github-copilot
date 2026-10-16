@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { executePromptTurn } from '@/acp/turn-runner';
+import { createMcpHub } from '@/acp/mcp/mcp-hub';
 import { FakeRouterClient } from '../../support/fake-router-client';
 import type { Session } from '@/acp/session-store';
 import type { RouterStreamEvent } from '@/types/router-contract';
@@ -14,7 +15,8 @@ function createMockSession(): Session {
     history: [],
     activeTurn: null,
     grants: new Set(),
-    mcpServers: []
+    mcpServers: [],
+    mcpHub: createMcpHub()
   };
 }
 
