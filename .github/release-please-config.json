@@ -14,7 +14,10 @@
   ],
   "packages": {
     ".": {
-      "changelog-path": "CHANGELOG.md"
+      "changelog-path": "CHANGELOG.md",
+      "extra-files": [
+        "packages/acp-agent/package.json"
+      ]
     }
   }
 }

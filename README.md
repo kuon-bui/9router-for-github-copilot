@@ -155,8 +155,19 @@ Open the **Command Palette** and search for `9router`.
 | `9router: Add Model` | Add a model directly |
 | `9router: Toggle Model Fast Tier` | Toggle Fast Tier requests for a model |
 | `9router: Configure Vision Proxy` | Select a Vision proxy source and model |
+| `9router: Set Up ACP Agent` | Generate ACP agent config snippets for Zed, JetBrains, or VS Code |
 | `9router: Show Usage` | Open quota and usage dashboard |
 | `9router: Show Diagnostics` | Open troubleshooting details |
+
+### Agent Client Protocol (ACP) support
+
+Use 9router as a coding agent in other editors that speak the [Agent Client Protocol (ACP)](https://agentclientprotocol.com) such as **Zed**, **JetBrains IDEs**, or **VS Code** (via an ACP client extension):
+
+1. Run `9router: Set Up ACP Agent` from the Command Palette.
+2. Select your target editor and default model.
+3. Paste the generated snippet into your editor's agent configuration.
+
+The companion npm package [`9router-acp`](./packages/acp-agent/README.md) (`npx -y 9router-acp`) runs as a standalone headless process providing multi-turn file tools, terminal execution, and MCP server support.
 
 ## Advanced setup
 

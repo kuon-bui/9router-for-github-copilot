@@ -85,6 +85,9 @@ jobs:
       - name: Package extension
         run: pnpm run package
 
+      - name: Verify ACP agent package
+        run: npm pack ./packages/acp-agent --dry-run
+
       - name: Upload VSIX artifact
         uses: actions/upload-artifact@v4
         with:
@@ -109,3 +112,15 @@ jobs:
             --packagePath "$(ls -1 *.vsix)" \
             --allow-proposed-apis languageModelThinkingPart \
             --skip-duplicate
+
+      - name: Publish ACP agent to npm
+        if: needs.release.outputs.release_created == 'true'
+        shell: bash
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          if [ -n "$NODE_AUTH_TOKEN" ]; then
+            npm publish ./packages/acp-agent --access public
+          else
+            echo "NPM_TOKEN not configured; skipping npm publish"
+          fi
