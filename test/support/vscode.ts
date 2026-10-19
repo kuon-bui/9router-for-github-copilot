@@ -246,6 +246,9 @@ const configurationListeners = new Set<
 const warningMessages: string[] = [];
 let warningResponse: string | undefined;
 let warningResponseSet = false;
+let warningResponses: Array<string | undefined> = [];
+let openDialogResult: MockUri[] | undefined;
+const openDialogCalls: unknown[] = [];
 const DEFAULT_WEBVIEW_SHELL = [
   '<meta http-equiv="Content-Security-Policy" content="{{csp}}">',
   '<link rel="stylesheet" href="{{styleUri}}">',
@@ -321,7 +324,14 @@ export const window = {
   async showWarningMessage(message: string, ...items: unknown[]): Promise<string | undefined> {
     warningMessages.push(message);
     const actions = items.filter((item): item is string => typeof item === 'string');
+    if (warningResponses.length > 0) {
+      return warningResponses.shift();
+    }
     return warningResponseSet ? warningResponse : actions[0];
+  },
+  async showOpenDialog(options?: unknown): Promise<MockUri[] | undefined> {
+    openDialogCalls.push(options);
+    return openDialogResult;
   }
 };
 
@@ -471,8 +481,23 @@ export function __fireConfigurationChange(section: string): void {
 }
 
 export function __setWarningResponse(value: string | undefined): void {
+  warningResponses = [];
   warningResponse = value;
   warningResponseSet = true;
+}
+
+export function __setWarningResponses(values: Array<string | undefined>): void {
+  warningResponse = undefined;
+  warningResponseSet = false;
+  warningResponses = [...values];
+}
+
+export function __setOpenDialogResult(uris: string[] | undefined): void {
+  openDialogResult = uris === undefined ? undefined : uris.map((uri) => createUri(uri));
+}
+
+export function __getOpenDialogCalls(): unknown[] {
+  return [...openDialogCalls];
 }
 
 export function __setWebviewShell(html: string): void {
@@ -558,6 +583,9 @@ export function __resetVscodeState(): void {
   warningMessages.length = 0;
   warningResponse = undefined;
   warningResponseSet = false;
+  warningResponses = [];
+  openDialogResult = undefined;
+  openDialogCalls.length = 0;
   webviewShell = DEFAULT_WEBVIEW_SHELL;
   for (const panel of webviewPanels) {
     panel.dispose();

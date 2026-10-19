@@ -9,6 +9,7 @@ import type { VisionProxyConfigurator } from './vision-configuration';
 import type { ModelEditorOpenOptions, ModelEditorOpener } from './model-editor-panel';
 import type { ConnectionTester } from './test-connection';
 import type { UsageReporter } from './show-usage';
+import type { CodexExporter } from './export-codex-config';
 
 interface FastTierQuickPickItem extends vscode.QuickPickItem {
   sourceIndex: number;
@@ -21,6 +22,7 @@ interface CommandDependencies {
   manageModels?: ModelEditorOpener;
   testConnection?: ConnectionTester;
   showUsage?: UsageReporter;
+  exportCodexConfig?: CodexExporter;
 }
 
 async function runModelEditor(
@@ -214,6 +216,21 @@ export function registerCommands(
         await dependencies.configureVisionProxy?.(cancellation.token);
       } finally {
         cancellation.dispose();
+      }
+    })
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand('9routerCopilot.exportCodexConfig', async () => {
+      try {
+        await dependencies.exportCodexConfig?.();
+      } catch (error) {
+        const requestId = error instanceof NineRouterError ? error.requestId : undefined;
+        const message =
+          error instanceof NineRouterError ? error.message : 'Unexpected Codex export error';
+        await vscode.window.showErrorMessage(
+          `9router Codex export failed: ${message}${requestId ? ` Request ID: ${requestId}.` : ''}`
+        );
       }
     })
   );

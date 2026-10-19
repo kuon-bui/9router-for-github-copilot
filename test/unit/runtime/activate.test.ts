@@ -31,6 +31,7 @@ describe('activateExtension', () => {
 
     await activateExtension(context, {
       readDefaultVisionProxyPrompt: async () => 'Default Vision prompt.',
+      readDefaultCodexInstructions: async () => 'Default Codex instructions.',
       createProvider: (_context, _routerClient, _snapshot, options) => {
         providerConfigurator = options.configureVisionProxy;
         return providerStub;
@@ -42,5 +43,34 @@ describe('activateExtension', () => {
 
     expect(providerConfigurator).toBeTypeOf('function');
     expect(commandConfigurator).toBe(providerConfigurator);
+  });
+
+  it('activates successfully without reading Codex instructions during activation', async () => {
+    const context = {
+      secrets: { get: async () => undefined },
+      subscriptions: [],
+      extensionUri: Uri.file('/ext'),
+      extensionPath: '/ext'
+    } as never;
+
+    const readInstructionsMock = vi.fn(async () => {
+      throw new Error('Should not be called during activation');
+    });
+
+    const providerStub = {
+      getSnapshot: () => undefined,
+      refreshFromSnapshot: () => undefined,
+      dispose: vi.fn()
+    } as unknown as NineRouterChatProvider;
+
+    await expect(
+      activateExtension(context, {
+        readDefaultVisionProxyPrompt: async () => 'Default Vision prompt.',
+        readDefaultCodexInstructions: readInstructionsMock,
+        createProvider: () => providerStub
+      })
+    ).resolves.toBeUndefined();
+
+    expect(readInstructionsMock).not.toHaveBeenCalled();
   });
 });
