@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.16.0](https://github.com/kuon-bui/9router-for-github-copilot/compare/v0.15.0...v0.16.0) (2026-11-16)
+
+
+### ⚠ BREAKING CHANGES
+
+* the extension now requires VS Code 1.146.0 or newer. Users on older VS Code versions stay on the previous release.
+
+### Dependencies
+
+* require VS Code 1.146.0 or newer ([232210f](https://github.com/kuon-bui/9router-for-github-copilot/commit/232210f72d4663b091c6bcea049dd7beb41805f8))
+
 ## [0.15.0](https://github.com/kuon-bui/9router-for-github-copilot/compare/v0.14.0...v0.15.0) (2026-10-14)
 
 
