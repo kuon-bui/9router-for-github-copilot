@@ -194,8 +194,10 @@ On extension activation:
 
 - register commands such as `Set API Key`
 - register the `9router` language model chat provider
-- activate `github.copilot-chat` if available
-- trigger a model picker refresh
+- activate `github.copilot-chat` if available, without blocking activation on it
+- trigger a model picker refresh, and refresh again on API key changes and on snapshot setting changes
+
+Activation is triggered by `onLanguageModelChatProvider:9router`. See the production design for the full activation contract.
 
 ### 2. Model Discovery
 

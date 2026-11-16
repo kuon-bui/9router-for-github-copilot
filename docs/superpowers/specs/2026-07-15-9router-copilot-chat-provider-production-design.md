@@ -136,13 +136,20 @@ Upstream provider
 
 ### 1. Activation
 
+The extension activates on `onLanguageModelChatProvider:9router`, so it loads when Copilot Chat first asks for 9router models rather than at every startup. Commands and the `@9router` participant still activate it on demand.
+
 On activation, the extension should:
 
 - register commands such as `Set API Key` and `Clear API Key`
 - register the `9router` language model chat provider
 - load local model display settings
-- activate `github.copilot-chat` when available
-- refresh model availability when configuration changes
+- activate `github.copilot-chat` when available, without waiting on it; a failure there is logged and never fails activation
+- fall back to an empty default Vision proxy prompt when the bundled prompt cannot be read, which disables proxy Vision but keeps text chat working
+- refresh model availability when a setting that feeds the provider snapshot changes, coalescing bursts of writes into one republish; panel-only preferences such as `usageCompact` do not republish
+- refresh model availability when the `9router` API key is set, changed, or cleared, including from another window
+- warn once when settings hide models (invalid runtime settings or rejected model entries), with actions for diagnostics and the model manager; unmapped draft entries and pending Vision proxy setup do not warn
+- show a one-time first-run message when no API key exists, and offer `Add Model` after a key is saved while the picker is empty
+- log one activation summary line with snapshot state and counts, never secrets
 
 ### 2. Model publication
 

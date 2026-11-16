@@ -198,6 +198,7 @@ Each model can have its own display name, Fast Tier, tools, Vision mode, Thinkin
 - **Image input is blocked** — edit the model and choose `Native` or `Proxy` Vision mode.
 - **Vision proxy is missing** — run `9router: Configure Vision Proxy`.
 - **Thinking Effort is unavailable** — edit the model and add supported effort choices.
+- **A warning says models were hidden** — choose **Show Diagnostics** to see which setting is invalid, or **Manage Models** to fix the entry.
 - **More detail is needed** — run `9router: Show Diagnostics`.
 
 </details>
