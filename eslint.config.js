@@ -22,7 +22,7 @@ const sharedGlobals = {
 module.exports = [
   {
     ignores: [
-      'dist/**',
+      '**/dist/**',
       'node_modules/**',
       'scripts/**',
       '*.vsix',
