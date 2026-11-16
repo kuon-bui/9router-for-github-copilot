@@ -29,7 +29,7 @@ jobs:
 
     steps:
       - name: Create release
-        uses: googleapis/release-please-action@v4
+        uses: googleapis/release-please-action@v5
         id: release
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -48,24 +48,26 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: ${{ github.event_name == 'workflow_dispatch' && github.sha || needs.release.outputs.tag_name }}
 
       - name: Verify manual release version
         if: github.event_name == 'workflow_dispatch'
         shell: bash
-        run: test "v$(node -p "require('./package.json').version")" = "${{ inputs.tag }}"
+        env:
+          INPUT_TAG: ${{ inputs.tag }}
+        run: test "v$(node -p "require('./package.json').version")" = "$INPUT_TAG"
 
       - name: Set up pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v6
         with:
           version: 11
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
-          node-version: 22
+          node-version: 24
           cache: pnpm
 
       - name: Install dependencies
@@ -87,14 +89,14 @@ jobs:
         run: pnpm run package
 
       - name: Upload VSIX artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: 9router-copilot-${{ needs.release.outputs.tag_name || inputs.tag }}
           path: "*.vsix"
           if-no-files-found: error
 
       - name: Attach VSIX to GitHub release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ needs.release.outputs.tag_name || inputs.tag }}
           files: "*.vsix"
