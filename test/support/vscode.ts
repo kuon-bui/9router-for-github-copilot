@@ -255,6 +255,14 @@ const DEFAULT_WEBVIEW_SHELL = [
 ].join('\n');
 let webviewShell = DEFAULT_WEBVIEW_SHELL;
 
+interface MockExtension {
+  activate: () => Promise<void>;
+}
+
+const installedExtensions = new Map<string, MockExtension>();
+const executedCommands: string[] = [];
+let informationResponse: string | undefined;
+
 export const ConfigurationTarget = { Global: 1 } as const;
 export const ViewColumn = { Active: -1, Beside: -2 } as const;
 
@@ -286,6 +294,10 @@ export const commands = {
     return new Disposable(() => {
       commandHandlers.delete(command);
     });
+  },
+  async executeCommand(command: string, ..._args: unknown[]): Promise<unknown> {
+    executedCommands.push(command);
+    return undefined;
   }
 };
 
@@ -310,9 +322,9 @@ export const window = {
   async showQuickPick(): Promise<unknown> {
     return quickPickValues.shift();
   },
-  async showInformationMessage(message: string): Promise<string | undefined> {
+  async showInformationMessage(message: string, ..._items: unknown[]): Promise<string | undefined> {
     informationMessages.push(message);
-    return undefined;
+    return informationResponse;
   },
   async showErrorMessage(message: string): Promise<string | undefined> {
     errorMessages.push(message);
@@ -372,8 +384,8 @@ export const workspace = {
 };
 
 export const extensions = {
-  getExtension(): { activate: () => Promise<void> } | undefined {
-    return undefined;
+  getExtension(id: string): MockExtension | undefined {
+    return installedExtensions.get(id);
   }
 };
 
@@ -475,6 +487,22 @@ export function __setWarningResponse(value: string | undefined): void {
   warningResponseSet = true;
 }
 
+export function __setExtension(id: string, extension: MockExtension | undefined): void {
+  if (extension) {
+    installedExtensions.set(id, extension);
+  } else {
+    installedExtensions.delete(id);
+  }
+}
+
+export function __getExecutedCommands(): string[] {
+  return [...executedCommands];
+}
+
+export function __setInformationResponse(value: string | undefined): void {
+  informationResponse = value;
+}
+
 export function __setWebviewShell(html: string): void {
   webviewShell = html;
 }
@@ -559,6 +587,9 @@ export function __resetVscodeState(): void {
   warningResponse = undefined;
   warningResponseSet = false;
   webviewShell = DEFAULT_WEBVIEW_SHELL;
+  installedExtensions.clear();
+  executedCommands.length = 0;
+  informationResponse = undefined;
   for (const panel of webviewPanels) {
     panel.dispose();
   }

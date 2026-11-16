@@ -5,7 +5,7 @@ import {
   loadRuntimeSettings
 } from '@/config/settings';
 import { readDefaultVisionProxyPrompt } from '@/config/vision-proxy-prompt';
-import { disposeOutputChannel } from '@/debug/output-channel';
+import { disposeOutputChannel, logDebugEvent } from '@/debug/output-channel';
 import { createRouterClient } from '@/router/client';
 import { NineRouterChatProvider } from '@/provider/provider';
 import { registerCommands } from './commands';
@@ -15,7 +15,7 @@ import { createModelEditorOpener } from './model-editor-panel';
 import { createConnectionTester } from './test-connection';
 import { createUsageReporter } from './show-usage';
 import type { RouterClient } from '@/router/client';
-import type { SettingsSnapshot } from '@/config/settings';
+import type { RuntimeSettings, SettingsSnapshot } from '@/config/settings';
 import type { VisionProxyConfigurator } from './vision-configuration';
 
 let providerRegistration: vscode.Disposable | undefined;
@@ -44,32 +44,33 @@ export async function activateExtension(
     ((providerContext, routerClient, snapshot, options) =>
       new NineRouterChatProvider(providerContext, routerClient, snapshot, options));
   const registerRuntimeCommands = hooks.registerCommands ?? registerCommands;
-  const defaultVisionProxyPrompt = await (
-    hooks.readDefaultVisionProxyPrompt ?? readDefaultVisionProxyPrompt
-  )(context.extensionPath);
+  const defaultVisionProxyPrompt = await loadDefaultVisionPrompt(
+    hooks.readDefaultVisionProxyPrompt ?? readDefaultVisionProxyPrompt,
+    context.extensionPath
+  );
+  const getRuntimeSettings = (): RuntimeSettings =>
+    loadRuntimeSettings(getExtensionConfiguration(), defaultVisionProxyPrompt);
+  const buildSnapshot = (): SettingsSnapshot =>
+    buildSettingsSnapshot(getExtensionConfiguration(), defaultVisionProxyPrompt);
 
   const routerClient = createRouterClient({ fetch: globalThis.fetch });
   const configureVisionProxy = createVisionProxyConfigurator({
     secrets: context.secrets,
     routerClient,
-    getRuntimeSettings: () =>
-      loadRuntimeSettings(getExtensionConfiguration(), defaultVisionProxyPrompt)
+    getRuntimeSettings
   });
 
   const manageModels = createModelEditorOpener({
     secrets: context.secrets,
     routerClient,
     extensionUri: context.extensionUri,
-    getRuntimeSettings: () =>
-      loadRuntimeSettings(getExtensionConfiguration(), defaultVisionProxyPrompt)
+    getRuntimeSettings
   });
 
-  provider = createProvider(
-    context,
-    routerClient,
-    buildSettingsSnapshot(getExtensionConfiguration(), defaultVisionProxyPrompt),
-    { configureVisionProxy, defaultVisionProxyPrompt }
-  );
+  provider = createProvider(context, routerClient, buildSnapshot(), {
+    configureVisionProxy,
+    defaultVisionProxyPrompt
+  });
   const testConnection = createConnectionTester({
     secrets: context.secrets,
     routerClient,
@@ -94,15 +95,49 @@ export async function activateExtension(
   context.subscriptions.push(
     vscode.workspace.onDidChangeConfiguration((event) =>
       handleConfigurationChange(event, () => {
-        provider?.refreshFromSnapshot(
-          buildSettingsSnapshot(getExtensionConfiguration(), defaultVisionProxyPrompt)
-        );
+        provider?.refreshFromSnapshot(buildSnapshot());
       })
     )
   );
 
+  activateCopilotChat();
+}
+
+function describeFailure(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+// Text chat must keep working without the bundled prompt; an empty prompt already means
+// "proxy Vision unavailable" to the snapshot, so the failure only needs to be visible.
+async function loadDefaultVisionPrompt(
+  read: typeof readDefaultVisionProxyPrompt,
+  extensionPath: string
+): Promise<string> {
+  try {
+    return await read(extensionPath);
+  } catch (error) {
+    logDebugEvent(
+      'minimal',
+      '9router default Vision proxy prompt unavailable',
+      { reason: describeFailure(error) },
+      'minimal'
+    );
+    return '';
+  }
+}
+
+// Not awaited: under lazy activation Copilot Chat may be the one activating us, and waiting on
+// it from inside that chain could deadlock. A failure there must not fail our activation.
+function activateCopilotChat(): void {
   const copilotChatExtension = vscode.extensions.getExtension('GitHub.copilot-chat');
-  await copilotChatExtension?.activate();
+  copilotChatExtension?.activate().then(undefined, (error: unknown) => {
+    logDebugEvent(
+      'minimal',
+      'GitHub Copilot Chat activation failed',
+      { reason: describeFailure(error) },
+      'minimal'
+    );
+  });
 }
 
 export function handleConfigurationChange(
