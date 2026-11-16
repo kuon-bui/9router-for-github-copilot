@@ -21,6 +21,7 @@ import {
   createCoalescedRefresh
 } from './settings-refresh';
 import { createSnapshotHealthReporter } from './snapshot-health';
+import { showWelcomeIfNeeded } from './welcome';
 import type { SnapshotHealthNotice } from './snapshot-health';
 import type { RouterClient } from '@/router/client';
 import type { RuntimeSettings, SettingsSnapshot } from '@/config/settings';
@@ -129,6 +130,14 @@ export async function activateExtension(
   }
 
   activateCopilotChat();
+  showWelcomeIfNeeded(context).catch((error: unknown) => {
+    logDebugEvent(
+      'minimal',
+      '9router welcome message failed',
+      { reason: describeFailure(error) },
+      'minimal'
+    );
+  });
 
   logDebugEvent(
     initialSnapshot.runtime?.debugMode ?? 'minimal',
