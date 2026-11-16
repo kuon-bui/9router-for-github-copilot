@@ -6,13 +6,16 @@ import {
   Uri,
   __fireConfigurationChange,
   __getExecutedCommands,
+  __getInformationMessages,
   __getOutputLines,
   __getRegisteredProvider,
   __getWarningMessages,
   __resetVscodeState,
   __setConfigurationValues,
-  __setExtension
+  __setExtension,
+  __setWarningResponse
 } from '@test/support/vscode';
+import { WELCOME_SHOWN_KEY } from '@/runtime/welcome';
 import type { NineRouterChatProvider } from '@/provider/provider';
 import type { VisionProxyConfigurator } from '@/runtime/vision-configuration';
 
@@ -20,15 +23,21 @@ const coderModel = { id: 'coder', name: 'Coder', modelId: 'router/coder' };
 
 interface ContextOverrides {
   apiKey?: string | undefined;
+  secretReadError?: Error;
 }
 
 function createContext(overrides: ContextOverrides = {}) {
   const secretChanges = new EventEmitter<{ key: string }>();
   const globalStateValues = new Map<string, unknown>();
-  const apiKey = 'apiKey' in overrides ? overrides.apiKey : 'sk-secret';
+  const state = { apiKey: 'apiKey' in overrides ? overrides.apiKey : 'sk-secret' };
   const context = {
     secrets: {
-      get: async () => apiKey,
+      get: async () => {
+        if (overrides.secretReadError) {
+          throw overrides.secretReadError;
+        }
+        return state.apiKey;
+      },
       store: vi.fn(async () => undefined),
       delete: vi.fn(async () => undefined),
       onDidChange: secretChanges.event
@@ -44,7 +53,12 @@ function createContext(overrides: ContextOverrides = {}) {
     extensionPath: '/ext'
   };
 
-  return { context: context as never, secretChanges, globalStateValues };
+  const setApiKey = (value: string | undefined): void => {
+    state.apiKey = value;
+    secretChanges.fire({ key: '9router.apiKey' });
+  };
+
+  return { context: context as never, secretChanges, globalStateValues, setApiKey };
 }
 
 function createProviderStub() {
@@ -194,6 +208,88 @@ describe('activateExtension', () => {
     expect(__getWarningMessages()).toEqual([
       '9router hid 1 model entry with invalid settings from the Copilot Chat model picker.'
     ]);
+  });
+
+  it('greets a fresh install without a settings warning', async () => {
+    const { context, globalStateValues } = createContext({ apiKey: undefined });
+
+    await activateExtension(context, hooks());
+
+    await vi.waitFor(() =>
+      expect(__getInformationMessages()).toEqual([
+        'Connect 9router to use its models in GitHub Copilot Chat.'
+      ])
+    );
+    expect(__getWarningMessages()).toEqual([]);
+    expect(globalStateValues.get(WELCOME_SHOWN_KEY)).toBe(true);
+  });
+
+  it('opens Manage Models from the hidden-models warning', async () => {
+    __setWarningResponse('Manage Models');
+    __setConfigurationValues({
+      models: [coderModel, { id: 'bad', name: '', modelId: 'router/bad' }]
+    });
+
+    await activateExtension(createContext().context, hooks());
+
+    await vi.waitFor(() =>
+      expect(__getExecutedCommands()).toEqual(['9routerCopilot.manageModels'])
+    );
+  });
+
+  it('warns about broken settings once the first API key is saved', async () => {
+    __setConfigurationValues({ baseUrl: 'not-a-url' });
+    const { context, setApiKey } = createContext({ apiKey: undefined });
+    await activateExtension(context, hooks());
+    expect(__getWarningMessages()).toEqual([]);
+
+    setApiKey('sk-secret');
+
+    await vi.waitFor(() =>
+      expect(__getWarningMessages()).toEqual([
+        '9router settings are invalid (9router-copilot.baseUrl). All 9router models are hidden from the Copilot Chat model picker.'
+      ])
+    );
+  });
+
+  it('does not warn when the API key is cleared', async () => {
+    __setConfigurationValues({ baseUrl: 'not-a-url' });
+    const { context, setApiKey } = createContext({ apiKey: undefined });
+    await activateExtension(context, hooks());
+
+    setApiKey(undefined);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(providerStub.refreshFromSnapshot).toHaveBeenCalledTimes(1);
+    expect(__getWarningMessages()).toEqual([]);
+  });
+
+  it('completes activation when the API key cannot be read', async () => {
+    const { context } = createContext({ secretReadError: new Error('keyring locked') });
+
+    await expect(activateExtension(context, hooks())).resolves.toBeUndefined();
+
+    expect(__getRegisteredProvider()).toBe(providerStub);
+    expect(
+      __getOutputLines().some(
+        (line) =>
+          line.startsWith('9router extension activated') && line.includes('"apiKeyConfigured":false')
+      )
+    ).toBe(true);
+  });
+
+  it('redacts bearer tokens in logged failure reasons', async () => {
+    __setExtension('GitHub.copilot-chat', {
+      activate: () => Promise.reject(new Error('proxy rejected Bearer sk-live-123 header'))
+    });
+
+    await activateExtension(createContext().context, hooks());
+
+    await vi.waitFor(() =>
+      expect(__getOutputLines().join('\n')).toContain('Bearer [REDACTED]')
+    );
+    expect(__getOutputLines().join('\n')).not.toContain('sk-live-123');
   });
 
   it('registers the provider with an empty Vision prompt when the bundled prompt is unreadable', async () => {

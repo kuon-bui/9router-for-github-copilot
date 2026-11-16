@@ -73,8 +73,9 @@ export function registerCommands(
       }
 
       await setApiKey(context.secrets, value);
-      // A first-time key with nothing in the picker yet still leaves Copilot Chat empty.
-      if (dependencies.getSettingsSnapshot?.()?.publishedModels.length === 0) {
+      // A first-time key with nothing in the picker yet still leaves Copilot Chat empty. Only the
+      // 'empty' state means "no usable model"; invalid runtime settings hide valid models too.
+      if (dependencies.getSettingsSnapshot?.()?.state === 'empty') {
         const choice = await vscode.window.showInformationMessage(
           '9router API key saved. Add a model to show it in Copilot Chat.',
           'Add Model'

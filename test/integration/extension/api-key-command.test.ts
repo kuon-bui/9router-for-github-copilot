@@ -11,10 +11,12 @@ import {
   __setInputBoxValue
 } from '@test/support/vscode';
 
-const snapshotOf = (models: unknown[]) =>
-  buildSettingsSnapshot({ get: (key: string) => (key === 'models' ? models : undefined) } as never);
+const snapshotOf = (models: unknown[], values: Record<string, unknown>) =>
+  buildSettingsSnapshot({
+    get: (key: string) => (key === 'models' ? models : values[key])
+  } as never);
 
-function register(models: unknown[]) {
+function register(models: unknown[], values: Record<string, unknown> = {}) {
   const store = vi.fn(async () => undefined);
   registerCommands(
     {
@@ -22,7 +24,7 @@ function register(models: unknown[]) {
       extensionUri: Uri.file('/ext'),
       secrets: { get: async () => undefined, store, delete: async () => undefined }
     } as never,
-    { getSettingsSnapshot: () => snapshotOf(models) }
+    { getSettingsSnapshot: () => snapshotOf(models, values) }
   );
 
   return { store };
@@ -45,6 +47,14 @@ describe('9routerCopilot.setApiKey', () => {
       '9router API key saved. Add a model to show it in Copilot Chat.'
     ]);
     expect(__getExecutedCommands()).toEqual(['9routerCopilot.addModel']);
+  });
+
+  it('does not offer Add Model when runtime settings hide valid models', async () => {
+    register([{ id: 'coder', name: 'Coder', modelId: 'router/coder' }], { baseUrl: 'not-a-url' });
+
+    await __getCommandHandler('9routerCopilot.setApiKey')?.();
+
+    expect(__getInformationMessages()).toEqual([]);
   });
 
   it('stays quiet after saving a key when models are published', async () => {

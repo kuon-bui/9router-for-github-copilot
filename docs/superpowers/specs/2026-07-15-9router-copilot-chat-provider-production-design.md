@@ -136,7 +136,7 @@ Upstream provider
 
 ### 1. Activation
 
-The extension activates on `onLanguageModelChatProvider:9router`, so it loads when Copilot Chat first asks for 9router models rather than at every startup. Commands and the `@9router` participant still activate it on demand.
+The extension activates on `onLanguageModelChatProvider:9router`, so it loads when Copilot Chat first asks for 9router models instead of unconditionally at startup. With Copilot Chat enabled that request usually arrives during startup anyway; the gain is for windows where Copilot Chat is disabled or not installed. Commands and the `@9router` participant still activate it on demand.
 
 On activation, the extension should:
 
@@ -147,8 +147,8 @@ On activation, the extension should:
 - fall back to an empty default Vision proxy prompt when the bundled prompt cannot be read, which disables proxy Vision but keeps text chat working
 - refresh model availability when a setting that feeds the provider snapshot changes, coalescing bursts of writes into one republish; panel-only preferences such as `usageCompact` do not republish
 - refresh model availability when the `9router` API key is set, changed, or cleared, including from another window
-- warn once when settings hide models (invalid runtime settings or rejected model entries), with actions for diagnostics and the model manager; unmapped draft entries and pending Vision proxy setup do not warn
-- show a one-time first-run message when no API key exists, and offer `Add Model` after a key is saved while the picker is empty
+- warn once when settings hide models (invalid runtime settings or rejected model entries), with actions for diagnostics and the model manager; unmapped draft entries and pending Vision proxy setup do not warn. The warning is raised on settings changes, at activation, and when an API key is saved, but only while a key exists
+- show a one-time first-run message when no API key exists, and offer `Add Model` after a key is saved while no usable model is configured (snapshot state `empty`)
 - log one activation summary line with snapshot state and counts, never secrets
 
 ### 2. Model publication

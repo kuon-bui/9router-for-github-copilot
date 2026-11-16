@@ -7,6 +7,7 @@ import {
 import { getApiKey, isApiKeyChange } from '@/config/secret-store';
 import { readDefaultVisionProxyPrompt } from '@/config/vision-proxy-prompt';
 import { disposeOutputChannel, logDebugEvent } from '@/debug/output-channel';
+import { redactBearerTokens } from '@/debug/redaction';
 import { createRouterClient } from '@/router/client';
 import { NineRouterChatProvider } from '@/provider/provider';
 import { registerCommands } from './commands';
@@ -117,16 +118,25 @@ export async function activateExtension(
     // Fires for set, change, and clear, including from another window. A new snapshot version
     // makes the provider refetch catalog metadata with the current key.
     context.secrets.onDidChange((event) => {
-      if (isApiKeyChange(event)) {
-        provider?.refreshFromSnapshot(buildSnapshot());
+      if (!isApiKeyChange(event)) {
+        return;
       }
+
+      const snapshot = buildSnapshot();
+      provider?.refreshFromSnapshot(snapshot);
+      // Once a key exists the first-run guidance no longer speaks for broken settings.
+      void hasApiKey(context.secrets).then((configured) => {
+        if (configured) {
+          healthReporter.report(snapshot);
+        }
+      });
     })
   );
 
   // A fresh install has no key yet; the first-run guidance speaks for it instead of a warning.
-  const apiKeyConfigured = (await getApiKey(context.secrets)) !== undefined;
+  const apiKeyConfigured = await hasApiKey(context.secrets);
   if (apiKeyConfigured) {
-    healthReporter.report(initialSnapshot);
+    healthReporter.report(provider.getSnapshot() ?? initialSnapshot);
   }
 
   activateCopilotChat();
@@ -168,8 +178,24 @@ function showSnapshotHealthNotice(notice: SnapshotHealthNotice): void {
     });
 }
 
+// Third-party and transport messages can quote request headers, so strip credentials inline.
 function describeFailure(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
+  return redactBearerTokens(error instanceof Error ? error.message : String(error));
+}
+
+// A locked or unavailable keychain must not fail activation after the provider is registered.
+async function hasApiKey(secrets: vscode.SecretStorage): Promise<boolean> {
+  try {
+    return (await getApiKey(secrets)) !== undefined;
+  } catch (error) {
+    logDebugEvent(
+      'minimal',
+      '9router API key could not be read',
+      { reason: describeFailure(error) },
+      'minimal'
+    );
+    return false;
+  }
 }
 
 // Text chat must keep working without the bundled prompt; an empty prompt already means
