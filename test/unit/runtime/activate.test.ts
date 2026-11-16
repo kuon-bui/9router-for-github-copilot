@@ -1,8 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { activateExtension, deactivateExtension } from '@/runtime/activate';
+import { SETTINGS_REFRESH_DELAY_MS } from '@/runtime/settings-refresh';
 import {
   EventEmitter,
   Uri,
+  __fireConfigurationChange,
   __getOutputLines,
   __getRegisteredProvider,
   __resetVscodeState,
@@ -112,6 +114,18 @@ describe('activateExtension', () => {
     await expect(
       activateExtension(createContext().context, hooks())
     ).resolves.toBeUndefined();
+  });
+
+  it('republishes once after a burst of model setting changes', async () => {
+    vi.useFakeTimers();
+    await activateExtension(createContext().context, hooks());
+
+    __fireConfigurationChange('9router-copilot.models');
+    __fireConfigurationChange('9router-copilot.models');
+    __fireConfigurationChange('9router-copilot.usageCompact');
+    vi.advanceTimersByTime(SETTINGS_REFRESH_DELAY_MS);
+
+    expect(providerStub.refreshFromSnapshot).toHaveBeenCalledTimes(1);
   });
 
   it('registers the provider with an empty Vision prompt when the bundled prompt is unreadable', async () => {

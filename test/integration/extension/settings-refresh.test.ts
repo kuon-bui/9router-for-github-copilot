@@ -17,16 +17,23 @@ describe('handleConfigurationChange', () => {
     vi.restoreAllMocks();
   });
 
-  it('ignores unrelated settings changes and refreshes on 9router keys', () => {
+  it('refreshes for snapshot settings and ignores usageCompact', () => {
     const refresh = vi.fn();
 
     handleConfigurationChange(
       {
-        affectsConfiguration: (section: string) => section === '9router-copilot'
+        affectsConfiguration: (section: string) => section === '9router-copilot.models'
       } as never,
       refresh
     );
+    expect(refresh).toHaveBeenCalledTimes(1);
 
+    handleConfigurationChange(
+      {
+        affectsConfiguration: (section: string) => section === '9router-copilot.usageCompact'
+      } as never,
+      refresh
+    );
     expect(refresh).toHaveBeenCalledTimes(1);
   });
 });

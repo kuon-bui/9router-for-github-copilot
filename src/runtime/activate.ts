@@ -14,6 +14,11 @@ import { createVisionProxyConfigurator } from './vision-configuration';
 import { createModelEditorOpener } from './model-editor-panel';
 import { createConnectionTester } from './test-connection';
 import { createUsageReporter } from './show-usage';
+import {
+  SETTINGS_REFRESH_DELAY_MS,
+  affectsProviderSnapshot,
+  createCoalescedRefresh
+} from './settings-refresh';
 import type { RouterClient } from '@/router/client';
 import type { RuntimeSettings, SettingsSnapshot } from '@/config/settings';
 import type { VisionProxyConfigurator } from './vision-configuration';
@@ -92,11 +97,13 @@ export async function activateExtension(
   providerRegistration = vscode.lm.registerLanguageModelChatProvider('9router', provider);
   context.subscriptions.push(providerRegistration);
 
+  const settingsRefresh = createCoalescedRefresh(() => {
+    provider?.refreshFromSnapshot(buildSnapshot());
+  }, SETTINGS_REFRESH_DELAY_MS);
   context.subscriptions.push(
+    settingsRefresh,
     vscode.workspace.onDidChangeConfiguration((event) =>
-      handleConfigurationChange(event, () => {
-        provider?.refreshFromSnapshot(buildSnapshot());
-      })
+      handleConfigurationChange(event, () => settingsRefresh.schedule())
     )
   );
 
@@ -144,7 +151,7 @@ export function handleConfigurationChange(
   event: Pick<vscode.ConfigurationChangeEvent, 'affectsConfiguration'>,
   refresh: () => void
 ): void {
-  if (event.affectsConfiguration('9router-copilot')) {
+  if (affectsProviderSnapshot(event)) {
     refresh();
   }
 }
