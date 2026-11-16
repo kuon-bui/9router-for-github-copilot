@@ -266,18 +266,18 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "@tailwindcss/vite": "^4.3.3",
-    "@types/node": "^26.1.1",
-    "@types/vscode": "^1.125.0",
-    "@typescript-eslint/eslint-plugin": "^8.64.0",
-    "@typescript-eslint/parser": "^8.64.0",
+    "@tailwindcss/vite": "^4.3.5",
+    "@types/node": "^26.6.6",
+    "@types/vscode": "~1.125.0",
+    "@typescript-eslint/eslint-plugin": "^8.72.2",
+    "@typescript-eslint/parser": "^8.72.2",
     "@vscode/vsce": "^4.1.1",
-    "eslint": "^10.7.0",
-    "preact": "^10.29.8",
-    "sass": "^1.103.1",
-    "tailwindcss": "^4.3.3",
-    "typescript": "^5.6.3",
-    "vite": "^8.2.2",
-    "vitest": "^4.1.10"
+    "eslint": "^10.15.0",
+    "preact": "^11.2.0",
+    "sass": "^1.108.2",
+    "tailwindcss": "^4.3.5",
+    "typescript": "^6.0.3",
+    "vite": "^8.3.8",
+    "vitest": "^5.1.0"
   }
 }
