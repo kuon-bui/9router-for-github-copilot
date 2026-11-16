@@ -10,6 +10,10 @@ export async function setApiKey(secrets: vscode.SecretStorage, value: string): P
   await secrets.store(API_KEY_SECRET, value.trim());
 }
 
+export function isApiKeyChange(event: Pick<vscode.SecretStorageChangeEvent, 'key'>): boolean {
+  return event.key === API_KEY_SECRET;
+}
+
 export async function clearApiKey(secrets: vscode.SecretStorage): Promise<void> {
   await secrets.delete(API_KEY_SECRET);
 }

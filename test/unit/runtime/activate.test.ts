@@ -128,6 +128,17 @@ describe('activateExtension', () => {
     expect(providerStub.refreshFromSnapshot).toHaveBeenCalledTimes(1);
   });
 
+  it('republishes immediately when the API key changes', async () => {
+    const { context, secretChanges } = createContext();
+    await activateExtension(context, hooks());
+
+    secretChanges.fire({ key: '9router.apiKey' });
+    expect(providerStub.refreshFromSnapshot).toHaveBeenCalledTimes(1);
+
+    secretChanges.fire({ key: 'other.secret' });
+    expect(providerStub.refreshFromSnapshot).toHaveBeenCalledTimes(1);
+  });
+
   it('registers the provider with an empty Vision prompt when the bundled prompt is unreadable', async () => {
     let receivedPrompt: string | undefined;
 

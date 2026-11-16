@@ -4,6 +4,7 @@ import {
   getExtensionConfiguration,
   loadRuntimeSettings
 } from '@/config/settings';
+import { isApiKeyChange } from '@/config/secret-store';
 import { readDefaultVisionProxyPrompt } from '@/config/vision-proxy-prompt';
 import { disposeOutputChannel, logDebugEvent } from '@/debug/output-channel';
 import { createRouterClient } from '@/router/client';
@@ -104,7 +105,14 @@ export async function activateExtension(
     settingsRefresh,
     vscode.workspace.onDidChangeConfiguration((event) =>
       handleConfigurationChange(event, () => settingsRefresh.schedule())
-    )
+    ),
+    // Fires for set, change, and clear, including from another window. A new snapshot version
+    // makes the provider refetch catalog metadata with the current key.
+    context.secrets.onDidChange((event) => {
+      if (isApiKeyChange(event)) {
+        provider?.refreshFromSnapshot(buildSnapshot());
+      }
+    })
   );
 
   activateCopilotChat();
