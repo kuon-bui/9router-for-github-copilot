@@ -11,7 +11,7 @@
   "license": "MIT",
   "icon": "media/icon.png",
   "engines": {
-    "vscode": "^1.133.0"
+    "vscode": "^1.146.0"
   },
   "enabledApiProposals": [
     "languageModelThinkingPart"
@@ -268,7 +268,7 @@
     "@eslint/js": "^10.0.1",
     "@tailwindcss/vite": "^4.3.5",
     "@types/node": "^26.6.6",
-    "@types/vscode": "~1.125.0",
+    "@types/vscode": "~1.146.0",
     "@typescript-eslint/eslint-plugin": "^8.72.2",
     "@typescript-eslint/parser": "^8.72.2",
     "@vscode/vsce": "^4.1.1",

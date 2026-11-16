@@ -42,7 +42,7 @@
 
 ## Quick start
 
-**You need:** VS Code `1.133.0` or newer, GitHub Copilot Chat, a running 9router service, and a valid 9router API key.
+**You need:** VS Code `1.146.0` or newer, GitHub Copilot Chat, a running 9router service, and a valid 9router API key.
 
 ### 1. Install
 

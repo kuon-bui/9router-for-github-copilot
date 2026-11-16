@@ -1,6 +1,6 @@
-// Vendored from microsoft/vscode tag 1.133.0:
+// Vendored from microsoft/vscode tag 1.146.0:
 //   src/vscode-dts/vscode.proposed.languageModelThinkingPart.d.ts
-// Required because @types/vscode ships no proposed API typings (latest published is 1.125.0).
+// Required because @types/vscode ships no proposed API typings.
 // Refresh this file when bumping the `languageModelThinkingPart` proposal in package.json.
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
@@ -8,6 +8,11 @@
  *--------------------------------------------------------------------------------------------*/
 
 declare module 'vscode' {
+
+	export interface LanguageModelChatRequestOptions {
+		/** Whether to include opaque reasoning state needed to replay the response in later requests. */
+		includeEncryptedThinking?: boolean;
+	}
 
 	/**
 	 * A language model response part containing thinking/reasoning content.
