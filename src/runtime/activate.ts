@@ -4,7 +4,7 @@ import {
   getExtensionConfiguration,
   loadRuntimeSettings
 } from '@/config/settings';
-import { isApiKeyChange } from '@/config/secret-store';
+import { getApiKey, isApiKeyChange } from '@/config/secret-store';
 import { readDefaultVisionProxyPrompt } from '@/config/vision-proxy-prompt';
 import { disposeOutputChannel, logDebugEvent } from '@/debug/output-channel';
 import { createRouterClient } from '@/router/client';
@@ -20,6 +20,8 @@ import {
   affectsProviderSnapshot,
   createCoalescedRefresh
 } from './settings-refresh';
+import { createSnapshotHealthReporter } from './snapshot-health';
+import type { SnapshotHealthNotice } from './snapshot-health';
 import type { RouterClient } from '@/router/client';
 import type { RuntimeSettings, SettingsSnapshot } from '@/config/settings';
 import type { VisionProxyConfigurator } from './vision-configuration';
@@ -45,6 +47,7 @@ export async function activateExtension(
   context: vscode.ExtensionContext,
   hooks: ActivationHooks = {}
 ): Promise<void> {
+  const activationStartedAt = Date.now();
   const createProvider =
     hooks.createProvider ??
     ((providerContext, routerClient, snapshot, options) =>
@@ -73,7 +76,8 @@ export async function activateExtension(
     getRuntimeSettings
   });
 
-  provider = createProvider(context, routerClient, buildSnapshot(), {
+  const initialSnapshot = buildSnapshot();
+  provider = createProvider(context, routerClient, initialSnapshot, {
     configureVisionProxy,
     defaultVisionProxyPrompt
   });
@@ -98,8 +102,11 @@ export async function activateExtension(
   providerRegistration = vscode.lm.registerLanguageModelChatProvider('9router', provider);
   context.subscriptions.push(providerRegistration);
 
+  const healthReporter = createSnapshotHealthReporter(showSnapshotHealthNotice);
   const settingsRefresh = createCoalescedRefresh(() => {
-    provider?.refreshFromSnapshot(buildSnapshot());
+    const snapshot = buildSnapshot();
+    provider?.refreshFromSnapshot(snapshot);
+    healthReporter.report(snapshot);
   }, SETTINGS_REFRESH_DELAY_MS);
   context.subscriptions.push(
     settingsRefresh,
@@ -115,7 +122,41 @@ export async function activateExtension(
     })
   );
 
+  // A fresh install has no key yet; the first-run guidance speaks for it instead of a warning.
+  const apiKeyConfigured = (await getApiKey(context.secrets)) !== undefined;
+  if (apiKeyConfigured) {
+    healthReporter.report(initialSnapshot);
+  }
+
   activateCopilotChat();
+
+  logDebugEvent(
+    initialSnapshot.runtime?.debugMode ?? 'minimal',
+    '9router extension activated',
+    {
+      snapshotState: initialSnapshot.state,
+      publishedModelCount: initialSnapshot.publishedModels.length,
+      rejectedModelCount: initialSnapshot.rejectedModels.length,
+      issueCount: initialSnapshot.issues.length,
+      apiKeyConfigured,
+      durationMs: Date.now() - activationStartedAt
+    },
+    'minimal'
+  );
+}
+
+const HEALTH_NOTICE_ACTIONS: Readonly<Record<string, string>> = {
+  'Show Diagnostics': '9routerCopilot.showDiagnostics',
+  'Manage Models': '9routerCopilot.manageModels'
+};
+
+function showSnapshotHealthNotice(notice: SnapshotHealthNotice): void {
+  void vscode.window
+    .showWarningMessage(notice.message, ...Object.keys(HEALTH_NOTICE_ACTIONS))
+    .then((choice) => {
+      const command = choice ? HEALTH_NOTICE_ACTIONS[choice] : undefined;
+      return command ? vscode.commands.executeCommand(command) : undefined;
+    });
 }
 
 function describeFailure(error: unknown): string {

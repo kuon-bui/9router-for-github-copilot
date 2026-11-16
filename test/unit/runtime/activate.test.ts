@@ -5,13 +5,18 @@ import {
   EventEmitter,
   Uri,
   __fireConfigurationChange,
+  __getExecutedCommands,
   __getOutputLines,
   __getRegisteredProvider,
+  __getWarningMessages,
   __resetVscodeState,
+  __setConfigurationValues,
   __setExtension
 } from '@test/support/vscode';
 import type { NineRouterChatProvider } from '@/provider/provider';
 import type { VisionProxyConfigurator } from '@/runtime/vision-configuration';
+
+const coderModel = { id: 'coder', name: 'Coder', modelId: 'router/coder' };
 
 interface ContextOverrides {
   apiKey?: string | undefined;
@@ -137,6 +142,58 @@ describe('activateExtension', () => {
 
     secretChanges.fire({ key: 'other.secret' });
     expect(providerStub.refreshFromSnapshot).toHaveBeenCalledTimes(1);
+  });
+
+  it('logs one activation summary without secrets', async () => {
+    __setConfigurationValues({ models: [coderModel] });
+
+    await activateExtension(createContext().context, hooks());
+
+    const summaries = __getOutputLines().filter((line) =>
+      line.startsWith('9router extension activated')
+    );
+    expect(summaries).toHaveLength(1);
+    expect(summaries[0]).toContain('"snapshotState":"valid"');
+    expect(summaries[0]).toContain('"publishedModelCount":1');
+    expect(summaries[0]).toContain('"apiKeyConfigured":true');
+    expect(__getOutputLines().join('\n')).not.toContain('sk-secret');
+  });
+
+  it('warns about invalid runtime settings at activation and opens diagnostics', async () => {
+    __setConfigurationValues({ baseUrl: 'not-a-url' });
+
+    await activateExtension(createContext().context, hooks());
+
+    expect(__getWarningMessages()).toEqual([
+      '9router settings are invalid (9router-copilot.baseUrl). All 9router models are hidden from the Copilot Chat model picker.'
+    ]);
+    await vi.waitFor(() =>
+      expect(__getExecutedCommands()).toContain('9routerCopilot.showDiagnostics')
+    );
+  });
+
+  it('does not warn at activation without an API key', async () => {
+    __setConfigurationValues({ baseUrl: 'not-a-url' });
+
+    await activateExtension(createContext({ apiKey: undefined }).context, hooks());
+
+    expect(__getWarningMessages()).toEqual([]);
+  });
+
+  it('warns once when a settings change hides a model', async () => {
+    vi.useFakeTimers();
+    __setConfigurationValues({ models: [coderModel] });
+    await activateExtension(createContext().context, hooks());
+
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      __setConfigurationValues({ models: [coderModel, { id: 'bad', name: '', modelId: 'router/bad' }] });
+      __fireConfigurationChange('9router-copilot.models');
+      vi.advanceTimersByTime(SETTINGS_REFRESH_DELAY_MS);
+    }
+
+    expect(__getWarningMessages()).toEqual([
+      '9router hid 1 model entry with invalid settings from the Copilot Chat model picker.'
+    ]);
   });
 
   it('registers the provider with an empty Vision prompt when the bundled prompt is unreadable', async () => {
