@@ -22,7 +22,7 @@
   ],
   "main": "./dist/src/extension.js",
   "activationEvents": [
-    "onStartupFinished"
+    "onLanguageModelChatProvider:9router"
   ],
   "contributes": {
     "commands": [
