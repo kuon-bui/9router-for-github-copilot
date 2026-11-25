@@ -1,7 +1,14 @@
 import type { JSX } from 'react';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { createDraftFromCatalog } from '@/config/model-draft';
-import { toRouterModelMetadata } from './view-model';
+import { Combobox } from '@/webview/shared/Combobox';
+import {
+  buildModelOptions,
+  buildProviderOptions,
+  findCatalogProvider,
+  resolveActiveProvider,
+  toRouterModelMetadata
+} from './view-model';
 import type { ModelDraft } from '@/config/model-draft';
 import type { ModelEditorRow, ModelEditorState } from '@/types/model-editor';
 
@@ -30,9 +37,35 @@ function initialDraft(state: ModelEditorState, row: ModelEditorRow | undefined):
 
 export function ModelForm(props: ModelFormProps): JSX.Element {
   const [draft, setDraft] = useState<ModelDraft>(() => initialDraft(props.state, props.row));
+  const [provider, setProvider] = useState<string>(
+    () => findCatalogProvider(props.state.catalog, draft.modelId) ?? ''
+  );
+
+  const providerOptions = useMemo(
+    () => buildProviderOptions(props.state.catalog),
+    [props.state.catalog]
+  );
+  // A catalog refresh can drop the chosen provider; treat that as no provider chosen.
+  const activeProvider = resolveActiveProvider(providerOptions, provider);
+  const modelOptions = useMemo(
+    () => (activeProvider ? buildModelOptions(props.state.catalog, activeProvider) : []),
+    [props.state.catalog, activeProvider]
+  );
+  const selectedModelValue = modelOptions.some((option) => option.value === draft.modelId)
+    ? draft.modelId
+    : '';
 
   function patch(changes: Partial<ModelDraft>): void {
     setDraft((current) => ({ ...current, ...changes }));
+  }
+
+  // A typed or pasted catalog id moves the pickers to it; an unknown id leaves them alone.
+  function setModelIdManually(modelId: string): void {
+    patch({ modelId });
+    const catalogProvider = findCatalogProvider(props.state.catalog, modelId);
+    if (catalogProvider !== undefined) {
+      setProvider(catalogProvider);
+    }
   }
 
   function prefill(modelId: string): void {
@@ -103,22 +136,26 @@ export function ModelForm(props: ModelFormProps): JSX.Element {
           <h3 className="m-0 text-[11px] font-semibold uppercase tracking-wide text-muted">
             Identity
           </h3>
-          <label htmlFor="field-catalog">
-            9router model
-            <select
+          <div className="grid grid-cols-1 gap-3 min-[480px]:grid-cols-2">
+            <Combobox
+              id="field-provider"
+              label="Provider"
+              placeholder="Search providers"
+              emptyText="No models in the 9router catalog"
+              options={providerOptions}
+              value={activeProvider}
+              onChange={setProvider}
+            />
+            <Combobox
               id="field-catalog"
-              className="ui-field"
-              value={draft.modelId}
-              onChange={(event) => prefill(event.currentTarget.value)}
-            >
-              <option value="">Select a 9router model</option>
-              {props.state.catalog.map((entry) => (
-                <option key={entry.modelId} value={entry.modelId}>
-                  {`${entry.modelId}${entry.inUse ? ' (in use)' : ''}${entry.vision ? ' - vision' : ''}`}
-                </option>
-              ))}
-            </select>
-          </label>
+              label="9router model"
+              placeholder={activeProvider ? 'Search models' : 'Select a provider first'}
+              disabled={!activeProvider}
+              options={modelOptions}
+              value={selectedModelValue}
+              onChange={prefill}
+            />
+          </div>
           <div className="grid grid-cols-1 gap-3 min-[480px]:grid-cols-2">
             <label htmlFor="field-id">
               Copilot id
@@ -154,7 +191,7 @@ export function ModelForm(props: ModelFormProps): JSX.Element {
                 autoComplete="off"
                 spellcheck={false}
                 value={draft.modelId}
-                onChange={(event) => patch({ modelId: event.currentTarget.value })}
+                onChange={(event) => setModelIdManually(event.currentTarget.value)}
               />
             </label>
             <label className="ui-check h-8">

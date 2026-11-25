@@ -63,6 +63,11 @@ button {
   padding: 6px 8px;
 }
 
+.ui-field:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
 select.ui-field {
   appearance: none;
   background-color: var(--vscode-dropdown-background, var(--vscode-input-background));
@@ -226,6 +231,75 @@ legend {
 
 ::view-transition-old(.model-row-exit) {
   animation: model-row-slide-out-right 220ms cubic-bezier(0.55, 0.085, 0.68, 0.53) both;
+}
+
+.ui-combobox-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+}
+
+.ui-combobox {
+  position: relative;
+}
+
+.ui-combobox-list {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 10;
+  margin-top: 4px;
+  max-height: 260px;
+  overflow-y: auto;
+  border: 1px solid var(--vscode-dropdown-border, var(--vscode-widget-border));
+  border-radius: 6px;
+  background: var(--vscode-dropdown-background, var(--vscode-input-background));
+  color: var(--vscode-dropdown-foreground, var(--vscode-input-foreground));
+  padding: 4px 0;
+}
+
+.ui-combobox-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  cursor: pointer;
+
+  &:hover {
+    background: var(--vscode-list-hoverBackground);
+  }
+}
+
+.ui-combobox-option-active {
+  background: var(--vscode-list-activeSelectionBackground);
+  color: var(--vscode-list-activeSelectionForeground);
+  /* High Contrast themes leave the selection background unset; the outline keeps the
+     keyboard highlight visible there. */
+  outline: 1px solid var(--vscode-list-focusOutline, transparent);
+  outline-offset: -1px;
+
+  &:hover {
+    background: var(--vscode-list-activeSelectionBackground);
+  }
+
+  .ui-combobox-detail {
+    color: inherit;
+    opacity: 0.85;
+  }
+}
+
+.ui-combobox-detail {
+  margin-left: auto;
+  flex-shrink: 0;
+  color: var(--vscode-descriptionForeground);
+  font-size: 11px;
+}
+
+.ui-combobox-empty {
+  padding: 6px 8px;
+  color: var(--vscode-descriptionForeground);
 }
 
 @media (prefers-reduced-motion: reduce) {

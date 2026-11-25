@@ -4,6 +4,10 @@ import type {
   ModelEditorRow,
   ModelEditorState
 } from '@/types/model-editor';
+import type { PickerOption } from '@/webview/shared/combobox-model';
+import { resolveProviderIcon } from '@/webview/shared/provider-icons';
+
+export const OTHER_PROVIDER = 'Other';
 
 export type ChipTone = 'plain' | 'warn' | 'bad';
 
@@ -105,4 +109,93 @@ export function toRouterModelMetadata(entry: ModelEditorCatalogEntry): RouterMod
     ...(entry.contextWindow !== undefined ? { contextWindow: entry.contextWindow } : {}),
     ...(entry.maxOutput !== undefined ? { maxOutput: entry.maxOutput } : {})
   };
+}
+
+export function resolveCatalogProvider(entry: ModelEditorCatalogEntry): string {
+  const ownedBy = entry.ownedBy?.trim();
+  if (ownedBy) {
+    return ownedBy;
+  }
+  const slashIndex = entry.modelId.indexOf('/');
+  if (slashIndex > 0) {
+    const prefix = entry.modelId.slice(0, slashIndex).trim();
+    if (prefix) {
+      return prefix;
+    }
+  }
+  return OTHER_PROVIDER;
+}
+
+export function findCatalogProvider(
+  catalog: readonly ModelEditorCatalogEntry[],
+  modelId: string
+): string | undefined {
+  if (!modelId) {
+    return undefined;
+  }
+  const match = catalog.find((item) => item.modelId === modelId);
+  return match ? resolveCatalogProvider(match) : undefined;
+}
+
+/** The chosen provider, or '' once a catalog refresh has dropped it. */
+export function resolveActiveProvider(
+  providerOptions: readonly PickerOption[],
+  provider: string
+): string {
+  return providerOptions.some((option) => option.value === provider) ? provider : '';
+}
+
+export function buildProviderOptions(
+  catalog: readonly ModelEditorCatalogEntry[]
+): PickerOption[] {
+  const counts = new Map<string, number>();
+  for (const entry of catalog) {
+    const provider = resolveCatalogProvider(entry);
+    counts.set(provider, (counts.get(provider) ?? 0) + 1);
+  }
+  const providers = [...counts.keys()].sort((a, b) => {
+    if (a === b) {
+      return 0;
+    }
+    if (a === OTHER_PROVIDER) {
+      return 1;
+    }
+    if (b === OTHER_PROVIDER) {
+      return -1;
+    }
+    return a.localeCompare(b);
+  });
+  return providers.map((provider) => {
+    const count = counts.get(provider) ?? 0;
+    const icon = provider === OTHER_PROVIDER ? undefined : resolveProviderIcon(provider);
+    return {
+      value: provider,
+      label: provider,
+      detail: count === 1 ? '1 model' : `${count} models`,
+      ...(icon !== undefined ? { iconUrl: icon.url } : {})
+    };
+  });
+}
+
+export function buildModelOptions(
+  catalog: readonly ModelEditorCatalogEntry[],
+  provider: string
+): PickerOption[] {
+  return catalog
+    .filter((entry) => resolveCatalogProvider(entry) === provider)
+    .map((entry) => {
+      const flags: string[] = [];
+      if (entry.inUse) {
+        flags.push('in use');
+      }
+      if (entry.vision) {
+        flags.push('vision');
+      }
+      const detail = flags.length > 0 ? flags.join(' · ') : undefined;
+      return {
+        value: entry.modelId,
+        label: entry.modelId,
+        ...(detail !== undefined ? { detail } : {})
+      };
+    });
 }
