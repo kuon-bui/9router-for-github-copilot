@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.17.0](https://github.com/kuon-bui/9router-for-github-copilot/compare/v0.16.0...v0.17.0) (2026-11-25)
+
+
+### Features
+
+* **webview:** pick provider then model in the model form ([#75](https://github.com/kuon-bui/9router-for-github-copilot/issues/75)) ([7db81be](https://github.com/kuon-bui/9router-for-github-copilot/commit/7db81bef4cca6caeee8ce862c3059351f7a196f9))
+
 ## [0.16.0](https://github.com/kuon-bui/9router-for-github-copilot/compare/v0.15.0...v0.16.0) (2026-11-16)
 
 
