@@ -13,6 +13,10 @@ describe('release guardrails', () => {
     expect(timeout.default).toBe(DEFAULT_REQUEST_TIMEOUT_MS);
   });
 
+  it('activates lazily when the 9router provider is requested', () => {
+    expect(manifest.activationEvents).toEqual(['onLanguageModelChatProvider:9router']);
+  });
+
   it('contributes the manage models command', () => {
     const commands = manifest.contributes.commands as Array<{ command: string; title: string }>;
 
