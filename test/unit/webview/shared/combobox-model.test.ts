@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { filterPickerOptions, handleComboboxKey } from '@/webview/shared/combobox-model';
+import { filterPickerOptions, handleComboboxKey, pickerEmptyMessage } from '@/webview/shared/combobox-model';
 
 const opts = [
   { value: 'cx/gpt-5', label: 'cx/gpt-5' },
@@ -41,4 +41,13 @@ describe('handleComboboxKey', () => {
     expect(handleComboboxKey({ open: true, activeIndex: 1 }, 'Escape', 3)).toEqual({ nav: { open: false, activeIndex: -1 }, preventDefault: true, restoreLabel: true }));
   it('other keys pass through', () =>
     expect(handleComboboxKey({ open: true, activeIndex: 1 }, 'a', 3)).toEqual({ nav: { open: true, activeIndex: 1 }, preventDefault: false }));
+});
+
+describe('pickerEmptyMessage', () => {
+  it('says the query matched nothing when options exist', () =>
+    expect(pickerEmptyMessage(3, 'No models in the 9router catalog')).toBe('No matches'));
+  it('uses the empty text when there are no options at all', () =>
+    expect(pickerEmptyMessage(0, 'No models in the 9router catalog')).toBe('No models in the 9router catalog'));
+  it('falls back to a generic message without empty text', () =>
+    expect(pickerEmptyMessage(0)).toBe('No options'));
 });

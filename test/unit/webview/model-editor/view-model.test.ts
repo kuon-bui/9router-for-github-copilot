@@ -7,6 +7,7 @@ import {
   findCatalogProvider,
   matchesRowTransition,
   OTHER_PROVIDER,
+  resolveActiveProvider,
   resolveCatalogProvider,
   toRouterModelMetadata
 } from '@/webview/model-editor/view-model';
@@ -160,4 +161,14 @@ describe('buildModelOptions', () => {
     ]);
   });
   it('returns [] for an unknown provider', () => expect(buildModelOptions([entry({ modelId: 'cx/a' })], 'nope')).toEqual([]));
+});
+
+describe('resolveActiveProvider', () => {
+  const options = [{ value: 'cx', label: 'cx' }, { value: 'gc', label: 'gc' }];
+  it('keeps a provider that is still in the catalog', () =>
+    expect(resolveActiveProvider(options, 'gc')).toBe('gc'));
+  it('drops a provider that a catalog refresh removed', () =>
+    expect(resolveActiveProvider(options, 'kimi')).toBe(''));
+  it('stays empty when nothing is chosen', () =>
+    expect(resolveActiveProvider(options, '')).toBe(''));
 });

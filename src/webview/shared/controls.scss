@@ -63,6 +63,11 @@ button {
   padding: 6px 8px;
 }
 
+.ui-field:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
 select.ui-field {
   appearance: none;
   background-color: var(--vscode-dropdown-background, var(--vscode-input-background));

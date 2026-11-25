@@ -17,6 +17,11 @@ export interface ComboboxKeyResult {
   readonly restoreLabel?: true;
 }
 
+/** What an empty popup says: no match for the query, or nothing to pick at all. */
+export function pickerEmptyMessage(optionCount: number, emptyText?: string): string {
+  return optionCount > 0 ? 'No matches' : (emptyText ?? 'No options');
+}
+
 export function filterPickerOptions(
   options: readonly PickerOption[],
   query: string

@@ -1,11 +1,12 @@
 import type { JSX } from 'react';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { createDraftFromCatalog } from '@/config/model-draft';
 import { Combobox } from '@/webview/shared/Combobox';
 import {
   buildModelOptions,
   buildProviderOptions,
   findCatalogProvider,
+  resolveActiveProvider,
   toRouterModelMetadata
 } from './view-model';
 import type { ModelDraft } from '@/config/model-draft';
@@ -40,14 +41,31 @@ export function ModelForm(props: ModelFormProps): JSX.Element {
     () => findCatalogProvider(props.state.catalog, draft.modelId) ?? ''
   );
 
-  const providerOptions = buildProviderOptions(props.state.catalog);
-  const modelOptions = provider ? buildModelOptions(props.state.catalog, provider) : [];
+  const providerOptions = useMemo(
+    () => buildProviderOptions(props.state.catalog),
+    [props.state.catalog]
+  );
+  // A catalog refresh can drop the chosen provider; treat that as no provider chosen.
+  const activeProvider = resolveActiveProvider(providerOptions, provider);
+  const modelOptions = useMemo(
+    () => (activeProvider ? buildModelOptions(props.state.catalog, activeProvider) : []),
+    [props.state.catalog, activeProvider]
+  );
   const selectedModelValue = modelOptions.some((option) => option.value === draft.modelId)
     ? draft.modelId
     : '';
 
   function patch(changes: Partial<ModelDraft>): void {
     setDraft((current) => ({ ...current, ...changes }));
+  }
+
+  // A typed or pasted catalog id moves the pickers to it; an unknown id leaves them alone.
+  function setModelIdManually(modelId: string): void {
+    patch({ modelId });
+    const catalogProvider = findCatalogProvider(props.state.catalog, modelId);
+    if (catalogProvider !== undefined) {
+      setProvider(catalogProvider);
+    }
   }
 
   function prefill(modelId: string): void {
@@ -123,15 +141,16 @@ export function ModelForm(props: ModelFormProps): JSX.Element {
               id="field-provider"
               label="Provider"
               placeholder="Search providers"
+              emptyText="No models in the 9router catalog"
               options={providerOptions}
-              value={provider}
+              value={activeProvider}
               onChange={setProvider}
             />
             <Combobox
               id="field-catalog"
               label="9router model"
-              placeholder={provider ? 'Search models' : 'Select a provider first'}
-              disabled={!provider}
+              placeholder={activeProvider ? 'Search models' : 'Select a provider first'}
+              disabled={!activeProvider}
               options={modelOptions}
               value={selectedModelValue}
               onChange={prefill}
@@ -172,7 +191,7 @@ export function ModelForm(props: ModelFormProps): JSX.Element {
                 autoComplete="off"
                 spellcheck={false}
                 value={draft.modelId}
-                onChange={(event) => patch({ modelId: event.currentTarget.value })}
+                onChange={(event) => setModelIdManually(event.currentTarget.value)}
               />
             </label>
             <label className="ui-check h-8">

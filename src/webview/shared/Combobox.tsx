@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import {
   filterPickerOptions,
   handleComboboxKey,
+  pickerEmptyMessage,
   type ComboboxNav,
   type PickerOption
 } from './combobox-model';
@@ -14,6 +15,8 @@ export interface ComboboxProps {
   readonly value: string;
   readonly placeholder: string;
   readonly disabled?: boolean;
+  /** Shown when `options` is empty, as opposed to a query that matched nothing. */
+  readonly emptyText?: string;
   readonly onChange: (value: string) => void;
 }
 
@@ -34,6 +37,8 @@ export function Combobox(props: ComboboxProps): JSX.Element {
       ? `${props.id}-option-${nav.activeIndex}`
       : undefined;
   const labelId = `${props.id}-label`;
+  // The listbox exists only while open with matches; aria-controls must not point at nothing.
+  const hasListbox = isOpen && filtered.length > 0;
 
   // Long lists overflow the popup, so keep the keyboard-active option on screen.
   useEffect(() => {
@@ -100,7 +105,7 @@ export function Combobox(props: ComboboxProps): JSX.Element {
           placeholder={props.placeholder}
           value={inputValue}
           aria-expanded={isOpen}
-          aria-controls={listboxId}
+          {...(hasListbox ? { 'aria-controls': listboxId } : {})}
           aria-autocomplete="list"
           {...(activeOptionId !== undefined ? { 'aria-activedescendant': activeOptionId } : {})}
           onFocus={openPicker}
@@ -118,57 +123,59 @@ export function Combobox(props: ComboboxProps): JSX.Element {
         />
         {isOpen ? (
           <div
-            id={listboxId}
             className="ui-combobox-list"
-            role="listbox"
-            aria-labelledby={labelId}
             // Keep focus in the input for any press inside the popup (scrollbar, padding,
             // empty row); otherwise blur closes the list mid-drag.
             onMouseDown={(event) => event.preventDefault()}
           >
-            {filtered.length === 0 ? (
-              <div className="ui-combobox-empty">No matches</div>
+            {hasListbox ? (
+              <div id={listboxId} role="listbox" aria-labelledby={labelId}>
+                {filtered.map((option, index) => {
+                  const isActive = index === nav.activeIndex;
+                  const isSelected = option.value === props.value;
+                  return (
+                    <div
+                      key={option.value}
+                      id={`${props.id}-option-${index}`}
+                      role="option"
+                      aria-selected={isSelected}
+                      className={`ui-combobox-option${isActive ? ' ui-combobox-option-active' : ''}`}
+                      // mousemove, not mouseenter: keyboard scrolling slides options under a
+                      // still cursor and must not steal the active index.
+                      onMouseMove={() => {
+                        if (nav.activeIndex !== index) {
+                          setNav({ open: true, activeIndex: index });
+                        }
+                      }}
+                      onMouseDown={() => {
+                        setNav(CLOSED_NAV);
+                        setQuery('');
+                        props.onChange(option.value);
+                      }}
+                    >
+                      {option.iconUrl !== undefined ? (
+                        <img
+                          src={option.iconUrl}
+                          alt=""
+                          width={16}
+                          height={16}
+                          className="shrink-0"
+                          referrerPolicy="no-referrer"
+                        />
+                      ) : null}
+                      <span className="truncate">{option.label}</span>
+                      {option.detail !== undefined ? (
+                        <span className="ui-combobox-detail">{option.detail}</span>
+                      ) : null}
+                    </div>
+                  );
+                })}
+              </div>
             ) : (
-              filtered.map((option, index) => {
-                const isActive = index === nav.activeIndex;
-                const isSelected = option.value === props.value;
-                return (
-                  <div
-                    key={option.value}
-                    id={`${props.id}-option-${index}`}
-                    role="option"
-                    aria-selected={isSelected}
-                    className={`ui-combobox-option${isActive ? ' ui-combobox-option-active' : ''}`}
-                    // mousemove, not mouseenter: keyboard scrolling slides options under a
-                    // still cursor and must not steal the active index.
-                    onMouseMove={() => {
-                      if (nav.activeIndex !== index) {
-                        setNav({ open: true, activeIndex: index });
-                      }
-                    }}
-                    onMouseDown={() => {
-                      setNav(CLOSED_NAV);
-                      setQuery('');
-                      props.onChange(option.value);
-                    }}
-                  >
-                    {option.iconUrl !== undefined ? (
-                      <img
-                        src={option.iconUrl}
-                        alt=""
-                        width={16}
-                        height={16}
-                        className="shrink-0"
-                        referrerPolicy="no-referrer"
-                      />
-                    ) : null}
-                    <span className="truncate">{option.label}</span>
-                    {option.detail !== undefined ? (
-                      <span className="ui-combobox-detail">{option.detail}</span>
-                    ) : null}
-                  </div>
-                );
-              })
+              // Not an option, so it lives outside the listbox and is announced as status.
+              <div className="ui-combobox-empty" role="status">
+                {pickerEmptyMessage(props.options.length, props.emptyText)}
+              </div>
             )}
           </div>
         ) : null}

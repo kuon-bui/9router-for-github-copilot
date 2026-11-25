@@ -137,6 +137,14 @@ export function findCatalogProvider(
   return match ? resolveCatalogProvider(match) : undefined;
 }
 
+/** The chosen provider, or '' once a catalog refresh has dropped it. */
+export function resolveActiveProvider(
+  providerOptions: readonly PickerOption[],
+  provider: string
+): string {
+  return providerOptions.some((option) => option.value === provider) ? provider : '';
+}
+
 export function buildProviderOptions(
   catalog: readonly ModelEditorCatalogEntry[]
 ): PickerOption[] {
