@@ -1,7 +1,13 @@
 import type { JSX } from 'react';
 import { useState } from 'react';
 import { createDraftFromCatalog } from '@/config/model-draft';
-import { toRouterModelMetadata } from './view-model';
+import { Combobox } from '@/webview/shared/Combobox';
+import {
+  buildModelOptions,
+  buildProviderOptions,
+  findCatalogProvider,
+  toRouterModelMetadata
+} from './view-model';
 import type { ModelDraft } from '@/config/model-draft';
 import type { ModelEditorRow, ModelEditorState } from '@/types/model-editor';
 
@@ -30,6 +36,15 @@ function initialDraft(state: ModelEditorState, row: ModelEditorRow | undefined):
 
 export function ModelForm(props: ModelFormProps): JSX.Element {
   const [draft, setDraft] = useState<ModelDraft>(() => initialDraft(props.state, props.row));
+  const [provider, setProvider] = useState<string>(
+    () => findCatalogProvider(props.state.catalog, draft.modelId) ?? ''
+  );
+
+  const providerOptions = buildProviderOptions(props.state.catalog);
+  const modelOptions = provider ? buildModelOptions(props.state.catalog, provider) : [];
+  const selectedModelValue = modelOptions.some((option) => option.value === draft.modelId)
+    ? draft.modelId
+    : '';
 
   function patch(changes: Partial<ModelDraft>): void {
     setDraft((current) => ({ ...current, ...changes }));
@@ -103,22 +118,25 @@ export function ModelForm(props: ModelFormProps): JSX.Element {
           <h3 className="m-0 text-[11px] font-semibold uppercase tracking-wide text-muted">
             Identity
           </h3>
-          <label htmlFor="field-catalog">
-            9router model
-            <select
+          <div className="grid grid-cols-1 gap-3 min-[480px]:grid-cols-2">
+            <Combobox
+              id="field-provider"
+              label="Provider"
+              placeholder="Search providers"
+              options={providerOptions}
+              value={provider}
+              onChange={setProvider}
+            />
+            <Combobox
               id="field-catalog"
-              className="ui-field"
-              value={draft.modelId}
-              onChange={(event) => prefill(event.currentTarget.value)}
-            >
-              <option value="">Select a 9router model</option>
-              {props.state.catalog.map((entry) => (
-                <option key={entry.modelId} value={entry.modelId}>
-                  {`${entry.modelId}${entry.inUse ? ' (in use)' : ''}${entry.vision ? ' - vision' : ''}`}
-                </option>
-              ))}
-            </select>
-          </label>
+              label="9router model"
+              placeholder={provider ? 'Search models' : 'Select a provider first'}
+              disabled={!provider}
+              options={modelOptions}
+              value={selectedModelValue}
+              onChange={prefill}
+            />
+          </div>
           <div className="grid grid-cols-1 gap-3 min-[480px]:grid-cols-2">
             <label htmlFor="field-id">
               Copilot id
