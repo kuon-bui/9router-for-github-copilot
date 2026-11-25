@@ -1,5 +1,5 @@
 import type { JSX, KeyboardEvent } from 'react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   filterPickerOptions,
   handleComboboxKey,
@@ -33,6 +33,14 @@ export function Combobox(props: ComboboxProps): JSX.Element {
     isOpen && nav.activeIndex >= 0 && nav.activeIndex < filtered.length
       ? `${props.id}-option-${nav.activeIndex}`
       : undefined;
+  const labelId = `${props.id}-label`;
+
+  // Long lists overflow the popup, so keep the keyboard-active option on screen.
+  useEffect(() => {
+    if (activeOptionId !== undefined) {
+      document.getElementById(activeOptionId)?.scrollIntoView({ block: 'nearest' });
+    }
+  }, [activeOptionId]);
 
   function openPicker(): void {
     if (isDisabled) {
@@ -43,7 +51,13 @@ export function Combobox(props: ComboboxProps): JSX.Element {
     setNav({ open: true, activeIndex: selectedIndex });
   }
 
-  function handleInputChange(nextQuery: string): void {
+  function handleInputChange(rawValue: string): void {
+    // A closed picker shows the selected label, so typing appends to it; search only what
+    // the user typed rather than "<label><typed>".
+    const nextQuery =
+      !isOpen && selectedLabel.length > 0 && rawValue.startsWith(selectedLabel)
+        ? rawValue.slice(selectedLabel.length)
+        : rawValue;
     const nextFiltered = filterPickerOptions(props.options, nextQuery);
     setQuery(nextQuery);
     setNav({ open: true, activeIndex: nextFiltered.length > 0 ? 0 : -1 });
@@ -70,8 +84,10 @@ export function Combobox(props: ComboboxProps): JSX.Element {
   }
 
   return (
-    <label htmlFor={props.id}>
-      {props.label}
+    <div className="ui-combobox-field">
+      <label id={labelId} htmlFor={props.id}>
+        {props.label}
+      </label>
       <div className="ui-combobox">
         <input
           id={props.id}
@@ -101,7 +117,15 @@ export function Combobox(props: ComboboxProps): JSX.Element {
           onKeyDown={handleKeyDown}
         />
         {isOpen ? (
-          <div id={listboxId} className="ui-combobox-list" role="listbox">
+          <div
+            id={listboxId}
+            className="ui-combobox-list"
+            role="listbox"
+            aria-labelledby={labelId}
+            // Keep focus in the input for any press inside the popup (scrollbar, padding,
+            // empty row); otherwise blur closes the list mid-drag.
+            onMouseDown={(event) => event.preventDefault()}
+          >
             {filtered.length === 0 ? (
               <div className="ui-combobox-empty">No matches</div>
             ) : (
@@ -115,9 +139,14 @@ export function Combobox(props: ComboboxProps): JSX.Element {
                     role="option"
                     aria-selected={isSelected}
                     className={`ui-combobox-option${isActive ? ' ui-combobox-option-active' : ''}`}
-                    onMouseEnter={() => setNav({ open: true, activeIndex: index })}
-                    onMouseDown={(event) => {
-                      event.preventDefault();
+                    // mousemove, not mouseenter: keyboard scrolling slides options under a
+                    // still cursor and must not steal the active index.
+                    onMouseMove={() => {
+                      if (nav.activeIndex !== index) {
+                        setNav({ open: true, activeIndex: index });
+                      }
+                    }}
+                    onMouseDown={() => {
                       setNav(CLOSED_NAV);
                       setQuery('');
                       props.onChange(option.value);
@@ -144,6 +173,6 @@ export function Combobox(props: ComboboxProps): JSX.Element {
           </div>
         ) : null}
       </div>
-    </label>
+    </div>
   );
 }

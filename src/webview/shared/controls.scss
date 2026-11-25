@@ -228,6 +228,13 @@ legend {
   animation: model-row-slide-out-right 220ms cubic-bezier(0.55, 0.085, 0.68, 0.53) both;
 }
 
+.ui-combobox-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+}
+
 .ui-combobox {
   position: relative;
 }
@@ -263,6 +270,10 @@ legend {
 .ui-combobox-option-active {
   background: var(--vscode-list-activeSelectionBackground);
   color: var(--vscode-list-activeSelectionForeground);
+  /* High Contrast themes leave the selection background unset; the outline keeps the
+     keyboard highlight visible there. */
+  outline: 1px solid var(--vscode-list-focusOutline, transparent);
+  outline-offset: -1px;
 
   &:hover {
     background: var(--vscode-list-activeSelectionBackground);
