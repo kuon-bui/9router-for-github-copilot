@@ -1,5 +1,21 @@
 import { describe, expect, it } from 'vitest';
-import { buildModelListView, matchesRowTransition, toRouterModelMetadata } from '@/webview/model-editor/view-model';
+import type { ModelEditorCatalogEntry } from '@/types/model-editor';
+import {
+  buildModelListView,
+  buildModelOptions,
+  buildProviderOptions,
+  findCatalogProvider,
+  matchesRowTransition,
+  OTHER_PROVIDER,
+  resolveCatalogProvider,
+  toRouterModelMetadata
+} from '@/webview/model-editor/view-model';
+
+function entry(
+  overrides: Partial<ModelEditorCatalogEntry> & Pick<ModelEditorCatalogEntry, 'modelId'>
+): ModelEditorCatalogEntry {
+  return { vision: false, inUse: false, ...overrides };
+}
 
 const BASE_STATE = {
   catalog: [], warnings: [], thinkingModes: ['off' as const], thinkingEfforts: [],
@@ -99,4 +115,49 @@ describe('toRouterModelMetadata', () => {
       id: 'router/basic'
     });
   });
+});
+
+describe('resolveCatalogProvider', () => {
+  it('prefers ownedBy', () => expect(resolveCatalogProvider(entry({ modelId: 'cx/gpt', ownedBy: 'router' }))).toBe('router'));
+  it('falls back to the id prefix', () => expect(resolveCatalogProvider(entry({ modelId: 'cx/gpt-5' }))).toBe('cx'));
+  it('uses Other when neither exists', () => expect(resolveCatalogProvider(entry({ modelId: 'my-combo' }))).toBe(OTHER_PROVIDER));
+  it('treats a leading slash as no prefix', () => expect(resolveCatalogProvider(entry({ modelId: '/x' }))).toBe(OTHER_PROVIDER));
+});
+
+describe('findCatalogProvider', () => {
+  it('returns the provider of a catalog model', () => expect(findCatalogProvider([entry({ modelId: 'cx/a', ownedBy: 'cx' })], 'cx/a')).toBe('cx'));
+  it('returns undefined for unknown or empty ids', () => {
+    expect(findCatalogProvider([entry({ modelId: 'cx/a' })], 'gone/model')).toBeUndefined();
+    expect(findCatalogProvider([entry({ modelId: 'cx/a' })], '')).toBeUndefined();
+  });
+});
+
+describe('buildProviderOptions', () => {
+  it('groups, counts, sorts, and puts Other last', () => {
+    const options = buildProviderOptions([
+      entry({ modelId: 'zz-combo' }), entry({ modelId: 'gc/b', ownedBy: 'gc' }),
+      entry({ modelId: 'cx/a', ownedBy: 'cx' }), entry({ modelId: 'cx/b', ownedBy: 'cx' })
+    ]);
+    expect(options.map((o) => [o.value, o.detail])).toEqual([
+      ['cx', '2 models'], ['gc', '1 model'], [OTHER_PROVIDER, '1 model']
+    ]);
+    expect(options[0]?.iconUrl).toContain('/codex-color.svg');
+    expect(options[2]?.iconUrl).toBeUndefined();
+  });
+  it('returns [] for an empty catalog', () => expect(buildProviderOptions([])).toEqual([]));
+});
+
+describe('buildModelOptions', () => {
+  it('keeps catalog order for one provider with in use / vision detail', () => {
+    const options = buildModelOptions([
+      entry({ modelId: 'cx/b', ownedBy: 'cx', inUse: true, vision: true }),
+      entry({ modelId: 'gc/x', ownedBy: 'gc' }),
+      entry({ modelId: 'cx/a', ownedBy: 'cx' })
+    ], 'cx');
+    expect(options).toEqual([
+      { value: 'cx/b', label: 'cx/b', detail: 'in use · vision' },
+      { value: 'cx/a', label: 'cx/a' }
+    ]);
+  });
+  it('returns [] for an unknown provider', () => expect(buildModelOptions([entry({ modelId: 'cx/a' })], 'nope')).toEqual([]));
 });
